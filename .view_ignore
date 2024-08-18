@@ -1,0 +1,27 @@
+# .git ディレクトリを無視
+.git/**
+.ipynb_checkpoints/**
+# キャッシュファイルを無視
+*.pyc
+__pycache__/**
+
+# 環境設定ファイルを無視
+.env
+.venv
+env/
+venv/
+
+# IDEの設定ファイルを無視
+.vscode/
+.idea/
+
+# ログファイルを無視
+*.log
+
+# システムファイルを無視
+.DS_Store
+Thumbs.db
+
+# その他プロジェクト固有の無視ファイル
+node_modules/
+*.tmp

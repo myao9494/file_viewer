@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- タイトル: Pythonから渡されたfile_path変数を使用 -->
+    <title>{{ file_path }}</title>
+    <style>
+        /* CSSスタイル定義 */
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.4;
+            color: #333;
+            margin: 0;
+            padding: 20px;
+            font-size: 14px;
+        }
+        h1 {
+            color: #2c3e50;
+            border-bottom: 2px solid #2c3e50;
+            padding-bottom: 10px;
+            font-size: 1.5em;
+        }
+        .csv-container {
+            width: 100%;
+            margin: 0 auto;
+        }
+        .csv-table {
+            border-collapse: collapse;
+            width: 100%;
+            margin-bottom: 1em;
+            font-size: 0.9em;
+        }
+        .csv-table th, .csv-table td {
+            border: 1px solid #ddd;
+            padding: 6px;
+            text-align: left;
+        }
+        .csv-table tr:nth-child(even) {
+            background-color: #f2f2f2;
+        }
+        .csv-table th {
+            background-color: #4CAF50;
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <!-- ヘッダー: Pythonから渡されたfile_path変数を表示 -->
+    <h1>{{ file_path }}</h1>
+    <div class="csv-container">
+        <!-- CSVコンテンツ: Pythonから渡されたcontent変数を使用 -->
+        <!-- |safe フィルタ: HTMLをエスケープせずにそのまま出力 -->
+        {{ content|safe }}
+    </div>
+</body>
+</html>

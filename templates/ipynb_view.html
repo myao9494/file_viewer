@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- タイトル: Pythonから渡されたfile_path変数を使用 -->
+    <title>{{ file_path }}</title>
+    <style>
+        /* インラインCSSスタイル定義 */
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        h1 {
+            color: #2c3e50;
+            border-bottom: 2px solid #2c3e50;
+            padding-bottom: 10px;
+        }
+        .notebook-content {
+            background-color: #fff;
+            padding: 20px;
+            border-radius: 5px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+    </style>
+</head>
+<body>
+    <!-- ヘッダー: Pythonから渡されたfile_path変数を表示 -->
+    <h1>{{ file_path }}</h1>
+    <div class="notebook-content">
+        <!-- Jupyter Notebookのコンテンツ: Pythonから渡されたcontent変数を使用 -->
+        <!-- |safe フィルタ: HTMLをエスケープせずにそのまま出力 -->
+        {{ content|safe }}
+    </div>
+</body>
+</html>

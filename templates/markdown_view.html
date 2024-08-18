@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- タイトル: Pythonから渡されたfile_path変数を使用 -->
+    <title>{{ file_path }}</title>
+    <!-- Markdown用のCSSファイルを読み込み -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/markdown_style.css') }}">
+    <script>
+    // MathJax設定
+    MathJax = {
+        tex: {
+            // インライン数式の定義
+            inlineMath: [['$', '$'], ['\\(', '\\)']],
+            // ディスプレイ数式の定義
+            displayMath: [['$$', '$$'], ['\\[', '\\]']],
+            processEscapes: true,
+            processEnvironments: true
+        },
+        options: {
+            // MathJaxが無視するHTMLタグ
+            skipHtmlTags: ['script', 'noscript', 'style', 'textarea', 'pre']
+        }
+    };
+    </script>
+    <!-- MathJaxスクリプトの読み込み -->
+    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+</head>
+<body>
+    <!-- Markdownコンテンツを表示するコンテナ -->
+    <div class="markdown-body">
+        <!-- Markdownコンテンツ: Pythonから渡されたcontent変数を使用 -->
+        <!-- |safe フィルタ: HTMLをエスケープせずにそのまま出力 -->
+        {{ content|safe }}
+    </div>
+</body>
+</html>

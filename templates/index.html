@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+
+{% block head %}
+{{ super() }}
+<!-- <link rel="stylesheet" href="{{ url_for('static', filename='css/markdown_style.css') }}"> -->
+{% endblock %}
+
+{% block header %}
+<header>
+    <h1>File Viewer</h1>
+    <!-- 検索フォーム: search関数へのURLを動的に生成 -->
+    <form action="{{ url_for('search') }}" method="GET">
+        <!-- 検索クエリ入力フィールド: 前回の検索クエリがある場合は表示 -->
+        <input type="text" name="q" placeholder="Search files..." value="{{ search_query if search_query }}">
+        <button type="submit">Search</button>
+    </form>
+</header>
+{% endblock %}
+
+{% block content %}
+<div class="markdown-body">
+    <ul>
+        <!-- Pythonから渡されたfilesリストをループで処理 -->
+        {% for file in files %}
+        <li>
+            <!-- 各ファイルへのリンクを生成: view_file関数へのURLを動的に生成 -->
+            <a href="{{ url_for('view_file', file_path=file) }}">{{ file }}</a>
+        </li>
+        {% endfor %}
+    </ul>
+</div>
+{% endblock %}

@@ -1,0 +1,4 @@
+.ipynb_checkpoints/
+temp.ipynb
+*.pyc
+static/js/mathjax/

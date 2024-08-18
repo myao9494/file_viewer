@@ -1,0 +1,407 @@
+.markdown-body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
+    line-height: 1.6;
+    color: #333;
+    background-color: #e8e8e8;
+    padding: 20px;
+    counter-reset: h1counter;
+}
+
+.markdown-body h1, .markdown-body h2, .markdown-body h3, .markdown-body h4, .markdown-body h5, .markdown-body h6 {
+    position: relative;
+    margin-top: 24px;
+    margin-bottom: 16px;
+    font-weight: 600;
+    line-height: 1.25;
+    color: #0066cc;
+    border-bottom: 1px solid #a0a0a0;
+    padding-bottom: 0.3em;
+    padding-right: 20px;
+}
+
+.markdown-body h1 {
+    font-size: 2em;
+    border-bottom: 2px solid #0066cc;
+    margin-left: 0;
+    padding-left: 1em;
+}
+.markdown-body h2 {
+    font-size: 1.5em;
+    border-bottom: 2px solid #0066cc;
+    margin-left: 15px;
+    padding-left: 2em;
+}
+.markdown-body h3 { margin-left: 30px; padding-left: 3em; }
+.markdown-body h4 { margin-left: 45px; padding-left: 4em; }
+.markdown-body h5 { margin-left: 60px; padding-left: 5em; }
+.markdown-body h6 { margin-left: 75px; padding-left: 6em; }
+
+.markdown-body h1 { counter-reset: h2counter; }
+.markdown-body h2 { counter-reset: h3counter; }
+.markdown-body h3 { counter-reset: h4counter; }
+.markdown-body h4 { counter-reset: h5counter; }
+.markdown-body h5 { counter-reset: h6counter; }
+
+.markdown-body h1::before { content: counter(h1counter) ". "; counter-increment: h1counter; }
+.markdown-body h2::before { content: counter(h1counter) "." counter(h2counter) ". "; counter-increment: h2counter; }
+.markdown-body h3::before { content: counter(h1counter) "." counter(h2counter) "." counter(h3counter) ". "; counter-increment: h3counter; }
+.markdown-body h4::before { content: counter(h1counter) "." counter(h2counter) "." counter(h3counter) "." counter(h4counter) ". "; counter-increment: h4counter; }
+.markdown-body h5::before { content: counter(h1counter) "." counter(h2counter) "." counter(h3counter) "." counter(h4counter) "." counter(h5counter) ". "; counter-increment: h5counter; }
+.markdown-body h6::before { content: counter(h1counter) "." counter(h2counter) "." counter(h3counter) "." counter(h4counter) "." counter(h5counter) "." counter(h6counter) ". "; counter-increment: h6counter; }
+
+.markdown-body h1::before, .markdown-body h2::before, .markdown-body h3::before, .markdown-body h4::before, .markdown-body h5::before, .markdown-body h6::before {
+    position: absolute;
+    left: 0;
+    white-space: nowrap;
+}
+
+.markdown-body h1 + *:not(h1):not(h2):not(h3):not(h4):not(h5):not(h6),
+.markdown-body h1 ~ *:not(h1):not(h2):not(h3):not(h4):not(h5):not(h6) { margin-left: 15px; margin-right: 20px; }
+.markdown-body h2 + *:not(h1):not(h2):not(h3):not(h4):not(h5):not(h6),
+.markdown-body h2 ~ *:not(h1):not(h2):not(h3):not(h4):not(h5):not(h6) { margin-left: 30px; margin-right: 20px; }
+.markdown-body h3 + *:not(h1):not(h2):not(h3):not(h4):not(h5):not(h6),
+.markdown-body h3 ~ *:not(h1):not(h2):not(h3):not(h4):not(h5):not(h6) { margin-left: 45px; margin-right: 20px; }
+.markdown-body h4 + *:not(h1):not(h2):not(h3):not(h4):not(h5):not(h6),
+.markdown-body h4 ~ *:not(h1):not(h2):not(h3):not(h4):not(h5):not(h6) { margin-left: 60px; margin-right: 20px; }
+.markdown-body h5 + *:not(h1):not(h2):not(h3):not(h4):not(h5):not(h6),
+.markdown-body h5 ~ *:not(h1):not(h2):not(h3):not(h4):not(h5):not(h6) { margin-left: 75px; margin-right: 20px; }
+.markdown-body h6 + *:not(h1):not(h2):not(h3):not(h4):not(h5):not(h6),
+.markdown-body h6 ~ *:not(h1):not(h2):not(h3):not(h4):not(h5):not(h6) { margin-left: 90px; margin-right: 20px; }
+
+.markdown-body ul, .markdown-body ol {
+    padding-left: 2em;
+}
+
+.markdown-body li {
+    margin-bottom: 0.25em;
+}
+
+.markdown-body ol {
+    counter-reset: item;
+    list-style-type: none;
+    padding-left: 0.8em;
+}
+
+.markdown-body ol > li {
+    counter-increment: item;
+    margin-bottom: 10px;
+    position: relative;
+    padding-left: 30px;
+}
+
+.markdown-body ol > li::before {
+    content: counter(item) ".";
+    position: absolute;
+    left: 0;
+    color: #000000;
+    font-weight: bold;
+}
+
+.markdown-body ol ol {
+    counter-reset: subitem;
+    padding-left: 30px;
+}
+
+.markdown-body ol ol > li::before {
+    content: counter(item) "." counter(subitem) ".";
+    counter-increment: subitem;
+}
+
+.markdown-body ul {
+    list-style-type: disc;
+    padding-left: 1.5em;
+}
+
+.markdown-body ul li {
+    padding-left: 5px;
+}
+
+.markdown-body ul ul {
+    list-style-type: circle;
+}
+
+.markdown-body ul ul ul {
+    list-style-type: square;
+}
+
+.markdown-body li > input[type="checkbox"] {
+    margin-left: -1.5em;
+    margin-right: 0.5em;
+}
+
+.markdown-body li li > input[type="checkbox"] {
+    margin-left: -1em;
+}
+
+.markdown-body code {
+    background-color: #1e1e1e;
+    color: #ffffff;
+    border-radius: 3px;
+    font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, Courier, monospace;
+    font-size: 85%;
+    margin: 0;
+    padding: .2em .4em;
+}
+
+.markdown-body pre {
+    background-color: #1e1e1e;
+    color: #ffffff;
+    border-radius: 5px;
+    font-size: 85%;
+    line-height: 1.45;
+    overflow: auto;
+    padding: 1em;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+}
+
+.markdown-body blockquote {
+    background-color: #e5e5e5;
+    color: #000000;
+    padding: 0 1em;
+    margin: 0 0 16px 0;
+}
+
+.markdown-body a {
+    color: #0366d6;
+    text-decoration: none;
+}
+
+.markdown-body a:hover {
+    text-decoration: underline;
+}
+
+.markdown-body * {
+    max-width: none;
+}
+
+/* チェックボックスのスタイル */
+.markdown-body ul {
+    list-style-type: disc;
+    padding-left: 2em;
+}
+
+.markdown-body ol {
+    list-style-type: decimal;
+    padding-left: 2em;
+}
+
+.markdown-body ul.task-list {
+    list-style-type: none;
+    padding-left: 1.5em;
+}
+
+.markdown-body li.task-list-item {
+    position: relative;
+    margin-bottom: 0.5em;
+}
+
+.markdown-body li.task-list-item input[type="checkbox"] {
+    position: absolute;
+    left: -1.5em;
+    top: 0.25em;
+    margin: 0;
+}
+
+/* 数式のスタイル */
+.markdown-body .math.inline {
+    display: inline-block;
+    vertical-align: middle;
+}
+
+.markdown-body .math.display {
+    display: block;
+    margin: 0.5em 0;
+    text-align: left;
+    overflow-x: auto;
+    overflow-y: hidden;
+}
+
+.MathJax {
+    font-size: 100% !important;
+}
+
+.MathJax_Display {
+    overflow-x: auto;
+    overflow-y: hidden;
+    text-align: left !important;
+    margin: 0.5em 0 !important;
+}
+
+mjx-container {
+    font-size: 100% !important;
+}
+
+mjx-container mjx-math {
+    font-size: 100% !important;
+}
+
+mjx-container mjx-numerator {
+    font-size: 100% !important;
+}
+
+mjx-container mjx-denominator {
+    font-size: 100% !important;
+}
+
+mjx-container mjx-fracpad {
+    height: 0.2em !important;
+}
+
+mjx-container[jax="CHTML"][display="true"] {
+    text-align: left !important;
+    margin: 0.5em 0 !important;
+}
+
+mjx-container[jax="CHTML"][display="true"] mjx-math {
+    max-width: 100%;
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding: 0.5em 0;
+}
+
+.markdown-body img {
+    max-width: 100%;
+    height: auto;
+}
+
+/* 数式のスタイル */
+.math.inline {
+    display: inline-block;
+    vertical-align: middle;
+}
+
+.math.display {
+    display: block;
+    margin: 1em 0;
+    text-align: center;
+}
+
+.MathJax {
+    font-size: 100% !important;
+}
+
+/* コードブロックのスタイル */
+.markdown-body pre {
+    background-color: #1e1e1e;
+    color: #ffffff;
+    border-radius: 5px;
+    padding: 1em;
+    overflow-x: auto;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+}
+
+.markdown-body code {
+    background-color: #1e1e1e;
+    color: #ffffff;
+    padding: 0.2em 0.4em;
+    border-radius: 3px;
+    font-family: Consolas, Monaco, 'Andale Mono', 'Ubuntu Mono', monospace;
+}
+
+/* フェンスドコードブロック用のスタイル */
+.markdown-body .codehilite pre {
+    background-color: #1e1e1e;
+    color: #ffffff;
+    border-radius: 5px;
+    padding: 1em;
+    overflow-x: auto;
+}
+
+/* シンタックスハイライトのスタイル */
+.markdown-body .codehilite .hll { background-color: #2e2e2e }
+.markdown-body .codehilite .c { color: #6A9955 } /* Comment */
+.markdown-body .codehilite .err { color: #f44747; background-color: #1e1e1e } /* Error */
+.markdown-body .codehilite .k { color: #569cd6 } /* Keyword */
+.markdown-body .codehilite .l { color: #ce9178 } /* Literal */
+.markdown-body .codehilite .n { color: #9cdcfe } /* Name */
+.markdown-body .codehilite .o { color: #d4d4d4 } /* Operator */
+.markdown-body .codehilite .p { color: #d4d4d4 } /* Punctuation */
+.markdown-body .codehilite .cm { color: #6A9955 } /* Comment.Multiline */
+.markdown-body .codehilite .cp { color: #6A9955 } /* Comment.Preproc */
+.markdown-body .codehilite .c1 { color: #6A9955 } /* Comment.Single */
+.markdown-body .codehilite .cs { color: #6A9955 } /* Comment.Special */
+.markdown-body .codehilite .gd { color: #f44747 } /* Generic.Deleted */
+.markdown-body .codehilite .ge { font-style: italic } /* Generic.Emph */
+.markdown-body .codehilite .gh { color: #d4d4d4; font-weight: bold } /* Generic.Heading */
+.markdown-body .codehilite .gi { color: #608b4e } /* Generic.Inserted */
+.markdown-body .codehilite .gp { color: #d4d4d4; font-weight: bold } /* Generic.Prompt */
+.markdown-body .codehilite .gs { font-weight: bold } /* Generic.Strong */
+.markdown-body .codehilite .gu { color: #d4d4d4; font-weight: bold } /* Generic.Subheading */
+.markdown-body .codehilite .kc { color: #569cd6 } /* Keyword.Constant */
+.markdown-body .codehilite .kd { color: #569cd6 } /* Keyword.Declaration */
+.markdown-body .codehilite .kn { color: #569cd6 } /* Keyword.Namespace */
+.markdown-body .codehilite .kp { color: #569cd6 } /* Keyword.Pseudo */
+.markdown-body .codehilite .kr { color: #569cd6 } /* Keyword.Reserved */
+.markdown-body .codehilite .kt { color: #569cd6 } /* Keyword.Type */
+.markdown-body .codehilite .m { color: #b5cea8 } /* Literal.Number */
+.markdown-body .codehilite .s { color: #ce9178 } /* Literal.String */
+.markdown-body .codehilite .na { color: #9cdcfe } /* Name.Attribute */
+.markdown-body .codehilite .nb { color: #569cd6 } /* Name.Builtin */
+.markdown-body .codehilite .nc { color: #4ec9b0 } /* Name.Class */
+.markdown-body .codehilite .no { color: #9cdcfe } /* Name.Constant */
+.markdown-body .codehilite .nd { color: #4ec9b0 } /* Name.Decorator */
+.markdown-body .codehilite .ni { color: #d4d4d4 } /* Name.Entity */
+.markdown-body .codehilite .ne { color: #4ec9b0 } /* Name.Exception */
+.markdown-body .codehilite .nf { color: #dcdcaa } /* Name.Function */
+.markdown-body .codehilite .nl { color: #9cdcfe } /* Name.Label */
+.markdown-body .codehilite .nn { color: #4ec9b0 } /* Name.Namespace */
+.markdown-body .codehilite .nt { color: #569cd6 } /* Name.Tag */
+.markdown-body .codehilite .nv { color: #9cdcfe } /* Name.Variable */
+.markdown-body .codehilite .ow { color: #569cd6 } /* Operator.Word */
+.markdown-body .codehilite .w { color: #d4d4d4 } /* Text.Whitespace */
+.markdown-body .codehilite .mf { color: #b5cea8 } /* Literal.Number.Float */
+.markdown-body .codehilite .mh { color: #b5cea8 } /* Literal.Number.Hex */
+.markdown-body .codehilite .mi { color: #b5cea8 } /* Literal.Number.Integer */
+.markdown-body .codehilite .mo { color: #b5cea8 } /* Literal.Number.Oct */
+.markdown-body .codehilite .sb { color: #ce9178 } /* Literal.String.Backtick */
+.markdown-body .codehilite .sc { color: #ce9178 } /* Literal.String.Char */
+.markdown-body .codehilite .sd { color: #ce9178 } /* Literal.String.Doc */
+.markdown-body .codehilite .s2 { color: #ce9178 } /* Literal.String.Double */
+.markdown-body .codehilite .se { color: #ce9178 } /* Literal.String.Escape */
+.markdown-body .codehilite .sh { color: #ce9178 } /* Literal.String.Heredoc */
+.markdown-body .codehilite .si { color: #ce9178 } /* Literal.String.Interpol */
+.markdown-body .codehilite .sx { color: #ce9178 } /* Literal.String.Other */
+.markdown-body .codehilite .sr { color: #d16969 } /* Literal.String.Regex */
+.markdown-body .codehilite .s1 { color: #ce9178 } /* Literal.String.Single */
+.markdown-body .codehilite .ss { color: #ce9178 } /* Literal.String.Symbol */
+.markdown-body .codehilite .bp { color: #569cd6 } /* Name.Builtin.Pseudo */
+.markdown-body .codehilite .vc { color: #9cdcfe } /* Name.Variable.Class */
+.markdown-body .codehilite .vg { color: #9cdcfe } /* Name.Variable.Global */
+.markdown-body .codehilite .vi { color: #9cdcfe } /* Name.Variable.Instance */
+.markdown-body .codehilite .il { color: #b5cea8 } /* Literal.Number.Integer.Long */
+
+
+.task-list {
+    list-style-type: none;
+    padding-left: 0;
+    position: relative;
+  }
+  
+  .task-list-item {
+    display: flex;
+    align-items: flex-start;  /* 上揃えに変更 */
+    position: relative;
+    padding-left: 1.5em;  /* チェックボックスの幅 + 余白 */
+    min-height: 1.5em;  /* チェックボックスの高さに合わせる */
+  }
+  
+  .task-list-item input[type="checkbox"] {
+    position: absolute;
+    left: 0;
+    top: 0.6em !important;  /* さらに上に寄せる */
+    margin: 0;
+    flex-shrink: 0;
+    width: 1em;
+    height: 1em;
+  }
+  
+  .task-list-item p {
+    margin: 0;
+    padding-top: 0;  /* パディングを削除 */
+    line-height: 1em;  /* 行間をさらに狭める */
+    transform: translateY(-0.2em);  /* 文字を上に移動 */
+  }
+
+  
