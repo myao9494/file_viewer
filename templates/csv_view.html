@@ -3,7 +3,6 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <!-- タイトル: Pythonから渡されたfile_path変数を使用 -->
     <title>{{ file_path }}</title>
     <style>
         /* CSSスタイル定義 */
@@ -43,15 +42,42 @@
             background-color: #4CAF50;
             color: white;
         }
+        .full-path {
+            background-color: #f0f0f0;
+            padding: 10px;
+            margin-bottom: 20px;
+            cursor: pointer;
+        }
     </style>
 </head>
 <body>
     <!-- ヘッダー: Pythonから渡されたfile_path変数を表示 -->
     <h1>{{ file_path }}</h1>
+    <div class="full-path" id="fullPath" onclick="copyToClipboard()">
+        {{ full_path }}
+    </div>
     <div class="csv-container">
         <!-- CSVコンテンツ: Pythonから渡されたcontent変数を使用 -->
         <!-- |safe フィルタ: HTMLをエスケープせずにそのまま出力 -->
         {{ content|safe }}
     </div>
+
+    <script>
+    function copyToClipboard() {
+        var fullPath = document.getElementById('fullPath');
+        var textArea = document.createElement("textarea");
+        textArea.value = fullPath.textContent;
+        document.body.appendChild(textArea);
+        textArea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textArea);
+        
+        // コピー成功のフィードバック
+        fullPath.style.backgroundColor = '#90EE90';
+        setTimeout(function() {
+            fullPath.style.backgroundColor = '#f0f0f0';
+        }, 500);
+    }
+    </script>
 </body>
 </html>

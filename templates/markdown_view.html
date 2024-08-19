@@ -26,13 +26,42 @@
     </script>
     <!-- MathJaxスクリプトの読み込み -->
     <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <style>
+        .full-path {
+            background-color: #f0f0f0;
+            padding: 10px;
+            margin-bottom: 20px;
+            cursor: pointer;
+        }
+    </style>
 </head>
 <body>
     <!-- Markdownコンテンツを表示するコンテナ -->
     <div class="markdown-body">
+        <div class="full-path" id="fullPath" onclick="copyToClipboard()">
+            {{ full_path }}
+        </div>
         <!-- Markdownコンテンツ: Pythonから渡されたcontent変数を使用 -->
         <!-- |safe フィルタ: HTMLをエスケープせずにそのまま出力 -->
         {{ content|safe }}
     </div>
+
+    <script>
+    function copyToClipboard() {
+        var fullPath = document.getElementById('fullPath');
+        var textArea = document.createElement("textarea");
+        textArea.value = fullPath.textContent;
+        document.body.appendChild(textArea);
+        textArea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textArea);
+        
+        // コピー成功のフィードバック
+        fullPath.style.backgroundColor = '#90EE90';
+        setTimeout(function() {
+            fullPath.style.backgroundColor = '#f0f0f0';
+        }, 500);
+    }
+    </script>
 </body>
 </html>

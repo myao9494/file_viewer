@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+
+{% block head %}
+{{ super() }}
+<style>
+    .full-path {
+        background-color: #f0f0f0;
+        padding: 10px;
+        margin-bottom: 20px;
+        cursor: pointer;
+    }
+    .image-container {
+        text-align: center;
+    }
+    .image-container img {
+        max-width: 100%;
+        height: auto;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="full-path" id="fullPath" onclick="copyToClipboard()">
+    {{ full_path }}
+</div>
+<div class="image-container">
+    <img src="{{ url_for('raw_file', file_path=file_path) }}" alt="{{ file_path }}">
+</div>
+
+<script>
+function copyToClipboard() {
+    var fullPath = document.getElementById('fullPath');
+    var textArea = document.createElement("textarea");
+    textArea.value = fullPath.textContent;
+    document.body.appendChild(textArea);
+    textArea.select();
+    document.execCommand('copy');
+    document.body.removeChild(textArea);
+    
+    // コピー成功のフィードバック
+    fullPath.style.backgroundColor = '#90EE90';
+    setTimeout(function() {
+        fullPath.style.backgroundColor = '#f0f0f0';
+    }, 500);
+}
+</script>
+{% endblock %}

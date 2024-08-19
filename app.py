@@ -1,6 +1,6 @@
 import os
 import fnmatch
-from flask import Flask, render_template, request, send_file, abort, url_for
+from flask import Flask, render_template, request, send_file, abort, url_for, Response
 import re
 import csv
 # import io
@@ -64,26 +64,41 @@ def view_file(file_path):
     renderers = {
         '.md': ('markdown_view.html', render_markdown),
         '.csv': ('csv_view.html', render_csv),
-        '.html': (None, lambda path: get_file_content(path, 'html')),
+        '.html': ('view_file.html', lambda path: get_file_content(path, 'html')),
     }
 
     # MIMEタイプを取得
     mime_type, _ = mimetypes.guess_type(full_path)
 
+    # SVGファイルの場合
+    if file_extension == '.svg':
+        with open(full_path, 'r', encoding='utf-8') as f:
+            svg_content = f.read()
+        return render_template('svg_view.html', svg_content=svg_content, file_path=file_path, full_path=full_path)
+
+    # 画像ファイルの場合
+    if mime_type and mime_type.startswith('image/'):
+        app.logger.info(f"Rendering image: {file_path}")
+        return render_template('image_view.html', file_path=file_path, full_path=full_path)
+
     # テキストファイルまたは特定の拡張子の場合
     if mime_type and mime_type.startswith('text/') or file_extension in ['.md', '.txt', '.py', '.js', '.css', '.json', '.ipynb', '.license', '.yml', '.yaml', '.xml', '.ini', '.cfg', '.conf']:
-        renderer = renderers.get(file_extension)
-        if renderer:
-            template, render_func = renderer
-            content = render_func(full_path)
-            return render_template(template, content=content, file_path=file_path) if template else content
-        else:
-            # 未定義のテキストファイルはそのまま表示
-            content = get_file_content(full_path, 'text')
-            return render_template('view_file.html', content=content, file_path=file_path)
+        renderer = renderers.get(file_extension, ('view_file.html', lambda path: get_file_content(path, 'text')))
+        template, render_func = renderer
+        content = render_func(full_path)
+        return render_template(template, content=content, file_path=file_path, full_path=full_path)
 
-    # バイナリファイルの場合（画像、PDF、その他のバイナリファイル）
+    # その他のファイルはダウンロード
     return send_file(full_path, as_attachment=True)
+
+@app.route('/raw/<path:file_path>')
+def raw_file(file_path):
+    full_path = os.path.join(BASE_DIR, file_path)
+    if os.path.exists(full_path):
+        with open(full_path, 'rb') as f:
+            return Response(f.read(), mimetype=mimetypes.guess_type(full_path)[0])
+    else:
+        abort(404)
 
 @app.route('/search')
 def search():
@@ -91,7 +106,7 @@ def search():
     ファイル検索を行う関数
 
     Returns:
-        str: 検索結果を含むレンダリングされたHTMLテンプレート
+        str: 検索結果含むレンダリングされたHTMLテンプレート
     """
     # クエリパラメータから検索語を取得
     query = request.args.get('q', '')
