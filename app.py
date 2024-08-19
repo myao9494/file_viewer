@@ -19,7 +19,17 @@ BASE_DIR = "/Users/sudoupousei/000_work"
 @app.route('/')
 def index():
     """
-    ホームページを表示する関数
+    シンプルなホームページを表示する関数
+
+    Returns:
+        str: レンダリングされたHTMLテンプレート
+    """
+    return render_template('home.html', base_dir=BASE_DIR)
+
+@app.route('/load_files')
+def load_files():
+    """
+    ファイルリストを読み込んで表示する関数
 
     Returns:
         str: レンダリングされたHTMLテンプレート

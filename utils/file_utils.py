@@ -11,7 +11,7 @@ def load_view_ignore():
     # .view_ignoreファイルのパスを取得
     view_ignore_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), '.view_ignore')
     if os.path.exists(view_ignore_path):
-        with open(view_ignore_path, 'r') as f:
+        with open(view_ignore_path, 'r', encoding='utf-8') as f:
             # 空行とコメント行を除外してパターンを読み込む
             patterns = [line.strip() for line in f if line.strip() and not line.startswith('#')]
         print("読み込まれたパターン:", patterns)  # デバッグ出力

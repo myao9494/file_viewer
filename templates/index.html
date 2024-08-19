@@ -2,7 +2,6 @@
 
 {% block head %}
 {{ super() }}
-<!-- <link rel="stylesheet" href="{{ url_for('static', filename='css/markdown_style.css') }}"> -->
 {% endblock %}
 
 {% block header %}
@@ -20,10 +19,8 @@
 {% block content %}
 <div class="markdown-body">
     <ul>
-        <!-- Pythonから渡されたfilesリストをループで処理 -->
         {% for file in files %}
         <li>
-            <!-- 各ファイルへのリンクを生成: view_file関数へのURLを動的に生成 -->
             <a href="{{ url_for('view_file', file_path=file) }}">{{ file }}</a>
         </li>
         {% endfor %}
