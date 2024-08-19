@@ -11,6 +11,8 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML" async></script>
     <!-- headブロック: 追加のhead要素をPythonコードから挿入可能 -->
     {% block head %}{% endblock %}
+    <!-- ファビコンの追加 -->
+    <link rel="icon" type="image/png" href="{{ url_for('static', filename='images/flask-icon.png') }}">
 </head>
 <body>
     <!-- headerブロック: ページヘッダーをPythonコードから挿入可能 -->
