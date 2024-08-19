@@ -8,8 +8,8 @@ from utils.file_handler import get_file_content, get_file_list
 from utils.search import search_files
 from utils.file_utils import filter_files
 from utils.markdown_renderer import render_markdown
-from utils.ipynb_renderer import render_ipynb
 from utils.csv_renderer import render_csv
+import mimetypes
 
 app = Flask(__name__, static_folder='static')
 
@@ -44,13 +44,13 @@ def load_files():
 @app.route('/view/<path:file_path>')
 def view_file(file_path):
     """
-    指定されたファイルを表示する関数
+    指定されたファイルを表示、ダウンロード、またはレンダリングする関数
 
     Args:
-        file_path (str): 表示するファイルのパス
+        file_path (str): 処理するファイルのパス
 
     Returns:
-        str: レンダリングされたHTMLまたはファイル内容
+        str: レンダリングされたHTML、ファイル内容、またはダウンロード可能なファイル
     """
     # フルパスを作成
     full_path = os.path.join(BASE_DIR, file_path)
@@ -64,25 +64,26 @@ def view_file(file_path):
     renderers = {
         '.md': ('markdown_view.html', render_markdown),
         '.csv': ('csv_view.html', render_csv),
-        '.ipynb': ('ipynb_view.html', render_ipynb),
         '.html': (None, lambda path: get_file_content(path, 'html')),
     }
 
-    # 画像やPDFファイルの場合はそのまま送信
-    if file_extension in ['.svg', '.png', '.jpg', '.jpeg', '.gif', '.pdf']:
-        return send_file(full_path)
+    # MIMEタイプを取得
+    mime_type, _ = mimetypes.guess_type(full_path)
 
-    # レンダリング方法を取得
-    renderer = renderers.get(file_extension)
-    if renderer:
-        template, render_func = renderer
-        content = render_func(full_path)
-        # テンプレートがある場合はレンダリング、ない場合は内容をそのまま返す
-        return render_template(template, content=content, file_path=file_path) if template else content
+    # テキストファイルまたは特定の拡張子の場合
+    if mime_type and mime_type.startswith('text/') or file_extension in ['.md', '.txt', '.py', '.js', '.css', '.json', '.ipynb', '.license', '.yml', '.yaml', '.xml', '.ini', '.cfg', '.conf']:
+        renderer = renderers.get(file_extension)
+        if renderer:
+            template, render_func = renderer
+            content = render_func(full_path)
+            return render_template(template, content=content, file_path=file_path) if template else content
+        else:
+            # 未定義のテキストファイルはそのまま表示
+            content = get_file_content(full_path, 'text')
+            return render_template('view_file.html', content=content, file_path=file_path)
 
-    # その他のファイルタイプはテキストとして表示
-    content = get_file_content(full_path, 'text')
-    return render_template('view_file.html', content=content, file_path=file_path)
+    # バイナリファイルの場合（画像、PDF、その他のバイナリファイル）
+    return send_file(full_path, as_attachment=True)
 
 @app.route('/search')
 def search():
