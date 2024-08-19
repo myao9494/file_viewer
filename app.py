@@ -1,6 +1,6 @@
 import os
 import fnmatch
-from flask import Flask, render_template, request, send_file, abort, url_for, Response
+from flask import Flask, render_template, request, send_file, abort, url_for, Response, send_from_directory
 import re
 import csv
 # import io
@@ -95,8 +95,7 @@ def view_file(file_path):
 def raw_file(file_path):
     full_path = os.path.join(BASE_DIR, file_path)
     if os.path.exists(full_path):
-        with open(full_path, 'rb') as f:
-            return Response(f.read(), mimetype=mimetypes.guess_type(full_path)[0])
+        return send_file(full_path)
     else:
         abort(404)
 

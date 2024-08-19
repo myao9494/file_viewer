@@ -24,25 +24,22 @@
         <!-- contentブロックを上書き -->
         {% block content %}
         <!-- ファイルパスを表示 -->
-        <div class="full-path" id="fullPath" onclick="copyToClipboard()">
-            {{ full_path }}
-        </div>
+        <div class="full-path" id="fullPath" onclick="copyToClipboard()">{{ full_path | trim }}</div>
         <!-- ファイルの内容を表示 -->
         <!-- preタグを使用してフォーマットを保持 -->
         <!-- |safe フィルタ: HTMLをエスケープせずにそのまま出力 -->
-        <pre class="file-content">{{ content|safe }}</pre>
+        <pre><code>{{ content }}</code></pre>
 
         <script>
         function copyToClipboard() {
             var fullPath = document.getElementById('fullPath');
             var textArea = document.createElement("textarea");
-            textArea.value = fullPath.textContent;
+            textArea.value = fullPath.textContent.trim();
             document.body.appendChild(textArea);
             textArea.select();
             document.execCommand('copy');
             document.body.removeChild(textArea);
             
-            // コピー成功のフィードバック
             fullPath.style.backgroundColor = '#90EE90';
             setTimeout(function() {
                 fullPath.style.backgroundColor = '#f0f0f0';

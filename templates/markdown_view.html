@@ -38,9 +38,7 @@
 <body>
     <!-- Markdownコンテンツを表示するコンテナ -->
     <div class="markdown-body">
-        <div class="full-path" id="fullPath" onclick="copyToClipboard()">
-            {{ full_path }}
-        </div>
+        <div class="full-path" id="fullPath" onclick="copyToClipboard()">{{ full_path | trim }}</div>
         <!-- Markdownコンテンツ: Pythonから渡されたcontent変数を使用 -->
         <!-- |safe フィルタ: HTMLをエスケープせずにそのまま出力 -->
         {{ content|safe }}
@@ -50,7 +48,7 @@
     function copyToClipboard() {
         var fullPath = document.getElementById('fullPath');
         var textArea = document.createElement("textarea");
-        textArea.value = fullPath.textContent;
+        textArea.value = fullPath.textContent.trim();
         document.body.appendChild(textArea);
         textArea.select();
         document.execCommand('copy');
@@ -62,6 +60,32 @@
             fullPath.style.backgroundColor = '#f0f0f0';
         }, 500);
     }
+
+    // 画像の読み込みエラーを処理する関数
+    function handleImageError(img) {
+        console.error('画像の読み込みに失敗しました:', img.src);
+        img.alt = '画像を読み込めませんでした';
+        img.style.border = '1px solid red';
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+        var images = document.getElementsByTagName('img');
+        var basePath = '{{ file_path }}';
+        basePath = basePath.substring(0, basePath.lastIndexOf('/') + 1);
+
+        for (var i = 0; i < images.length; i++) {
+            images[i].onerror = function() { handleImageError(this); };
+            var imgSrc = images[i].getAttribute('src');
+            if (imgSrc.startsWith('./')) {
+                images[i].src = '/raw/' + basePath + imgSrc.slice(2);
+            } else if (!imgSrc.startsWith('/') && !imgSrc.startsWith('http')) {
+                images[i].src = '/raw/' + basePath + imgSrc;
+            } else if (imgSrc.startsWith('/')) {
+                images[i].src = '/raw' + imgSrc;
+            }
+            console.log('Modified image src:', images[i].src); // デバッグ用
+        }
+    });
     </script>
 </body>
 </html>

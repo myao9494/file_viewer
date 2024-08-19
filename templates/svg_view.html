@@ -20,9 +20,7 @@
 {% endblock %}
 
 {% block content %}
-<div class="full-path" id="fullPath" onclick="copyToClipboard()">
-    {{ full_path }}
-</div>
+<div class="full-path" id="fullPath" onclick="copyToClipboard()">{{ full_path | trim }}</div>
 <div class="svg-container">
     {{ svg_content|safe }}
 </div>
@@ -31,13 +29,12 @@
 function copyToClipboard() {
     var fullPath = document.getElementById('fullPath');
     var textArea = document.createElement("textarea");
-    textArea.value = fullPath.textContent;
+    textArea.value = fullPath.textContent.trim();
     document.body.appendChild(textArea);
     textArea.select();
     document.execCommand('copy');
     document.body.removeChild(textArea);
     
-    // コピー成功のフィードバック
     fullPath.style.backgroundColor = '#90EE90';
     setTimeout(function() {
         fullPath.style.backgroundColor = '#f0f0f0';
