@@ -3,28 +3,54 @@
 {% block head %}
 {{ super() }}
 <style>
-    .full-path {
+    .file-info {
+        display: flex;
+        align-items: center;
         background-color: #f0f0f0;
-        padding: 10px;
-        margin-bottom: 20px;
+        padding: 5px;
+        margin-bottom: 10px;
+        font-size: 0.9em;
+    }
+    .size-input-container {
+        margin-right: 10px;
+        white-space: nowrap;
+    }
+    .full-path {
+        flex-grow: 1;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
         cursor: pointer;
     }
-    .svg-container {
-        text-align: center;
+    #size-input {
+        width: 40px;
     }
-    .svg-container svg {
-        max-width: 100%;
+    #svg-container {
+        width: 100%;
+        overflow-x: auto;
+    }
+    #svg-content {
+        width: 100%;
         height: auto;
+        display: block;
     }
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="full-path" id="fullPath" onclick="copyToClipboard()">{{ full_path | trim }}</div>
-<div class="svg-container">
-    {{ svg_content|safe }}
+<div class="file-info">
+    <div class="size-input-container">
+        <label for="size-input">サイズ調整 (%): </label>
+        <input type="number" id="size-input" value="100" min="10" max="200" step="2">
+    </div>
+    <div class="full-path" id="fullPath" onclick="copyToClipboard()" title="{{ full_path | trim }}">{{ full_path | trim }}</div>
 </div>
-
+<div id="svg-container">
+    <div id="svg-content">
+        {{ svg_content|safe }}
+    </div>
+</div>
+<script src="{{ url_for('static', filename='js/resize.js') }}"></script>
 <script>
 function copyToClipboard() {
     var fullPath = document.getElementById('fullPath');

@@ -3,26 +3,41 @@
 {% block head %}
 {{ super() }}
 <style>
-    .full-path {
+    .file-info {
+        display: flex;
+        align-items: center;
         background-color: #f0f0f0;
         padding: 10px;
         margin-bottom: 20px;
+    }
+    .size-input-container {
+        margin-right: 20px;
+    }
+    .full-path {
+        flex-grow: 1;
         cursor: pointer;
     }
-    .image-container {
-        text-align: center;
+    #image-container {
+        width: 100%;
+        overflow-x: auto;
     }
-    .image-container img {
-        max-width: 100%;
+    #image-content {
+        width: 100%;
         height: auto;
     }
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="full-path" id="fullPath" onclick="copyToClipboard()">{{ full_path }}</div>
-<div class="image-container">
-    <img src="{{ url_for('raw_file', file_path=file_path) }}" alt="画像">
+<div class="file-info">
+    <div class="size-input-container">
+        <label for="size-input">サイズ調整 (%): </label>
+        <input type="number" id="size-input" value="100" min="10" max="200" step="5">
+    </div>
+    <div class="full-path" id="fullPath" onclick="copyToClipboard()">{{ full_path }}</div>
+</div>
+<div id="image-container">
+    <img id="image-content" src="{{ url_for('raw_file', file_path=file_path) }}" alt="画像">
 </div>
 
 <script>
@@ -42,4 +57,5 @@ function copyToClipboard() {
     }, 500);
 }
 </script>
+<script src="{{ url_for('static', filename='js/resize.js') }}"></script>
 {% endblock %}

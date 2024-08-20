@@ -74,12 +74,17 @@ def view_file(file_path):
     if file_extension == '.svg':
         with open(full_path, 'r', encoding='utf-8') as f:
             svg_content = f.read()
+        svg_content = svg_content.replace('<svg', '<svg id="svg-content"', 1)
         return render_template('svg_view.html', svg_content=svg_content, file_path=file_path, full_path=full_path)
 
     # 画像ファイルの場合
     if mime_type and mime_type.startswith('image/'):
         app.logger.info(f"Rendering image: {file_path}")
         return render_template('image_view.html', file_path=file_path, full_path=full_path)
+
+    # PDFファイルの場合
+    if file_extension == '.pdf':
+        return send_file(full_path, mimetype='application/pdf')
 
     # テキストファイルまたは特定の拡張子の場合
     if mime_type and mime_type.startswith('text/') or file_extension in ['.md', '.txt', '.py', '.js', '.css', '.json', '.ipynb', '.license', '.yml', '.yaml', '.xml', '.ini', '.cfg', '.conf']:
