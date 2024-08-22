@@ -85,7 +85,7 @@ function openInCode() {
     .then(response => response.json())
     .then(data => {
         if (data.success) {
-            alert('ファイルがCodeで開かれました。');
+            // alert('ファイルがCodeで開かれました。');
         } else {
             alert('エラーが発生しました: ' + data.error);
         }
@@ -107,7 +107,7 @@ function openFolder() {
     .then(response => response.json())
     .then(data => {
         if (data.success) {
-            alert('フォルダが開かれました。');
+            // alert('フォルダが開かれました。');
         } else {
             alert('エラーが発生しました: ' + data.error);
         }

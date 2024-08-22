@@ -27,58 +27,78 @@
     <!-- MathJaxスクリプトの読み込み -->
     <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
     <style>
-        .full-path {
+        .file-info {
+            display: flex;
+            align-items: center;
             background-color: #f0f0f0;
             padding: 10px;
-            margin-bottom: 20px;
-            cursor: pointer;
-        }
-        .file-actions {
-            display: flex;
+            margin-bottom: 10px;
+            font-size: 0.9em;
             gap: 10px;
-            margin-bottom: 10px;
         }
-        .file-actions button {
-            padding: 5px 10px;
+        .full-path {
+            flex-grow: 1;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
             cursor: pointer;
+            padding: 5px;
+            border: 1px solid #ccc;
+            border-radius: 3px;
         }
-        .size-input-container {
-            margin-bottom: 10px;
+        #size-input {
+            width: 50px;
+        }
+        .markdown-body {
+            font-size: 90%;
         }
     </style>
 </head>
 <body>
-    <!-- Markdownコンテンツを表示するコンテナ -->
-    <div class="markdown-body">
-        <div class="full-path" id="fullPath" onclick="copyToClipboard()">{{ full_path | trim }}</div>
-        <div class="file-actions">
-            <button onclick="openInCode()">Codeで開く</button>
-            <button onclick="openFolder()">フォルダを開く</button>
-            <button onclick="openJupyter()">Jupyterで開く</button>
-        </div>
+    <div class="file-info">
+        <button onclick="openInCode()">Codeで開く</button>
+        <button onclick="openFolder()">フォルダを開く</button>
+        <button onclick="openJupyter()">Jupyterで開く</button>
         <div class="size-input-container">
             <label for="size-input">サイズ調整 (%): </label>
-            <input type="number" id="size-input" value="100" min="10" max="200" step="2">
+            <input type="number" id="size-input" value="90" min="10" max="200" step="2">
         </div>
-        <div id="markdown-content">
-            {{ content|safe }}
-        </div>
+        <div class="full-path" id="filePath" onclick="copyToClipboard('filePath')" title="{{ full_path }}">{{ full_path }}</div>
+        <div class="full-path" id="folderPath" onclick="copyToClipboard('folderPath')" title="{{ folder_path }}">{{ folder_path }}</div>
+    </div>
+    
+    <!-- 元のマークダウンコンテンツ表示部分 -->
+    <div class="markdown-body">
+        {{ content|safe }}
     </div>
 
+    <script src="{{ url_for('static', filename='js/resize.js') }}"></script>
     <script>
-    function copyToClipboard() {
-        var fullPath = document.getElementById('fullPath');
+    // MathJax設定
+    MathJax = {
+        tex: {
+            inlineMath: [['$', '$'], ['\\(', '\\)']],
+            displayMath: [['$$', '$$'], ['\\[', '\\]']],
+            processEscapes: true,
+            processEnvironments: true
+        },
+        options: {
+            skipHtmlTags: ['script', 'noscript', 'style', 'textarea', 'pre']
+        }
+    };
+
+    function copyToClipboard(elementId) {
+        var element = document.getElementById(elementId);
         var textArea = document.createElement("textarea");
-        textArea.value = fullPath.textContent.trim();
+        textArea.value = element.textContent;
         document.body.appendChild(textArea);
         textArea.select();
         document.execCommand('copy');
         document.body.removeChild(textArea);
         
-        // コピー成功のフィードバック
-        fullPath.style.backgroundColor = '#90EE90';
+        element.style.backgroundColor = '#90EE90';
         setTimeout(function() {
-            fullPath.style.backgroundColor = '#f0f0f0';
+            element.style.backgroundColor = '#f0f0f0';
         }, 500);
     }
 
@@ -93,14 +113,14 @@
         .then(response => response.json())
         .then(data => {
             if (data.success) {
-                alert('ファイルがCodeで開かれました。');
+                // alert('ファイルがCodeで開かれました。');
             } else {
                 alert('エラーが発生しました: ' + data.error);
             }
         })
         .catch((error) => {
             console.error('Error:', error);
-            alert('エラー���発生しました。');
+            alert('エラー発生しました。');
         });
     }
 
@@ -115,7 +135,7 @@
         .then(response => response.json())
         .then(data => {
             if (data.success) {
-                alert('フォルダが開かれました。');
+                // alert('フォルダが開かれました。');
             } else {
                 alert('エラーが発生しました: ' + data.error);
             }
@@ -151,12 +171,6 @@
     }
 
 
-    // サイズ調整機能
-    document.getElementById('size-input').addEventListener('input', function() {
-        const size = this.value;
-        document.getElementById('markdown-content').style.fontSize = size + '%';
-    });
-
     // 画像の読み込みエラーを処理する関数
     function handleImageError(img) {
         console.error('画像の読み込みに失敗しました:', img.src);
@@ -179,8 +193,45 @@
             } else if (imgSrc.startsWith('/')) {
                 images[i].src = '/raw' + imgSrc;
             }
-            console.log('Modified image src:', images[i].src); // デバッグ用
+            console.log('Modified image src:', images[i].src);
         }
+
+        // フォルダパスを設定
+        var filePath = '{{ full_path }}';
+        var folderPath = filePath.substring(0, filePath.lastIndexOf('/'));
+        document.getElementById('folderPath').textContent = folderPath;
+        document.getElementById('folderPath').title = folderPath;
+
+        // サイズ調整機能
+        var sizeInput = document.getElementById('size-input');
+        var markdownBody = document.querySelector('.markdown-body');
+
+        function updateSize() {
+            var size = parseInt(sizeInput.value);
+            if (isNaN(size) || size < 10) size = 10;
+            if (size > 200) size = 200;
+            markdownBody.style.fontSize = size + '%';
+            sizeInput.value = size;
+        }
+
+        sizeInput.addEventListener('input', function() {
+            clearTimeout(this.inputTimeout);
+            this.inputTimeout = setTimeout(updateSize, 300);
+        });
+
+        sizeInput.addEventListener('change', updateSize);
+
+        // ホイール操作でのサイズ調整
+        sizeInput.addEventListener('wheel', function(event) {
+            event.preventDefault();
+            var newSize = parseInt(this.value) + (event.deltaY > 0 ? -2 : 2);
+            this.value = newSize;
+            updateSize();
+        });
+
+        // 初期サイズを設定
+        sizeInput.value = 90;
+        updateSize();
     });
     </script>
 </body>
