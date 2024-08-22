@@ -10,6 +10,8 @@ from utils.file_utils import filter_files
 from utils.markdown_renderer import render_markdown
 from utils.csv_renderer import render_csv
 import mimetypes
+import subprocess
+from flask import jsonify
 
 app = Flask(__name__, static_folder='static')
 
@@ -65,7 +67,7 @@ def view_file(file_path):
         '.md': ('markdown_view.html', render_markdown),
         '.csv': ('csv_view.html', render_csv),
         '.html': ('view_file.html', lambda path: get_file_content(path, 'html')),
-    }
+        }
 
     # MIMEタイプを取得
     mime_type, _ = mimetypes.guess_type(full_path)
@@ -75,7 +77,7 @@ def view_file(file_path):
         with open(full_path, 'r', encoding='utf-8') as f:
             svg_content = f.read()
         svg_content = svg_content.replace('<svg', '<svg id="svg-content"', 1)
-        return render_template('svg_view.html', svg_content=svg_content, file_path=file_path, full_path=full_path)
+        return render_template('svg_view.html', svg_content=svg_content, file_path=file_path, full_path=full_path, BASE_DIR=BASE_DIR)
 
     # 画像ファイルの場合
     if mime_type and mime_type.startswith('image/'):
@@ -92,6 +94,13 @@ def view_file(file_path):
         template, render_func = renderer
         content = render_func(full_path)
         return render_template(template, content=content, file_path=file_path, full_path=full_path)
+
+    # Markdownファイルの場合
+    if file_extension == '.md':
+        with open(full_path, 'r', encoding='utf-8') as f:
+            content = f.read()
+        html_content = markdown.markdown(content, extensions=['fenced_code', 'codehilite'])
+        return render_template('markdown_view.html', content=html_content, file_path=file_path, full_path=full_path, BASE_DIR=BASE_DIR)
 
     # その他のファイルはダウンロード
     return send_file(full_path, as_attachment=True)
@@ -116,11 +125,52 @@ def search():
     query = request.args.get('q', '')
     # ファイル検索を実行
     results = search_files(BASE_DIR, query)
-    # 検索結果をフィルタリング
+    # 検結果をフィルタリング
     filtered_results = filter_files(results, BASE_DIR)
-    # 検索結果を含むindex.htmlテンプレートをレンダリング
+    # 検索結含むindex.htmlテンプレートをレンダリング
     return render_template('index.html', files=filtered_results, search_query=query)
 
+@app.route('/open-in-code', methods=['POST'])
+def open_in_code():
+    data = request.json
+    file_path = data.get('path')
+    if not file_path:
+        return jsonify({'success': False, 'error': 'ファイルパスが指定されていません。'})
+    
+    try:
+        # macOSの場合
+        vscode_path = '/Applications/Visual Studio Code.app/Contents/Resources/app/bin/code'
+        # Windowsの場合
+        # vscode_path = 'C:\\Program Files\\Microsoft VS Code\\Code.exe'
+        
+        if os.path.exists(vscode_path):
+            subprocess.Popen([vscode_path, os.path.dirname(file_path)])
+            return jsonify({'success': True})
+        else:
+            return jsonify({'success': False, 'error': 'Visual Studio Codeが見つかりません。'})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
+
+@app.route('/open-folder', methods=['POST'])
+def open_folder():
+    data = request.json
+    file_path = data.get('path')
+    if not file_path:
+        return jsonify({'success': False, 'error': 'ファイルパスが指定されていません。'})
+    
+    try:
+        folder_path = os.path.dirname(file_path)
+        if os.path.exists(folder_path):
+            # macOSの場合
+            subprocess.Popen(['open', folder_path])
+            # Windowsの場合
+            # subprocess.Popen(['explorer', folder_path])
+            return jsonify({'success': True})
+        else:
+            return jsonify({'success': False, 'error': 'フォルダが見つかりません。'})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
+
 if __name__ == '__main__':
-    # デバッグモードでアプリケーションを実行
+    # デバッグモードでアプリケーションを��行
     app.run(debug=True, host='0.0.0.0', port=5001)

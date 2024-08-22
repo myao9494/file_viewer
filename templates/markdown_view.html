@@ -33,15 +33,36 @@
             margin-bottom: 20px;
             cursor: pointer;
         }
+        .file-actions {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+        .file-actions button {
+            padding: 5px 10px;
+            cursor: pointer;
+        }
+        .size-input-container {
+            margin-bottom: 10px;
+        }
     </style>
 </head>
 <body>
     <!-- Markdownコンテンツを表示するコンテナ -->
     <div class="markdown-body">
         <div class="full-path" id="fullPath" onclick="copyToClipboard()">{{ full_path | trim }}</div>
-        <!-- Markdownコンテンツ: Pythonから渡されたcontent変数を使用 -->
-        <!-- |safe フィルタ: HTMLをエスケープせずにそのまま出力 -->
-        {{ content|safe }}
+        <div class="file-actions">
+            <button onclick="openInCode()">Codeで開く</button>
+            <button onclick="openFolder()">フォルダを開く</button>
+            <button onclick="openJupyter()">Jupyterで開く</button>
+        </div>
+        <div class="size-input-container">
+            <label for="size-input">サイズ調整 (%): </label>
+            <input type="number" id="size-input" value="100" min="10" max="200" step="2">
+        </div>
+        <div id="markdown-content">
+            {{ content|safe }}
+        </div>
     </div>
 
     <script>
@@ -60,6 +81,81 @@
             fullPath.style.backgroundColor = '#f0f0f0';
         }, 500);
     }
+
+    function openInCode() {
+        fetch('/open-in-code', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ path: '{{ full_path | trim }}' }),
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert('ファイルがCodeで開かれました。');
+            } else {
+                alert('エラーが発生しました: ' + data.error);
+            }
+        })
+        .catch((error) => {
+            console.error('Error:', error);
+            alert('エラー���発生しました。');
+        });
+    }
+
+    function openFolder() {
+        fetch('/open-folder', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ path: '{{ full_path | trim }}' }),
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert('フォルダが開かれました。');
+            } else {
+                alert('エラーが発生しました: ' + data.error);
+            }
+        })
+        .catch((error) => {
+            console.error('Error:', error);
+            alert('エラーが発生しました。');
+        });
+    }
+
+    function openJupyter() {
+        const basePath = '{{ BASE_DIR }}' || '/Users/sudoupousei/000_work';  // BASE_DIRが空の場合のフォールバック
+        const filePath = '{{ full_path | trim }}';
+        console.log('BASE_DIR:', basePath);
+        console.log('Full path:', filePath);
+        
+        // BASE_DIRの最後のディレクトリ名を取得
+        const baseDir = basePath.split('/').pop();
+        console.log('Base directory:', baseDir);
+        
+        let relativePath = '';
+        if (filePath.includes(baseDir)) {
+            relativePath = filePath.split(baseDir)[1].replace(/^\//, '');
+        } else {
+            relativePath = filePath.replace(basePath, '').replace(/^\//, '');
+        }
+        console.log('Relative path:', relativePath);
+        
+        const jupyterURL = 'http://localhost:8888/lab/tree/' + encodeURIComponent(relativePath);
+        console.log('Jupyter URL:', jupyterURL);
+        
+        window.open(jupyterURL, '_blank');
+    }
+
+
+    // サイズ調整機能
+    document.getElementById('size-input').addEventListener('input', function() {
+        const size = this.value;
+        document.getElementById('markdown-content').style.fontSize = size + '%';
+    });
 
     // 画像の読み込みエラーを処理する関数
     function handleImageError(img) {
