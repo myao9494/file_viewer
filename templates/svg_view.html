@@ -7,12 +7,12 @@
         display: flex;
         align-items: center;
         background-color: #f0f0f0;
-        padding: 5px;
+        padding: 10px;
         margin-bottom: 10px;
         font-size: 0.9em;
+        gap: 10px;
     }
     .size-input-container {
-        margin-right: 10px;
         white-space: nowrap;
     }
     .full-path {
@@ -21,9 +21,12 @@
         text-overflow: ellipsis;
         white-space: nowrap;
         cursor: pointer;
+        padding: 5px;
+        border: 1px solid #ccc;
+        border-radius: 3px;
     }
     #size-input {
-        width: 40px;
+        width: 50px;
     }
     #svg-container {
         width: 100%;
@@ -39,14 +42,15 @@
 
 {% block content %}
 <div class="file-info">
+    <button id="open-in-code" onclick="openInCode()">Codeで開く</button>
+    <button id="open-folder" onclick="openFolder()">フォルダを開く</button>
+    <button id="open-jupyter" onclick="openJupyter()">Jupyterで開く</button>
     <div class="size-input-container">
         <label for="size-input">サイズ調整 (%): </label>
         <input type="number" id="size-input" value="100" min="10" max="200" step="2">
     </div>
-    <div class="full-path" id="fullPath" onclick="copyToClipboard()" title="{{ full_path | trim }}">{{ full_path | trim }}</div>
-    <button id="open-in-code" onclick="openInCode()">Codeで開く</button>
-    <button id="open-folder" onclick="openFolder()">フォルダを開く</button>
-    <button id="open-jupyter" onclick="openJupyter()">Jupyterで開く</button>
+    <div class="full-path" id="filePath" onclick="copyToClipboard('filePath')" title="{{ full_path }}">{{ full_path }}</div>
+    <div class="full-path" id="folderPath" onclick="copyToClipboard('folderPath')" title="{{ folder_path }}">{{ folder_path }}</div>
 </div>
 <div id="svg-container">
     <div id="svg-content">
@@ -55,18 +59,18 @@
 </div>
 <script src="{{ url_for('static', filename='js/resize.js') }}"></script>
 <script>
-function copyToClipboard() {
-    var fullPath = document.getElementById('fullPath');
+function copyToClipboard(elementId) {
+    var element = document.getElementById(elementId);
     var textArea = document.createElement("textarea");
-    textArea.value = fullPath.textContent.trim();
+    textArea.value = element.textContent;
     document.body.appendChild(textArea);
     textArea.select();
     document.execCommand('copy');
     document.body.removeChild(textArea);
     
-    fullPath.style.backgroundColor = '#90EE90';
+    element.style.backgroundColor = '#90EE90';
     setTimeout(function() {
-        fullPath.style.backgroundColor = '#f0f0f0';
+        element.style.backgroundColor = '#f0f0f0';
     }, 500);
 }
 
@@ -122,5 +126,12 @@ function openJupyter() {
     const jupyterURL = 'http://localhost:8888/lab/tree/' + encodeURIComponent(relativePath);
     window.open(jupyterURL, '_blank');
 }
+
+document.addEventListener('DOMContentLoaded', function() {
+    var filePath = '{{ full_path }}';
+    var folderPath = filePath.substring(0, filePath.lastIndexOf('/'));
+    document.getElementById('folderPath').textContent = folderPath;
+    document.getElementById('folderPath').title = folderPath;
+});
 </script>
 {% endblock %}
