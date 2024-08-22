@@ -1,74 +1,71 @@
 import re
 import markdown
-from markdown.extensions import Extension, codehilite, fenced_code
+from markdown.extensions import Extension
 from markdown.preprocessors import Preprocessor
 
 class TaskListPreprocessor(Preprocessor):
-    """
-    Markdownのタスクリスト記法をHTMLに変換するプリプロセッサー
-    """
     def run(self, lines):
-        """
-        Markdownの各行を処理し、タスクリストをHTMLに変換する
-
-        Args:
-            lines (list): Markdownの行のリスト
-
-        Returns:
-            list: 変換後の行のリスト
-        """
         new_lines = []
-        in_list = False
+        list_stack = []
         for line in lines:
-            if line.strip().startswith('- [ ]') or line.strip().startswith('- [x]'):
-                # タスクリストアイテムの開始
-                if not in_list:
+            stripped = line.strip()
+            indent = len(line) - len(line.lstrip())
+            
+            if stripped.startswith('- [ ]') or stripped.startswith('- [x]'):
+                while list_stack and indent <= list_stack[-1][0]:
+                    new_lines.append('</ul>' * (list_stack[-1][1] + 1))
+                    list_stack.pop()
+                
+                if not list_stack or indent > list_stack[-1][0]:
                     new_lines.append('<ul class="task-list">')
-                    in_list = True
-                # 未完了タスクの変換
-                line = re.sub(r'^(\s*)-\s*\[ \]', r'\1<li class="task-list-item"><input type="checkbox" disabled>', line)
-                # 完了タスクの変換
-                line = re.sub(r'^(\s*)-\s*\[x\]', r'\1<li class="task-list-item"><input type="checkbox" checked disabled>', line)
-                new_lines.append(line + '</li>')
+                    list_stack.append((indent, 0))
+                
+                if stripped.startswith('- [ ]'):
+                    new_lines.append(f'<li class="task-list-item"><input type="checkbox" disabled>{{{{ITEM_CONTENT}}}}</li>')
+                else:
+                    new_lines.append(f'<li class="task-list-item"><input type="checkbox" checked disabled>{{{{ITEM_CONTENT}}}}</li>')
+                new_lines[-1] = new_lines[-1].replace('{{ITEM_CONTENT}}', line[indent+5:].strip())
+            elif stripped.startswith('-'):
+                while list_stack and indent <= list_stack[-1][0]:
+                    new_lines.append('</ul>' * (list_stack[-1][1] + 1))
+                    list_stack.pop()
+                
+                if not list_stack or indent > list_stack[-1][0]:
+                    new_lines.append('<ul>')
+                    list_stack.append((indent, 0))
+                
+                new_lines.append(f'<li>{{{{ITEM_CONTENT}}}}</li>')
+                new_lines[-1] = new_lines[-1].replace('{{ITEM_CONTENT}}', line[indent+1:].strip())
             else:
-                # タスクリスト以外の行の処理
-                if in_list:
-                    new_lines.append('</ul>')
-                    in_list = False
+                while list_stack:
+                    new_lines.append('</ul>' * (list_stack[-1][1] + 1))
+                    list_stack.pop()
                 new_lines.append(line)
-        # リストが閉じられていない場合の処理
-        if in_list:
-            new_lines.append('</ul>')
+        
+        while list_stack:
+            new_lines.append('</ul>' * (list_stack[-1][1] + 1))
+            list_stack.pop()
+        
         return new_lines
 
-class TaskListExtension(Extension):
-    """
-    タスクリスト機能を追加するMarkdown拡張
-    """
-    def extendMarkdown(self, md):
-        """
-        Markdownパーサーにタスクリストプリプロセッサーを登録する
-
-        Args:
-            md: Markdownパーサーインスタンス
-        """
-        md.preprocessors.register(TaskListPreprocessor(md), 'task_list', 50)
-
 def render_markdown(file_path):
-    """
-    Markdownファイルを読み込み、HTMLに変換する関数
-
-    Args:
-        file_path (str): 変換するMarkdownファイルのパス
-
-    Returns:
-        str: 変換後のHTML文字列
-    """
     # Markdownファイルを読み込む
     with open(file_path, 'r', encoding='utf-8') as file:
         content = file.read()
     
+    # タスクリストとリストの処理を行う
+    task_list_preprocessor = TaskListPreprocessor()
+    lines = content.split('\n')
+    processed_lines = task_list_preprocessor.run(lines)
+    processed_content = '\n'.join(processed_lines)
+    
     # Markdownパーサーを設定し、拡張機能を追加
-    md = markdown.Markdown(extensions=['extra', 'codehilite', 'fenced_code', TaskListExtension()])
-    # MarkdownをHTMLに変換して返す
-    return md.convert(content)
+    md = markdown.Markdown(extensions=['extra', 'codehilite', 'fenced_code'])
+    
+    # 処理済みの内容をHTMLに変換
+    html_content = md.convert(processed_content)
+    
+    # リスト項目内の強調表示を処理
+    html_content = re.sub(r'<li>(.*?)</li>', lambda m: f'<li>{md.convert(m.group(1))}</li>', html_content)
+    
+    return html_content
