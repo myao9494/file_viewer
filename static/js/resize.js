@@ -31,26 +31,41 @@ document.addEventListener('DOMContentLoaded', function() {
             // SVGの場合
             const svgElement = content.querySelector('svg');
             if (svgElement) {
-                const viewBox = svgElement.viewBox.baseVal;
-                contentWidth = viewBox.width;
-                contentHeight = viewBox.height;
+                // SVGの幅と高さを取得
+                contentWidth = svgElement.width.baseVal.value;
+                contentHeight = svgElement.height.baseVal.value;
+
+                // 幅と高さが設定されていない場合は、viewBoxから取得
+                if (contentWidth === 0 || contentHeight === 0) {
+                    const viewBox = svgElement.viewBox.baseVal;
+                    contentWidth = viewBox.width;
+                    contentHeight = viewBox.height;
+                }
+
+                // それでも取得できない場合は、SVGの現在のサイズを使用
+                if (contentWidth === 0 || contentHeight === 0) {
+                    contentWidth = svgElement.getBoundingClientRect().width;
+                    contentHeight = svgElement.getBoundingClientRect().height;
+                }
             } else {
                 // SVG要素が見つからない場合はデフォルト値を使用
                 return 35;
             }
         }
 
-        const widthRatio = viewportWidth / contentWidth;
-        const heightRatio = viewportHeight / contentHeight;
-        let initialSize;
-        
-        if (content.tagName.toLowerCase() === 'img') {
-            initialSize = Math.min(widthRatio, heightRatio) * 65;
-        } else {
-            initialSize = Math.min(widthRatio, heightRatio) * 60;
+        let widthRatio = viewportWidth / contentWidth;
+        let heightRatio = viewportHeight / contentHeight;
+
+        // widthRatioとheightRatioが1以下になるように調整
+        if (widthRatio > 1 || heightRatio > 1) {
+            const maxRatio = Math.max(widthRatio, heightRatio);
+            widthRatio /= maxRatio;
+            heightRatio /= maxRatio;
         }
-        
-        initialSize = Math.min(Math.max(initialSize, 30), 80); // 10%から200%の間に制限
+
+        let initialSize = Math.min(widthRatio, heightRatio) * 100;
+
+        initialSize = Math.min(Math.max(initialSize, 15), 100); // 30%から80%の間に制限
         return Math.round(initialSize / 2) * 2; // 2の倍数に丸める
     }
 
