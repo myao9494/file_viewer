@@ -1,9 +1,8 @@
 import os
 import fnmatch
-from flask import Flask, render_template, request, send_file, abort, url_for, Response, send_from_directory
+from flask import Flask, render_template, request, send_file, abort, url_for, Response, send_from_directory, jsonify
 import re
 import csv
-# import io
 from utils.file_handler import get_file_content, get_file_list
 from utils.search import search_files
 from utils.file_utils import filter_files
@@ -11,7 +10,9 @@ from utils.markdown_renderer import render_markdown
 from utils.csv_renderer import render_csv
 import mimetypes
 import subprocess
-from flask import jsonify
+from markdown import markdown
+import json
+import html
 
 app = Flask(__name__, static_folder='static')
 
@@ -57,7 +58,7 @@ def view_file(file_path):
     # フルパスを作成
     full_path = os.path.join(BASE_DIR, file_path)
     if not os.path.exists(full_path):
-        abort(404)  # ファイルが存在しない場合は404エラー
+        abort(404)  # ファイルが存在しな場合は404エラー
 
     # ファイル拡張子を取得
     file_extension = os.path.splitext(full_path)[1].lower()
@@ -84,7 +85,7 @@ def view_file(file_path):
         app.logger.info(f"Rendering image: {file_path}")
         return render_template('image_view.html', file_path=file_path, full_path=full_path)
 
-    # PDFファイルの場合
+    # PDFファイル場合
     if file_extension == '.pdf':
         return send_file(full_path, mimetype='application/pdf')
 
@@ -147,7 +148,7 @@ def open_in_code():
             subprocess.Popen([vscode_path, os.path.dirname(file_path)])
             return jsonify({'success': True})
         else:
-            return jsonify({'success': False, 'error': 'Visual Studio Codeが見つかりません。'})
+            return jsonify({'success': False, 'error': 'Visual Studio Codeがつかりません。'})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)})
 
@@ -171,6 +172,26 @@ def open_folder():
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)})
 
+@app.route('/mindmap/<path:file_path>')
+def view_mindmap(file_path):
+    """
+    指定されたMarkdownファイルをマインドマップとして表示する関数
+
+    Args:
+        file_path (str): 処理するファイルのパス
+
+    Returns:
+        str: マインドマップを表示するHTMLページ
+    """
+    full_path = os.path.join(BASE_DIR, file_path)
+    if not os.path.exists(full_path) or not full_path.endswith('.md'):
+        abort(404)
+
+    with open(full_path, 'r', encoding='utf-8') as f:
+        content = f.read()
+
+    return render_template('mindmap_view.html', content=content, file_path=file_path)
+
 if __name__ == '__main__':
-    # デバッグモードでアプリケーションを��行
+    # デバッグモードでアプリケーションを実行
     app.run(debug=True, host='0.0.0.0', port=5001)
