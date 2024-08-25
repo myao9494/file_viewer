@@ -60,7 +60,7 @@ def render_markdown(file_path):
     processed_content = '\n'.join(processed_lines)
     
     # Markdownパーサーを設定し、拡張機能を追加
-    md = markdown.Markdown(extensions=['extra', 'codehilite', 'fenced_code'])
+    md = markdown.Markdown(extensions=['extra', 'codehilite', 'fenced_code', 'tables'])
     
     # 処理済みの内容をHTMLに変換
     html_content = md.convert(processed_content)

@@ -26,6 +26,8 @@
     </script>
     <!-- MathJaxスクリプトの読み込み -->
     <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <!-- Font Awesome の追加 -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css">
     <style>
         .file-info {
             display: flex;
@@ -54,6 +56,62 @@
         }
         .file-info button {
             margin-right: 5px;
+        }
+
+        /* テーブルのスタイルを更新 */
+        .markdown-body table {
+            border-collapse: collapse;
+            margin-bottom: 1em;
+            width: auto;  /* 幅を自動調整に変更 */
+        }
+        .markdown-body table th,
+        .markdown-body table td {
+            border: 1px solid #000;
+            padding: 8px;
+            text-align: left;
+            white-space: nowrap;  /* セル内の改行を防ぐ */
+        }
+        .markdown-body table th {
+            background-color: #e6ffe6;  /* 薄い緑に変更 */
+            font-weight: bold;
+        }
+
+        /* コードブロックとインラインコードのスタイルを更新 */
+        .markdown-body pre,
+        .markdown-body code {
+            position: relative;
+        }
+        .copy-button {
+            position: absolute;
+            padding: 4px 8px;
+            font-size: 14px;
+            background-color: rgba(255, 255, 255, 0.7);
+            border: none;
+            border-radius: 3px;
+            cursor: pointer;
+            opacity: 0;
+            transition: opacity 0.3s, background-color 0.3s;
+        }
+        .markdown-body pre .copy-button {
+            top: 5px;
+            right: 5px; /* 右端に配置 */
+        }
+        .markdown-body code .copy-button {
+            top: 50%;
+            right: -30px;
+            transform: translateY(-50%);
+        }
+        .markdown-body pre:hover .copy-button,
+        .markdown-body code:hover .copy-button {
+            opacity: 1;
+        }
+        .markdown-body pre {
+            padding-right: 40px; /* コピーボタンのためのスペースを確保 */
+        }
+        .markdown-body code {
+            display: inline-block;
+            padding: 2px 4px;
+            margin-right: 30px; /* インラインコードの右側にスペースを確保 */
         }
     </style>
 </head>
@@ -156,7 +214,7 @@
         console.log('BASE_DIR:', basePath);
         console.log('Full path:', filePath);
         
-        // BASE_DIRの最後のディレクトリ名を取得
+        // BASE_DIRの最後のディ���クトリ名を取得
         const baseDir = basePath.split('/').pop();
         console.log('Base directory:', baseDir);
         
@@ -192,7 +250,7 @@
             alert('ポップアップがブロックされました。ブラウザの設定を確認してください。');
         } else {
             newWindow.onerror = function() {
-                alert('マインドマップの読み込み中にエラーが発生しました。');
+                alert('マインドマップの読み込み中にエラー発生ました。');
             };
         }
     }
@@ -222,7 +280,7 @@
             console.log('Modified image src:', images[i].src);
         }
 
-        // フォルダパスを設定
+        // フルダパスを設定
         var filePath = '{{ full_path }}';
         var folderPath = filePath.substring(0, filePath.lastIndexOf('/'));
         document.getElementById('folderPath').textContent = folderPath;
@@ -255,9 +313,49 @@
             updateSize();
         });
 
-        // 初期サイズを設定
+        // 初期イズを設定
         sizeInput.value = 90;
         updateSize();
+
+        // コードブロックとインラインコードにコピーボタンを追加
+        var codeElements = document.querySelectorAll('.markdown-body pre, .markdown-body code');
+        codeElements.forEach(function(element) {
+            if (element.tagName === 'CODE' && element.parentElement.tagName === 'PRE') {
+                return; // preの中のcodeは無視
+            }
+            var copyButton = document.createElement('button');
+            copyButton.className = 'copy-button';
+            copyButton.innerHTML = '<i class="fas fa-copy"></i>'; // Font Awesome のコピーアイコン
+            copyButton.setAttribute('title', 'クリックでコピー');
+            copyButton.addEventListener('click', function(event) {
+                event.stopPropagation();
+                var code = element.textContent;
+                copyToClipboardWithNotification(code);
+            });
+            element.appendChild(copyButton);
+        });
+
+        function copyToClipboardWithNotification(text) {
+            navigator.clipboard.writeText(text).then(function() {
+                // コピー成功時の処理
+                var notification = document.createElement('div');
+                notification.textContent = 'コピーしました！';
+                notification.style.position = 'fixed';
+                notification.style.top = '10px';
+                notification.style.right = '10px';
+                notification.style.padding = '10px';
+                notification.style.background = '#4CAF50';
+                notification.style.color = 'white';
+                notification.style.borderRadius = '5px';
+                notification.style.zIndex = '1000';
+                document.body.appendChild(notification);
+                setTimeout(function() {
+                    document.body.removeChild(notification);
+                }, 2000);
+            }).catch(function(err) {
+                console.error('コピーに失敗しまた:', err);
+            });
+        }
     });
     </script>
 </body>
