@@ -38,7 +38,7 @@ def load_files():
     Returns:
         str: レンダリングされたHTMLテンプレート
     """
-    # すべてのファ���
+    # すべてのファ
     all_files = get_file_list(BASE_DIR)
     # フィルタリングを適用
     files = filter_files(all_files, BASE_DIR)
@@ -214,7 +214,7 @@ def handle_invalid_path(invalid_path):
         invalid_path (str): アクセスされたパス
 
     Returns:
-        redirect: 適切なURLにリダイレクト、また���404エラーページ
+        redirect: 適切なURLにリダイレクト、またはフォルダを開く、または404エラーページ
     """
     # ベースディレクトリのパスを正規表現でエスケープ
     escaped_base_dir = re.escape(BASE_DIR)
@@ -228,7 +228,27 @@ def handle_invalid_path(invalid_path):
         flash('無効なURLです。正しいページにリダイレクトします。', 'warning')
         return redirect(viewer_path)
     
-    # ベースディレクトリのパスが含まれていない場合は404エラー
+    # ベースディレクトリのパスが含まれていない場合
+    full_path = '/' + invalid_path  # パスの先頭に'/'を追加
+    if os.path.exists(full_path):
+        if os.path.isdir(full_path):
+            folder_path = full_path
+        else:
+            folder_path = os.path.dirname(full_path)
+        
+        if os.path.exists(folder_path):
+            try:
+                # macOSの場合
+                subprocess.Popen(['open', folder_path])
+                # Windowsの場合
+                # subprocess.Popen(['explorer', folder_path])
+                flash(f'フォルダを開きました: {folder_path}', 'info')
+                return redirect(url_for('index'))
+            except Exception as e:
+                flash(f'フォルダを開く際にエラーが発生しました: {str(e)}', 'error')
+                return redirect(url_for('index'))
+    
+    # パスが存在しない場合は404エラー
     flash('指定されたページは存在しません。', 'error')
     return render_template('404.html'), 404
 
