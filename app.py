@@ -48,17 +48,16 @@ def load_files():
 @app.route('/view/')
 @app.route('/view/<path:file_path>')
 def view_file(file_path=''):
-    """
-    指定されたファイルまたはディレクトリを表示する関数
+    # file_pathが空の場合、ルートディレクトリを表示
+    if not file_path:
+        full_path = BASE_DIR
+        
+    else:
+        # 先頭のスラッシュを除去（もし存在する場合）
+        file_path = file_path.lstrip('/')
+        full_path = os.path.join(BASE_DIR, file_path)
+        
 
-    Args:
-        file_path (str): 処理するファイルまたはディレクトリのパス（デフォルトは空文字列）
-
-    Returns:
-        str: レンダリングされたHTML、ファイル内容、またはダウンロード可能なファイル
-    """
-    # フルパスを作成
-    full_path = os.path.join(BASE_DIR, file_path)
     if not os.path.exists(full_path):
         abort(404)  # ファイルが存在しない場合は404エラー
 
@@ -81,7 +80,7 @@ def view_file(file_path=''):
         '.md': ('markdown_view.html', render_markdown),
         '.csv': ('csv_view.html', render_csv),
         '.html': ('view_file.html', lambda path: get_file_content(path, 'html')),
-        }
+    }
 
     # MIMEタイプを取得
     mime_type, _ = mimetypes.guess_type(full_path)
@@ -102,19 +101,20 @@ def view_file(file_path=''):
     if file_extension == '.pdf':
         return send_file(full_path, mimetype='application/pdf')
 
-    # テキストファイルまたは特定の拡張子の場合
-    if mime_type and mime_type.startswith('text/') or file_extension in ['.md', '.txt', '.py', '.js', '.css', '.json', '.ipynb', '.license', '.yml', '.yaml', '.xml', '.ini', '.cfg', '.conf']:
-        renderer = renderers.get(file_extension, ('view_file.html', lambda path: get_file_content(path, 'text')))
-        template, render_func = renderer
-        content = render_func(full_path)
-        return render_template(template, content=content, file_path=file_path, full_path=full_path)
-
     # Markdownファイルの場合
     if file_extension == '.md':
-        with open(full_path, 'r', encoding='utf-8') as f:
-            content = f.read()
-        html_content = markdown.markdown(content, extensions=['fenced_code', 'codehilite'])
-        return render_template('markdown_view.html', content=html_content, file_path=file_path, full_path=full_path, BASE_DIR=BASE_DIR)
+        content = render_markdown(full_path)
+        return render_template('markdown_view.html', content=content, file_path=file_path, full_path=full_path, BASE_DIR=BASE_DIR)
+
+    # CSVファイルの場合
+    if file_extension == '.csv':
+        content = render_csv(full_path)
+        return render_template('csv_view.html', content=content, file_path=file_path, full_path=full_path, BASE_DIR=BASE_DIR)
+
+    # テキストファイルまたは特定の拡張子の場合
+    if mime_type and mime_type.startswith('text/') or file_extension in ['.txt', '.py', '.js', '.css', '.json', '.ipynb', '.license', '.yml', '.yaml', '.xml', '.ini', '.cfg', '.conf']:
+        content = get_file_content(full_path, 'text')
+        return render_template('view_file.html', content=content, file_path=file_path, full_path=full_path)
 
     # その他のファイルはダウンロード
     return send_file(full_path, as_attachment=True)

@@ -13,8 +13,19 @@
     {% block head %}{% endblock %}
     <!-- ファビコンの追加 -->
     <link rel="icon" type="image/png" href="{{ url_for('static', filename='images/flask-icon.png') }}">
+    <style>
+        #showDirectoryBtn {
+            position: fixed;
+            top: 10px;
+            left: 10px;
+            z-index: 1000;
+        }
+    </style>
 </head>
 <body>
+    <!-- ディレクトリ表示ボタンを追加 -->
+    <button id="showDirectoryBtn" class="btn btn-primary">ディレクトリを表示</button>
+
     <!-- headerブロック: ページヘッダーをPythonコードから挿入可能 -->
     {% block header %}{% endblock %}
     <div class="container">
@@ -25,7 +36,23 @@
         <!-- footerブロック: ページフッターをPythonコードから挿入可能 -->
         {% block footer %}{% endblock %}
     </div>
+
     <!-- JavaScriptファイルの読み込み: url_for関数を使用してFlaskのstatic_folderから取得 -->
     <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+    
+    <!-- ディレクトリ表示機能のためのJavaScript -->
+    <script>
+    document.getElementById('showDirectoryBtn').addEventListener('click', function() {
+        var currentPath = window.location.pathname;
+        var match = currentPath.match(/^\/view\/(.*)/);
+        if (match) {
+            var filePath = match[1];
+            var directoryPath = filePath.split('/').slice(0, -1).join('/') || '/';
+            window.location.href = '/view/' + directoryPath;
+        } else {
+            alert('現在のページのディレクトリを特定できません。');
+        }
+    });
+    </script>
 </body>
 </html>

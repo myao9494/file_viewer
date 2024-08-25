@@ -3,15 +3,21 @@
 {% block content %}
 <h2>ディレクトリ内容: {{ current_path or '/' }}</h2>
 
+{% if parent_path is not none %}
+<a href="{{ url_for('view_file', file_path=parent_path) }}">Parent Directory</a>
+{% endif %}
+
+<h3>Folders:</h3>
 <ul>
-    {% if parent_path is not none %}
-        <li><a href="{{ url_for('view_file', file_path=parent_path) }}">..</a></li>
-    {% endif %}
-    {% for folder in folders %}
-        <li>📁 <a href="{{ url_for('view_file', file_path=(current_path + '/' + folder).lstrip('/')) }}">{{ folder }}</a></li>
-    {% endfor %}
-    {% for file in files %}
-        <li>📄 <a href="{{ url_for('view_file', file_path=(current_path + '/' + file).lstrip('/')) }}">{{ file }}</a></li>
-    {% endfor %}
+{% for folder in folders %}
+    <li>📁 <a href="{{ url_for('view_file', file_path=(current_path + '/' + folder).strip('/')) }}">{{ folder }}</a></li>
+{% endfor %}
+</ul>
+
+<h3>Files:</h3>
+<ul>
+{% for file in files %}
+    <li>📄 <a href="{{ url_for('view_file', file_path=(current_path + '/' + file).strip('/')) }}">{{ file }}</a></li>
+{% endfor %}
 </ul>
 {% endblock %}
