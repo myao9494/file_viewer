@@ -30,12 +30,14 @@
     }
     #svg-container {
         width: 100%;
-        overflow-x: auto;
+        overflow: hidden;
+        touch-action: none;
     }
     #svg-content {
         width: 100%;
         height: auto;
         display: block;
+        transform-origin: 0 0;
     }
 </style>
 {% endblock %}
@@ -133,5 +135,52 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('folderPath').textContent = folderPath;
     document.getElementById('folderPath').title = folderPath;
 });
+
+let scale = 1;
+const svgContent = document.getElementById('svg-content');
+const svgContainer = document.getElementById('svg-container');
+
+svgContainer.addEventListener('wheel', function(e) {
+    if (e.ctrlKey) {
+        e.preventDefault();
+        const delta = e.deltaY > 0 ? 0.9 : 1.1;
+        scale *= delta;
+        scale = Math.min(Math.max(0.1, scale), 5);
+        svgContent.style.transform = `scale(${scale})`;
+        document.getElementById('size-input').value = Math.round(scale * 100);
+    }
+});
+
+let touchStartDistance = 0;
+svgContainer.addEventListener('touchstart', function(e) {
+    if (e.touches.length === 2) {
+        touchStartDistance = Math.hypot(
+            e.touches[0].pageX - e.touches[1].pageX,
+            e.touches[0].pageY - e.touches[1].pageY
+        );
+    }
+});
+
+svgContainer.addEventListener('touchmove', function(e) {
+    if (e.touches.length === 2) {
+        e.preventDefault();
+        const touchEndDistance = Math.hypot(
+            e.touches[0].pageX - e.touches[1].pageX,
+            e.touches[0].pageY - e.touches[1].pageY
+        );
+        const delta = touchEndDistance / touchStartDistance;
+        scale *= delta;
+        scale = Math.min(Math.max(0.1, scale), 5);
+        svgContent.style.transform = `scale(${scale})`;
+        document.getElementById('size-input').value = Math.round(scale * 100);
+        touchStartDistance = touchEndDistance;
+    }
+});
+
+document.getElementById('size-input').addEventListener('change', function(e) {
+    scale = e.target.value / 100;
+    svgContent.style.transform = `scale(${scale})`;
+});
+
 </script>
 {% endblock %}
