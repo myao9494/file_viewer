@@ -44,13 +44,18 @@
     <script>
     document.getElementById('showDirectoryBtn').addEventListener('click', function() {
         var currentPath = window.location.pathname;
-        var match = currentPath.match(/^\/view\/(.*)/);
-        if (match) {
-            var filePath = match[1];
-            var directoryPath = filePath.split('/').slice(0, -1).join('/') || '/';
-            window.location.href = '/view/' + directoryPath;
+        if (currentPath === '/view//' || currentPath === '/view') {
+            // ルートディレクトリの場合、/viewにリダイレクト
+            window.location.href = '/view';
         } else {
-            alert('現在のページのディレクトリを特定できません。');
+            var match = currentPath.match(/^\/view\/(.*)/);
+            if (match) {
+                var filePath = match[1];
+                var directoryPath = filePath.split('/').slice(0, -1).join('/') || '/';
+                window.location.href = '/view/' + directoryPath;
+            } else {
+                alert('現在のページのディレクトリを特定できません。');
+            }
         }
     });
     </script>

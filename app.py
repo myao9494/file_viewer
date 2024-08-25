@@ -45,9 +45,14 @@ def load_files():
     # index.htmlテンプレートをレンダリングし、ファイルリストを渡す
     return render_template('index.html', files=files)
 
-@app.route('/view/')
+@app.route('/view', defaults={'file_path': ''})
+@app.route('/view/', defaults={'file_path': ''})
 @app.route('/view/<path:file_path>')
-def view_file(file_path=''):
+def view_file(file_path):
+    # 末尾のスラッシュを削除
+    if file_path.endswith('/'):
+        return redirect(url_for('view_file', file_path=file_path.rstrip('/')))
+
     # file_pathが空の場合、ルートディレクトリを表示
     if not file_path:
         full_path = BASE_DIR
@@ -141,7 +146,7 @@ def search():
     results = search_files(BASE_DIR, query)
     # 検結果をフィルタリング
     filtered_results = filter_files(results, BASE_DIR)
-    # 検索結含むindex.htmlテンプレートをレンダリング
+    # 検索��含むindex.htmlテンプレートをレンダリング
     return render_template('index.html', files=filtered_results, search_query=query)
 
 @app.route('/open-in-code', methods=['POST'])
