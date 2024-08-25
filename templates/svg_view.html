@@ -140,24 +140,56 @@ let scale = 1;
 const svgContent = document.getElementById('svg-content');
 const svgContainer = document.getElementById('svg-container');
 
+function updateSvgContentSize() {
+    const svgElement = svgContent.querySelector('svg');
+    if (svgElement) {
+        // SVGの実際のサイズを取得
+        const bbox = svgElement.getBBox();
+        const viewBox = svgElement.viewBox.baseVal;
+        const width = viewBox.width || bbox.width;
+        const height = viewBox.height || bbox.height;
+
+        // コンテナのサイズを設定
+        svgContainer.style.width = `${width * scale}px`;
+        svgContainer.style.height = `${height * scale}px`;
+
+        // SVGコンテンツのサイズを設定
+        svgContent.style.width = `${width}px`;
+        svgContent.style.height = `${height}px`;
+    }
+}
+
+function applyTransform() {
+    svgContent.style.transform = `translate(${translateX}px, ${translateY}px) scale(${scale})`;
+    updateSvgContentSize();
+}
+
 svgContainer.addEventListener('wheel', function(e) {
     if (e.ctrlKey) {
         e.preventDefault();
-        const delta = e.deltaY > 0 ? 0.9 : 1.1;
-        scale *= delta;
-        scale = Math.min(Math.max(0.1, scale), 5);
-        svgContent.style.transform = `scale(${scale})`;
+        const zoomSensitivity = 0.03; // ズームの感度を調整（小さい値ほどゆっくりズームする）
+        const delta = e.deltaY > 0 ? -zoomSensitivity : zoomSensitivity;
+        scale = Math.min(Math.max(0.1, scale * (1 + delta)), 5);
+        applyTransform();
         document.getElementById('size-input').value = Math.round(scale * 100);
     }
 });
 
 let touchStartDistance = 0;
+let isDragging = false;
+let startX, startY;
+let translateX = 0, translateY = 0;
+
 svgContainer.addEventListener('touchstart', function(e) {
     if (e.touches.length === 2) {
         touchStartDistance = Math.hypot(
             e.touches[0].pageX - e.touches[1].pageX,
             e.touches[0].pageY - e.touches[1].pageY
         );
+    } else if (e.touches.length === 1) {
+        isDragging = true;
+        startX = e.touches[0].pageX - translateX;
+        startY = e.touches[0].pageY - translateY;
     }
 });
 
@@ -168,19 +200,45 @@ svgContainer.addEventListener('touchmove', function(e) {
             e.touches[0].pageX - e.touches[1].pageX,
             e.touches[0].pageY - e.touches[1].pageY
         );
-        const delta = touchEndDistance / touchStartDistance;
-        scale *= delta;
-        scale = Math.min(Math.max(0.1, scale), 5);
-        svgContent.style.transform = `scale(${scale})`;
+        const zoomSensitivity = 0.1; // ピンチズームの感度も調整
+        const delta = (touchEndDistance / touchStartDistance - 1) * zoomSensitivity;
+        scale = Math.min(Math.max(0.1, scale * (1 + delta)), 5);
+        applyTransform();
         document.getElementById('size-input').value = Math.round(scale * 100);
         touchStartDistance = touchEndDistance;
+    } else if (e.touches.length === 1 && isDragging) {
+        e.preventDefault();
+        const x = e.touches[0].pageX - startX;
+        const y = e.touches[0].pageY - startY;
+        translateX = x;
+        translateY = y;
+        applyTransform();
     }
+});
+
+svgContainer.addEventListener('touchend', function(e) {
+    isDragging = false;
 });
 
 document.getElementById('size-input').addEventListener('change', function(e) {
     scale = e.target.value / 100;
-    svgContent.style.transform = `scale(${scale})`;
+    applyTransform();
 });
 
+// 初期化時にSVGサイズを設定
+document.addEventListener('DOMContentLoaded', function() {
+    // SVG要素が完全に読み込まれるまで待機
+    const svgElement = svgContent.querySelector('svg');
+    if (svgElement) {
+        if (svgElement.complete) {
+            updateSvgContentSize();
+        } else {
+            svgElement.addEventListener('load', updateSvgContentSize);
+        }
+    }
+});
+
+// ウィンドウのリサイズ時にSVGサイズを再計算
+window.addEventListener('resize', updateSvgContentSize);
 </script>
 {% endblock %}
