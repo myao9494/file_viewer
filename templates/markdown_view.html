@@ -52,6 +52,9 @@
         .markdown-body {
             font-size: 90%;
         }
+        .file-info button {
+            margin-right: 5px;
+        }
     </style>
 </head>
 <body>
@@ -59,6 +62,7 @@
         <button onclick="openInCode()">Codeで開く</button>
         <button onclick="openFolder()">フォルダを開く</button>
         <button onclick="openJupyter()">Jupyterで開く</button>
+        <button onclick="showMindMap()">マインドマップを表示</button>
         <div class="size-input-container">
             <label for="size-input">サイズ調整 (%): </label>
             <input type="number" id="size-input" value="90" min="10" max="200" step="2">
@@ -170,6 +174,28 @@
         window.open(jupyterURL, '_blank');
     }
 
+    function showMindMap() {
+        const filePath = '{{ full_path | trim }}';
+        const basePath = '{{ BASE_DIR }}' || '/Users/sudoupousei/000_work';
+        
+        // ベースパスを除去して相対パスを取得
+        let relativePath = filePath.replace(basePath, '').replace(/^\//, '');
+        
+        const mindMapURL = 'http://localhost:5001/mindmap/' + encodeURIComponent(relativePath);
+        console.log('Mindmap URL:', mindMapURL);
+        
+        // 新しいウィンドウでマインドマップを開く
+        const newWindow = window.open(mindMapURL, '_blank');
+        
+        // エラーハンドリング
+        if (newWindow === null) {
+            alert('ポップアップがブロックされました。ブラウザの設定を確認してください。');
+        } else {
+            newWindow.onerror = function() {
+                alert('マインドマップの読み込み中にエラーが発生しました。');
+            };
+        }
+    }
 
     // 画像の読み込みエラーを処理する関数
     function handleImageError(img) {
