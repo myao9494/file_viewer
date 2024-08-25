@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="error-container">
+    <h1>404 - ページが見つかりません</h1>
+    <p>申し訳ありませんが、お探しのページは存在しないか、移動した可能性があります。</p>
+    <a href="{{ url_for('index') }}" class="btn btn-primary">ホームページに戻る</a>
+</div>
+{% endblock %}

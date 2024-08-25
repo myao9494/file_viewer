@@ -1,6 +1,6 @@
 import os
 import fnmatch
-from flask import Flask, render_template, request, send_file, abort, url_for, Response, send_from_directory, jsonify
+from flask import Flask, render_template, request, send_file, abort, url_for, Response, send_from_directory, jsonify, redirect, flash
 import re
 import csv
 from utils.file_handler import get_file_content, get_file_list
@@ -13,6 +13,7 @@ import subprocess
 from markdown import markdown
 import json
 import html
+import os.path
 
 app = Flask(__name__, static_folder='static')
 
@@ -37,20 +38,21 @@ def load_files():
     Returns:
         str: レンダリングされたHTMLテンプレート
     """
-    # すべてのファイルを取得
+    # すべてのファ���
     all_files = get_file_list(BASE_DIR)
     # フィルタリングを適用
     files = filter_files(all_files, BASE_DIR)
     # index.htmlテンプレートをレンダリングし、ファイルリストを渡す
     return render_template('index.html', files=files)
 
+@app.route('/view/')
 @app.route('/view/<path:file_path>')
-def view_file(file_path):
+def view_file(file_path=''):
     """
-    指定されたファイルを表示、ダウンロード、またはレンダリングする関数
+    指定されたファイルまたはディレクトリを表示する関数
 
     Args:
-        file_path (str): 処理するファイルのパス
+        file_path (str): 処理するファイルまたはディレクトリのパス（デフォルトは空文字列）
 
     Returns:
         str: レンダリングされたHTML、ファイル内容、またはダウンロード可能なファイル
@@ -58,9 +60,20 @@ def view_file(file_path):
     # フルパスを作成
     full_path = os.path.join(BASE_DIR, file_path)
     if not os.path.exists(full_path):
-        abort(404)  # ファイルが存在しな場合は404エラー
+        abort(404)  # ファイルが存在しない場合は404エラー
 
-    # ファイル拡張子を取得
+    # ディレクトリの場合
+    if os.path.isdir(full_path):
+        # ディレクトリ内のファイルとフォルダのリストを取得
+        items = os.listdir(full_path)
+        # ファイルとフォルダを分けてソート
+        folders = sorted([item for item in items if os.path.isdir(os.path.join(full_path, item))])
+        files = sorted([item for item in items if os.path.isfile(os.path.join(full_path, item))])
+        parent_path = os.path.dirname(file_path) if file_path != '' else None
+        # ディレクトリ表示用のテンプレートをレンダリング
+        return render_template('directory_view.html', folders=folders, files=files, current_path=file_path, parent_path=parent_path)
+
+    # ファイルの場合
     file_extension = os.path.splitext(full_path)[1].lower()
     
     # ファイルタイプごとのレンダリング方法を定義
@@ -120,7 +133,7 @@ def search():
     ファイル検索を行う関数
 
     Returns:
-        str: 検索結果含むレンダリングされたHTMLテンプレート
+        str: 検索結果含むレンダリングされたHTMLンプレート
     """
     # クエリパラメータから検索語を取得
     query = request.args.get('q', '')
@@ -148,7 +161,7 @@ def open_in_code():
             subprocess.Popen([vscode_path, os.path.dirname(file_path)])
             return jsonify({'success': True})
         else:
-            return jsonify({'success': False, 'error': 'Visual Studio Codeがつかりません。'})
+            return jsonify({'success': False, 'error': 'Visual Studio Codeがつりせん。'})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)})
 
@@ -181,7 +194,7 @@ def view_mindmap(file_path):
         file_path (str): 処理するファイルのパス
 
     Returns:
-        str: マインドマップを表示するHTMLページ
+        str: インドマップを表示するHTMLページ
     """
     full_path = os.path.join(BASE_DIR, file_path)
     if not os.path.exists(full_path) or not full_path.endswith('.md'):
@@ -192,6 +205,34 @@ def view_mindmap(file_path):
 
     return render_template('mindmap_view.html', content=content, file_path=file_path)
 
+@app.route('/<path:invalid_path>')
+def handle_invalid_path(invalid_path):
+    """
+    無効なパスへのアクセスを処理し、適切にリダイレクトまたはエラーを表示する関数
+
+    Args:
+        invalid_path (str): アクセスされたパス
+
+    Returns:
+        redirect: 適切なURLにリダイレクト、また���404エラーページ
+    """
+    # ベースディレクトリのパスを正規表現でエスケープ
+    escaped_base_dir = re.escape(BASE_DIR)
+    
+    # ベースディレクトリのパスを除去
+    match = re.match(f'^{escaped_base_dir}/?(.*)$', '/' + invalid_path)
+    if match:
+        relative_path = match.group(1)
+        # ファイルビューアのパスを構築
+        viewer_path = url_for('view_file', file_path=relative_path)
+        flash('無効なURLです。正しいページにリダイレクトします。', 'warning')
+        return redirect(viewer_path)
+    
+    # ベースディレクトリのパスが含まれていない場合は404エラー
+    flash('指定されたページは存在しません。', 'error')
+    return render_template('404.html'), 404
+
 if __name__ == '__main__':
+    app.secret_key = 'your_secret_key_here'  # フラッシュメッセージのために必要
     # デバッグモードでアプリケーションを実行
     app.run(debug=True, host='0.0.0.0', port=5001)
