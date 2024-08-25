@@ -191,18 +191,24 @@
     }
 
     function openFolder() {
+        var filePath = '{{ full_path | safe }}';  // サーバーから渡されたフルパスを使用
+        filePath = filePath.replace(/\\/g, '/');  // バックスラッシュをスラッシュに変換
+        
+        console.log("Sending file path:", filePath);  // デバッグ用
+
         fetch('/open-folder', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
             },
-            body: JSON.stringify({ path: '{{ full_path | trim }}' }),
+            body: JSON.stringify({ path: filePath }),
         })
         .then(response => response.json())
         .then(data => {
             if (data.success) {
-                // alert('フォルダが開かれました。');
+                console.log('フォルダが開かれました。');
             } else {
+                console.error('エラーが発生しました:', data.error);
                 alert('エラーが発生しました: ' + data.error);
             }
         })
@@ -218,7 +224,7 @@
         console.log('BASE_DIR:', basePath);
         console.log('Full path:', filePath);
         
-        // BASE_DIRの最後のディ���クトリ名を取得
+        // BASE_DIRの最後のディレクトリ名を取得
         const baseDir = basePath.split('/').pop();
         console.log('Base directory:', baseDir);
         
@@ -236,27 +242,37 @@
         window.open(jupyterURL, '_blank');
     }
 
+    // function showMindMap() {
+    //     const filePath = '{{ full_path | trim }}';
+    //     const basePath = '{{ BASE_DIR }}' || '/Users/sudoupousei/000_work';
+        
+    //     // ベースパスを除去して相対パスを取得
+    //     let relativePath = filePath.replace(basePath, '').replace(/^\//, '');
+        
+    //     const mindMapURL = '/mindmap/' + encodeURIComponent(relativePath);
+    //     console.log('Mindmap URL:', mindMapURL);
+        
+    //     // 新しいウィンドウでマインドマップを開く
+    //     const newWindow = window.open(mindMapURL, '_blank');
+        
+    //     // エラーハンドリング
+    //     if (newWindow === null) {
+    //         alert('ポップアップがブロックされました。ブラウザの設定を確認してください。');
+    //     } else {
+    //         newWindow.onerror = function() {
+    //             alert('マインドマップの読み込み中にエラー発生ました。');
+    //         };
+    //     }
+    // }
     function showMindMap() {
-        const filePath = '{{ full_path | trim }}';
-        const basePath = '{{ BASE_DIR }}' || '/Users/sudoupousei/000_work';
-        
-        // ベースパスを除去して相対パスを取得
-        let relativePath = filePath.replace(basePath, '').replace(/^\//, '');
-        
-        const mindMapURL = 'http://localhost:5001/mindmap/' + encodeURIComponent(relativePath);
-        console.log('Mindmap URL:', mindMapURL);
-        
-        // 新しいウィンドウでマインドマップを開く
-        const newWindow = window.open(mindMapURL, '_blank');
-        
-        // エラーハンドリング
-        if (newWindow === null) {
-            alert('ポップアップがブロックされました。ブラウザの設定を確認してください。');
-        } else {
-            newWindow.onerror = function() {
-                alert('マインドマップの読み込み中にエラー発生ました。');
-            };
-        }
+        var filePath = '{{ file_path | safe }}';
+        // ファイルパスを正規化
+        filePath = filePath.replace(/\\/g, '/').replace(/\/+/g, '/').trim();
+        // 'file_viewer'と'README.md'の間にスラッシュを挿入
+        filePath = filePath.replace('file_viewer', 'file_viewer/');
+        var mindmapUrl = '/mindmap/' + filePath;
+        console.log("Mindmap URL:", mindmapUrl);  // デバッグ用
+        window.open(mindmapUrl, '_blank');
     }
 
     // 画像の読み込みエラーを処理する関数
@@ -283,12 +299,6 @@
             }
             console.log('Modified image src:', images[i].src);
         }
-
-        // フルダパスを設定
-        var filePath = '{{ full_path }}';
-        var folderPath = filePath.substring(0, filePath.lastIndexOf('/'));
-        document.getElementById('folderPath').textContent = folderPath;
-        document.getElementById('folderPath').title = folderPath;
 
         // サイズ調整機能
         var sizeInput = document.getElementById('size-input');

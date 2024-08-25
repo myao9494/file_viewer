@@ -1,7 +1,9 @@
 {% extends "base.html" %}
 
 {% block content %}
-<h2>ディレクトリ内容: {{ current_path or '/' }}</h2>
+<div class="folder-path">
+    <h2>現在のフォルダ: {{ full_path }}</h2>
+</div>
 
 {% if parent_path is not none %}
 <a href="{{ url_for('view_file', file_path=parent_path) }}">Parent Directory</a>
