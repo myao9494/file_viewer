@@ -1,25 +1,71 @@
 {% extends "base.html" %}
 
 {% block content %}
+<style>
+    .folder-path {
+        margin-bottom: 10px;
+        padding-left: 40px; /* アイコンの幅に合わせて調整 */
+    }
+    .folder-path h2 {
+        margin: 0;
+        font-size: 1.2em;
+    }
+    ul {
+        list-style-type: none;
+        padding-left: 0;
+    }
+    li {
+        margin-bottom: 5px;
+    }
+    .icon {
+        display: inline-block;
+        width: 20px;
+        margin-right: 5px;
+    }
+</style>
+
 <div class="folder-path">
     <h2>現在のフォルダ: {{ full_path }}</h2>
 </div>
 
 {% if parent_path is not none %}
-<a href="{{ url_for('view_file', file_path=parent_path) }}">Parent Directory</a>
+<a href="{{ url_for('view_file', file_path=parent_path) }}">上の階層へ</a>
 {% endif %}
 
-<h3>Folders:</h3>
+<form id="search-form">
+    <input type="text" id="search-input" placeholder="このページ内を検索">
+    <button type="submit">検索</button>
+</form>
+
+<h3>フォルダ:</h3>
 <ul>
 {% for folder in folders %}
-    <li>📁 <a href="{{ url_for('view_file', file_path=(current_path + '/' + folder).strip('/')) }}">{{ folder }}</a></li>
+    <li>
+        <span class="icon">📁</span>
+        <a href="{{ url_for('view_file', file_path=(current_path + '/' + folder).strip('/')) }}">{{ folder }}</a>
+    </li>
 {% endfor %}
 </ul>
 
-<h3>Files:</h3>
+<h3>ファイル:</h3>
 <ul>
 {% for file in files %}
-    <li>📄 <a href="{{ url_for('view_file', file_path=(current_path + '/' + file).strip('/')) }}">{{ file }}</a></li>
+    <li><a href="{{ url_for('view_file', file_path=(current_path + '/' + file).strip('/')) }}">📄 {{ file }}</a></li>
 {% endfor %}
 </ul>
+
+<script>
+document.getElementById('search-form').addEventListener('submit', function(e) {
+    e.preventDefault();
+    var searchText = document.getElementById('search-input').value.toLowerCase();
+    var items = document.querySelectorAll('ul li');
+    items.forEach(function(item) {
+        if (item.textContent.toLowerCase().includes(searchText)) {
+            item.style.display = '';
+        } else {
+            item.style.display = 'none';
+        }
+    });
+});
+</script>
 {% endblock %}

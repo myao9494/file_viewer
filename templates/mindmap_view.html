@@ -4,9 +4,13 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>マインドマップ: {{ file_path }}</title>
-    <script src="https://unpkg.com/d3@7"></script>
-    <script src="https://unpkg.com/markmap-view@0.15.4"></script>
-    <script src="https://unpkg.com/markmap-lib@0.15.4"></script>
+    <script src="{{ url_for('static', filename='js/d3.min.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/markmap-view.min.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/markmap-lib.min.js') }}"></script>
+    <!-- オンライン版（コメントアウト） -->
+    <!-- <script src="https://unpkg.com/d3@7"></script> -->
+    <!-- <script src="https://unpkg.com/markmap-view@0.15.4"></script> -->
+    <!-- <script src="https://unpkg.com/markmap-lib@0.15.4"></script> -->
     <style>
         body {
             margin: 0;

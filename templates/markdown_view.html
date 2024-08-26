@@ -28,11 +28,19 @@
         }
     };
     </script>
-    <!-- MathJaxスクリプトの読み込み -->
-    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
-    <!-- Font Awesome の追加 -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css">
+    <!-- MathJaxスクリプトの読み込み (ローカル版) -->
+    <script id="MathJax-script" async src="{{ url_for('static', filename='js/tex-mml-chtml.js') }}"></script>
+    <!-- オンライン版（コメントアウト） -->
+    <!-- <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script> -->
+    <!-- Font Awesome の追加 (ローカル版) -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/font-awesome.min.css') }}">
+    <!-- オンライン版（コメントアウト） -->
+    <!-- <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css"> -->
     <style>
+        .file-info-container {
+            margin-left: 40px; /* ディレクトリ表示アイコンの幅に合わせて調整 */
+            padding-top: 10px; /* 上部に少し余白を追加 */
+        }
         .file-info {
             display: flex;
             align-items: center;
@@ -41,6 +49,7 @@
             margin-bottom: 10px;
             font-size: 0.9em;
             gap: 10px;
+            border-radius: 5px; /* 角を少し丸くする */
         }
         .full-path {
             flex-grow: 1;
@@ -60,6 +69,18 @@
         }
         .file-info button {
             margin-right: 5px;
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 1.2em;
+            color: #333;
+            padding: 5px;
+            border-radius: 3px;
+            transition: background-color 0.3s;
+        }
+        
+        .file-info button:hover {
+            background-color: #e0e0e0;
         }
 
         /* テーブルのスタイルを更新 */
@@ -117,20 +138,30 @@
             padding: 2px 4px;
             margin-right: 30px; /* インラインコードの右側にスペースを確保 */
         }
+
+        /* レスポンシブデザイン対応 */
+        @media (max-width: 768px) {
+            .file-info-container {
+                margin-left: 30px; /* 小さい画面では少し狭くする */
+            }
+        }
     </style>
 </head>
 <body>
-    <div class="file-info">
-        <button onclick="openInCode()">Codeで開く</button>
-        <button onclick="openFolder()">フォルダを開く</button>
-        <button onclick="openJupyter()">Jupyterで開く</button>
-        <button onclick="showMindMap()">マインドマップを表示</button>
-        <div class="size-input-container">
-            <label for="size-input">サイズ調整 (%): </label>
-            <input type="number" id="size-input" value="90" min="10" max="200" step="2">
+    <!-- ファイル情報バーをコンテナで囲む -->
+    <div class="file-info-container">
+        <div class="file-info">
+            <button onclick="openInCode()" title="Codeで開く"><i class="fas fa-code"></i></button>
+            <button onclick="openFolder()" title="フォルダを開く"><i class="fas fa-folder-open"></i></button>
+            <button onclick="openJupyter()" title="Jupyterで開く"><i class="fas fa-book"></i></button>
+            <button onclick="showMindMap()" title="マインドマップを表示"><i class="fas fa-project-diagram"></i></button>
+            <div class="size-input-container">
+                <label for="size-input">サイズ調整 (%): </label>
+                <input type="number" id="size-input" value="90" min="10" max="200" step="2">
+            </div>
+            <div class="full-path" id="filePath" onclick="copyToClipboard('filePath')" title="{{ full_path }}">{{ full_path }}</div>
+            <div class="full-path" id="folderPath" onclick="copyToClipboard('folderPath')" title="{{ folder_path }}">{{ folder_path }}</div>
         </div>
-        <div class="full-path" id="filePath" onclick="copyToClipboard('filePath')" title="{{ full_path }}">{{ full_path }}</div>
-        <div class="full-path" id="folderPath" onclick="copyToClipboard('folderPath')" title="{{ folder_path }}">{{ folder_path }}</div>
     </div>
     
     <!-- 元のマークダウンコンテンツ表示部分 -->

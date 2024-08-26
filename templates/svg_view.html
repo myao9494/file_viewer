@@ -2,7 +2,13 @@
 
 {% block head %}
 {{ super() }}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/markdown_style.css') }}">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css">
 <style>
+    .file-info-container {
+        margin-left: 40px;
+        padding-top: 10px;
+    }
     .file-info {
         display: flex;
         align-items: center;
@@ -11,6 +17,7 @@
         margin-bottom: 10px;
         font-size: 0.9em;
         gap: 10px;
+        border-radius: 5px;
     }
     .size-input-container {
         white-space: nowrap;
@@ -28,6 +35,20 @@
     #size-input {
         width: 50px;
     }
+    .file-info button {
+        margin-right: 5px;
+        background: none;
+        border: none;
+        cursor: pointer;
+        font-size: 1.2em;
+        color: #333;
+        padding: 5px;
+        border-radius: 3px;
+        transition: background-color 0.3s;
+    }
+    .file-info button:hover {
+        background-color: #e0e0e0;
+    }
     #svg-container {
         width: 100%;
         overflow: hidden;
@@ -43,16 +64,18 @@
 {% endblock %}
 
 {% block content %}
-<div class="file-info">
-    <button id="open-in-code" onclick="openInCode()">Codeで開く</button>
-    <button id="open-folder" onclick="openFolder()">フォルダを開く</button>
-    <button id="open-jupyter" onclick="openJupyter()">Jupyterで開く</button>
-    <div class="size-input-container">
-        <label for="size-input">サイズ調整 (%): </label>
-        <input type="number" id="size-input" value="100" min="10" max="200" step="2">
+<div class="file-info-container">
+    <div class="file-info">
+        <button onclick="openInCode()" title="Codeで開く"><i class="fas fa-code"></i></button>
+        <button onclick="openFolder()" title="フォルダを開く"><i class="fas fa-folder-open"></i></button>
+        <button onclick="openJupyter()" title="Jupyterで開く"><i class="fas fa-book"></i></button>
+        <div class="size-input-container">
+            <label for="size-input">サイズ調整 (%): </label>
+            <input type="number" id="size-input" value="100" min="10" max="200" step="2">
+        </div>
+        <div class="full-path" id="filePath" onclick="copyToClipboard('filePath')" title="{{ full_path }}">{{ full_path }}</div>
+        <div class="full-path" id="folderPath" onclick="copyToClipboard('folderPath')" title="{{ folder_path }}">{{ folder_path }}</div>
     </div>
-    <div class="full-path" id="filePath" onclick="copyToClipboard('filePath')" title="{{ full_path }}">{{ full_path }}</div>
-    <div class="full-path" id="folderPath" onclick="copyToClipboard('folderPath')" title="{{ folder_path }}">{{ folder_path }}</div>
 </div>
 <div id="svg-container">
     <div id="svg-content">

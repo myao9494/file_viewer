@@ -13,18 +13,35 @@
     {% block head %}{% endblock %}
     <!-- ファビコンの追加 -->
     <link rel="icon" type="image/png" href="{{ url_for('static', filename='images/flask-icon.png') }}">
+    <!-- Font Awesome の追加 (ローカル版) -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/font-awesome.min.css') }}">
+    <!-- オンライン版（コメントアウト） -->
+    <!-- <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css"> -->
     <style>
         #showDirectoryBtn {
             position: fixed;
             top: 10px;
             left: 10px;
             z-index: 1000;
+            background: none;
+            border: none;
+            font-size: 24px;
+            color: #333;
+            cursor: pointer;
+            padding: 5px;
+            border-radius: 50%;
+            transition: background-color 0.3s;
+        }
+        #showDirectoryBtn:hover {
+            background-color: rgba(0, 0, 0, 0.1);
         }
     </style>
 </head>
 <body>
-    <!-- ディレクトリ表示ボタンを追加 -->
-    <button id="showDirectoryBtn" class="btn btn-primary">ディレクトリを表示</button>
+    <!-- ディレクトリ表示ボタンをアイコンに変更 -->
+    <button id="showDirectoryBtn" title="ディレクトリを表示">
+        <i class="fas fa-folder-open"></i>
+    </button>
 
     <!-- headerブロック: ページヘッダーをPythonコードから挿入可能 -->
     {% block header %}{% endblock %}

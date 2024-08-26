@@ -1,5 +1,6 @@
 import os
 import fnmatch
+import platform
 from flask import Flask, render_template, request, send_file, abort, url_for, Response, send_from_directory, jsonify, redirect, flash
 import re
 import csv
@@ -17,10 +18,18 @@ import os.path
 
 app = Flask(__name__, static_folder='static')
 
-# ベースディレクトリの設定
-# BASE_DIR = r"C:\Users\kabu_server\000_work"
-BASE_DIR = r"C:\Users\kabu_server\000_work"  # Windowsの場合
+# OSの種類を判別
+IS_WINDOWS = platform.system() == 'Windows'
 
+# パスの区切り文字を統一する関数を追加
+def normalize_path(path):
+    return path.replace('\\', '/')
+
+# ベースディレクトリの設定
+
+mac_BASE_DIR = r"/Users/sudoupousei/000_work"  # Windowsの場合
+win_BASE_DIR = r"C:\Users\kabu_server\000_work"
+BASE_DIR = normalize_path(mac_BASE_DIR if not IS_WINDOWS else win_BASE_DIR)
 
 @app.route('/')
 def index():
@@ -63,7 +72,7 @@ def view_file(file_path):
     else:
         # 先頭のスラッシュを除去（もし存在する場合）
         file_path = file_path.lstrip('/')
-        full_path = os.path.join(BASE_DIR, file_path)
+        full_path = normalize_path(os.path.join(BASE_DIR, file_path))
 
     app.logger.info(f"full_path: {full_path}")
 
@@ -133,7 +142,7 @@ def view_file(file_path):
 
 @app.route('/raw/<path:file_path>')
 def raw_file(file_path):
-    full_path = os.path.join(BASE_DIR, file_path)
+    full_path = normalize_path(os.path.join(BASE_DIR, file_path))
     if os.path.exists(full_path):
         return send_file(full_path)
     else:
@@ -164,16 +173,16 @@ def open_in_code():
         return jsonify({'success': False, 'error': 'ファイルパスが指定されていません。'})
     
     try:
-        # macOSの場合
-        # vscode_path = '/Applications/Visual Studio Code.app/Contents/Resources/app/bin/code'
-        # Windowsの場合
-        vscode_path = r'C:\Users\kabu_server\AppData\Local\Programs\Microsoft VS Code\Code.exe'
+        if IS_WINDOWS:
+            vscode_path = r'C:\Users\kabu_server\AppData\Local\Programs\Microsoft VS Code\Code.exe'
+        else:
+            vscode_path = '/Applications/Visual Studio Code.app/Contents/Resources/app/bin/code'
         
         if os.path.exists(vscode_path):
-            subprocess.Popen([vscode_path, os.path.dirname(file_path)])
+            subprocess.Popen([vscode_path, normalize_path(os.path.dirname(file_path))])
             return jsonify({'success': True})
         else:
-            return jsonify({'success': False, 'error': 'Visual Studio Codeがつりせん。'})
+            return jsonify({'success': False, 'error': 'Visual Studio Codeが見つかりません。'})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)})
 
@@ -191,10 +200,12 @@ def open_folder():
         app.logger.info(f"開こうとしているfolder_path: {repr(folder_path)}")
         
         if os.path.exists(folder_path):
-            # macOSの場合
-            # subprocess.Popen(['open', folder_path])
-            # Windowsの場合
-            subprocess.Popen(['explorer', folder_path])
+            if IS_WINDOWS:
+                # Windowsの場合、バックスラッシュを使用
+                folder_path = folder_path.replace('/', '\\')
+                subprocess.Popen(['explorer', folder_path])
+            else:
+                subprocess.Popen(['open', folder_path])
             return jsonify({'success': True})
         else:
             return jsonify({'success': False, 'error': f'フォルダが見つかりません: {folder_path}'})
@@ -244,11 +255,13 @@ def handle_invalid_path(invalid_path):
     Returns:
         redirect: 適切なURLにリダイレクト、またはフォルダを開く、または404エラーページ
     """
+    app.logger.info(f"handle_invalid_path関数が呼び出されました。invalid_path: {repr(invalid_path)}")
+
     # ベースディレクトリのパスを正規表現でエスケープ
     escaped_base_dir = re.escape(BASE_DIR)
     
     # ベースディレクトリのパスを除去
-    match = re.match(f'^{escaped_base_dir}/?(.*)$', '/' + invalid_path)
+    match = re.match(f'^{escaped_base_dir}/?(.*)$', invalid_path)
     if match:
         relative_path = match.group(1)
         # ファイルビューアのパスを構築
@@ -257,26 +270,34 @@ def handle_invalid_path(invalid_path):
         return redirect(viewer_path)
     
     # ベースディレクトリのパスが含まれていない場合
-    full_path = '/' + invalid_path  # パスの先頭に'/'を追加
+    full_path = os.path.join(BASE_DIR, invalid_path)
+    app.logger.info(f"構築されたfull_path: {repr(full_path)}")
+
     if os.path.exists(full_path):
         if os.path.isdir(full_path):
             folder_path = full_path
         else:
             folder_path = os.path.dirname(full_path)
         
+        app.logger.info(f"開こうとしているfolder_path: {repr(folder_path)}")
+
         if os.path.exists(folder_path):
             try:
-                # macOSの場合
-                subprocess.Popen(['open', folder_path])
-                # Windowsの場合
-                # subprocess.Popen(['explorer', folder_path])
-                flash(f'フォルダを開きました: {folder_path}', 'info')
+                if IS_WINDOWS:
+                    # Windowsの場合、バックスラッシュを使用
+                    folder_path = folder_path.replace('/', '\\')
+                    subprocess.Popen(['explorer', folder_path], shell=True)
+                else:
+                    subprocess.Popen(['open', folder_path])
+                flash(f'��ォルダを開きました: {folder_path}', 'info')
                 return redirect(url_for('index'))
             except Exception as e:
+                app.logger.error(f"フォルダを開く際にエラーが発生しました: {str(e)}")
                 flash(f'フォルダを開く際にエラーが発生しました: {str(e)}', 'error')
                 return redirect(url_for('index'))
     
     # パスが存在しない場合は404エラー
+    app.logger.error(f"指定されたパスが存在しません: {full_path}")
     flash('指定されたページは存在しません。', 'error')
     return render_template('404.html'), 404
 

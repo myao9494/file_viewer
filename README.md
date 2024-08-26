@@ -37,6 +37,37 @@
    pip install -r requirements.txt
    ```
 
+### JavaScriptライブラリのローカル配置:
+
+1. 以下のディレクトリ構造を作成します:
+```
+static/
+├── js/
+│   ├── d3.min.js
+│   ├── markmap-view.min.js
+│   └── markmap-lib.min.js
+└── css/
+      └── font-awesome.min.css
+```
+
+2. 各ライブラリをダウンロードし、適切な場所に配置します:
+   - D3.js: https://d3js.org/d3.v7.min.js をダウンロードし、`static/js/d3.min.js` として保存
+   - Markmap View: https://unpkg.com/markmap-view@0.15.4/dist/index.min.js をダウンロードし、`static/js/markmap-view.min.js` として保存
+   - Markmap Lib: https://unpkg.com/markmap-lib@0.15.4/dist/index.min.js をダウンロードし、`static/js/markmap-lib.min.js` として保存
+   - Font Awesome: https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css をダウンロードし、`static/css/font-awesome.min.css` として保存
+
+3. HTMLテンプレート内のスクリプトとCSSの参照を更新します:
+   - `templates/base.html`:
+     ```html
+     <link rel="stylesheet" href="{{ url_for('static', filename='css/font-awesome.min.css') }}">
+     ```
+   - `templates/mindmap_view.html`:
+     ```html
+     <script src="{{ url_for('static', filename='js/d3.min.js') }}"></script>
+     <script src="{{ url_for('static', filename='js/markmap-view.min.js') }}"></script>
+     <script src="{{ url_for('static', filename='js/markmap-lib.min.js') }}"></script>
+     ```
+
 ## 使用方法
 1. アプリケーションを起動する:
    ```
@@ -54,6 +85,7 @@
 - テキストファイルとHTMLファイルの表示
 - ファイル検索機能
 - .view_ignoreファイルを使用した表示除外設定
+- マインドマップ表示機能（オフラインサポート）
 
 ## カスタマイズ
 - `BASE_DIR`変数（app.py内）を変更して、表示するディレクトリを設定できます
