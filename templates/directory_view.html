@@ -2,7 +2,7 @@
 
 {% block content %}
 <style>
-    .folder-path {らじ
+    .folder-path {
         margin-bottom: 10px;
         padding: 10px;
         background-color: #f0f0f0;
@@ -15,7 +15,7 @@
         font-size: 1.2em;
         cursor: pointer;
         flex-grow: 1;
-        margin-left: 30px; // アイコンとの間隔を確保
+        margin-left: 30px;
     }
     .folder-icon {
         font-size: 1.5em;
@@ -81,76 +81,116 @@
         <label><input type="radio" name="filter" value="md"> MD</label>
         <label><input type="radio" name="filter" value="svg"> SVG</label>
         <label><input type="radio" name="filter" value="all"> 全て</label>
+        <form id="depth-form" style="display: inline-block; margin-left: 15px;">
+            <label for="depth">階層数:</label>
+            <input type="number" id="depth" name="depth" value="{{ depth }}" min="0" style="width: 50px;">
+        </form>
     </div>
 </div>
 
 <h3>フォルダ:</h3>
-<ul>
+<ul class="folder-list">
 {% for folder in folders %}
-    <li>
+    <li class="folder">
         <span class="icon">📁</span>
-        <a href="{{ url_for('view_file', file_path=(current_path + '/' + folder).strip('/')) }}">{{ folder }}</a>
+        <a href="{{ url_for('view_file', file_path=folder.path) }}">{{ folder.relative_path }}</a>
     </li>
 {% endfor %}
 </ul>
 
 <h3>ファイル:</h3>
-<ul>
+<ul class="file-list">
 {% for file in files %}
-    <li><a href="{{ url_for('view_file', file_path=(current_path + '/' + file).strip('/')) }}">📄 {{ file }}</a></li>
+    <li class="file">
+        <span class="icon">📄</span>
+        <a href="{{ url_for('view_file', file_path=file.path) }}">{{ file.relative_path }}</a>
+    </li>
 {% endfor %}
 </ul>
 
 <script>
-document.getElementById('search-form').addEventListener('submit', function(e) {
-    e.preventDefault();
-    var searchText = document.getElementById('search-input').value.toLowerCase();
-    var items = document.querySelectorAll('ul li');
-    items.forEach(function(item) {
-        if (item.textContent.toLowerCase().includes(searchText)) {
-            item.style.display = '';
-        } else {
-            item.style.display = 'none';
-        }
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('DOMContentLoaded event fired');
+
+    // 検索機能
+    document.getElementById('search-form').addEventListener('submit', function(e) {
+        e.preventDefault();
+        console.log('Search form submitted');
+        var searchText = document.getElementById('search-input').value.toLowerCase();
+        var items = document.querySelectorAll('.folder-list li, .file-list li');
+        items.forEach(function(item) {
+            if (item.classList.contains('folder') || item.textContent.toLowerCase().includes(searchText)) {
+                item.style.display = '';
+            } else {
+                item.style.display = 'none';
+            }
+        });
+    });
+
+    // フィルター機能
+    function applyFilter() {
+        console.log('applyFilter function called');
+        var selectedFilter = document.querySelector('input[name="filter"]:checked').value;
+        console.log('Selected filter:', selectedFilter);
+        var files = document.querySelectorAll('.file-list li');
+        files.forEach(function(file) {
+            var fileName = file.querySelector('a').textContent.toLowerCase();
+            console.log('Processing file:', fileName);
+            if (selectedFilter === 'all' ||
+                (selectedFilter === 'md+svg' && (fileName.endsWith('.md') || fileName.endsWith('.svg'))) ||
+                (selectedFilter === 'md' && fileName.endsWith('.md')) ||
+                (selectedFilter === 'svg' && fileName.endsWith('.svg'))) {
+                file.style.display = '';
+                console.log('File displayed');
+            } else {
+                file.style.display = 'none';
+                console.log('File hidden');
+            }
+        });
+    }
+
+    // ラジオボタンのイベントリスナーを設定
+    document.querySelectorAll('input[name="filter"]').forEach(function(radio) {
+        console.log('Adding event listener to radio button:', radio.value);
+        radio.addEventListener('change', function() {
+            console.log('Radio button changed:', this.value);
+            applyFilter();
+        });
+    });
+
+    // 初期表示時にフィルターを適用
+    console.log('Applying initial filter');
+    applyFilter();
+
+    // 階層数の入力フィールドのイベントリスナーを設定
+    document.getElementById('depth').addEventListener('change', function() {
+        console.log('Depth changed:', this.value);
+        var currentUrl = new URL(window.location.href);
+        currentUrl.searchParams.set('depth', this.value);
+        window.location.href = currentUrl.toString();
+    });
+
+    // depth-formのsubmitイベントを無効化
+    document.getElementById('depth-form').addEventListener('submit', function(e) {
+        e.preventDefault();
+    });
+
+    // クリップボードにコピーする機能
+    function copyToClipboard(elementId) {
+        var element = document.getElementById(elementId);
+        var text = element.textContent;
+        navigator.clipboard.writeText(text).then(function() {
+            console.log('Copying to clipboard was successful!');
+        }, function(err) {
+            console.error('Could not copy text: ', err);
+        });
+    }
+
+    // currentPathのクリックイベントを設定
+    document.getElementById('currentPath').addEventListener('click', function() {
+        console.log('currentPath clicked');
+        copyToClipboard('currentPath');
     });
 });
-
-function copyToClipboard(elementId) {
-    var element = document.getElementById(elementId);
-    var textArea = document.createElement("textarea");
-    textArea.value = element.textContent.replace('現在のフォルダ: ', '');
-    document.body.appendChild(textArea);
-    textArea.select();
-    document.execCommand('copy');
-    document.body.removeChild(textArea);
-    
-    element.style.backgroundColor = '#90EE90';
-    setTimeout(function() {
-        element.style.backgroundColor = '#f0f0f0';
-    }, 500);
-}
-
-function applyFilter() {
-    var selectedFilter = document.querySelector('input[name="filter"]:checked').value;
-    var items = document.querySelectorAll('ul li');
-    items.forEach(function(item) {
-        var fileName = item.textContent.toLowerCase();
-        if (selectedFilter === 'all' ||
-            (selectedFilter === 'md+svg' && (fileName.endsWith('.md') || fileName.endsWith('.svg'))) ||
-            (selectedFilter === 'md' && fileName.endsWith('.md')) ||
-            (selectedFilter === 'svg' && fileName.endsWith('.svg'))) {
-            item.style.display = '';
-        } else {
-            item.style.display = 'none';
-        }
-    });
-}
-
-document.querySelectorAll('input[name="filter"]').forEach(function(radio) {
-    radio.addEventListener('change', applyFilter);
-});
-
-// 初期表示時にフィルターを適用
-applyFilter();
 </script>
 {% endblock %}

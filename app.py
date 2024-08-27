@@ -66,6 +66,8 @@ def load_files():
 def view_file(file_path):
     app.logger.info(f"view_file関数が呼び出されました。file_path: {repr(file_path)}")
 
+    depth = int(request.args.get('depth', 0))  # デフォルトを0に変更
+
     # 末尾のスラッシュを削除
     if file_path.endswith('/'):
         return redirect(url_for('view_file', file_path=file_path.rstrip('/')))
@@ -74,7 +76,7 @@ def view_file(file_path):
     if not file_path:
         full_path = BASE_DIR
     else:
-        # 先頭のスラッシュを除去（もし存在する場合）
+        # 先頭のラッシュを除去（もし存在する場合）
         file_path = file_path.lstrip('/')
         full_path = normalize_path(os.path.join(BASE_DIR, file_path))
 
@@ -87,14 +89,9 @@ def view_file(file_path):
     # ディレクトリの場合
     if os.path.isdir(full_path):
         app.logger.info(f"ディレクトリを表示します: {full_path}")
-        # ディレクトリ内のファイルとフォルダのリストを取得
-        items = os.listdir(full_path)
-        # ファイルとフォルダを分けてソート
-        folders = sorted([item for item in items if os.path.isdir(os.path.join(full_path, item))])
-        files = sorted([item for item in items if os.path.isfile(os.path.join(full_path, item))])
+        folders, files = get_items_with_depth(full_path, depth, file_path)
         parent_path = os.path.dirname(file_path) if file_path != '' else None
-        # ディレクトリ表示用のテンプレートをレンダリング
-        return render_template('directory_view.html', folders=folders, files=files, current_path=file_path, parent_path=parent_path, full_path=full_path)
+        return render_template('directory_view.html', folders=folders, files=files, current_path=file_path, parent_path=parent_path, full_path=full_path, depth=depth)
 
     # ファイルの場合
     file_extension = os.path.splitext(full_path)[1].lower()
@@ -200,7 +197,7 @@ def open_in_code():
             subprocess.Popen([vscode_path, normalize_path(os.path.dirname(file_path))])
             return jsonify({'success': True})
         else:
-            return jsonify({'success': False, 'error': 'Visual Studio Codeが見つかりません。'})
+            return jsonify({'success': False, 'error': 'Visual Studio Codeが見つかりま���ん。'})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)})
 
@@ -336,6 +333,47 @@ def open_path():
     except Exception as e:
         app.logger.error(f"エラーが発生しました: {str(e)}")
         return jsonify({'success': False, 'error': str(e)})
+
+def get_items_with_depth(root_path, depth, current_path):
+    folders = []
+    files = []
+    for dirpath, dirnames, filenames in os.walk(root_path):
+        relative_path = os.path.relpath(dirpath, root_path)
+        if relative_path == '.':
+            current_depth = 0
+        else:
+            current_depth = len(relative_path.split(os.sep))
+
+        if current_depth > depth:
+            dirnames[:] = []  # これ以上深いディレクトリは探索しない
+            continue
+
+        if current_depth == depth:
+            for dirname in dirnames:
+                full_path = os.path.join(dirpath, dirname)
+                relative_to_current = os.path.relpath(full_path, root_path)
+                folders.append({
+                    'is_dir': True,
+                    'path': os.path.join(current_path, relative_to_current),
+                    'relative_path': relative_to_current
+                })
+            
+        if current_depth <= depth:
+            for filename in filenames:
+                full_path = os.path.join(dirpath, filename)
+                relative_to_current = os.path.relpath(full_path, root_path)
+                files.append({
+                    'is_dir': False,
+                    'path': os.path.join(current_path, relative_to_current),
+                    'relative_path': relative_to_current
+                })
+
+        if current_depth == 0 and depth == 0:
+            break  # 現在のフォルダのみを処理
+
+    folders.sort(key=lambda x: x['relative_path'].lower())
+    files.sort(key=lambda x: x['relative_path'].lower())
+    return folders, files
 
 if __name__ == '__main__':
     app.secret_key = 'your_secret_key_here'  # フラッシュメッセージのために必要
