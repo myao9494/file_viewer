@@ -2,13 +2,24 @@
 
 {% block content %}
 <style>
-    .folder-path {
+    .folder-path {らじ
         margin-bottom: 10px;
-        padding-left: 40px; /* アイコンの幅に合わせて調整 */
+        padding: 10px;
+        background-color: #f0f0f0;
+        border-radius: 5px;
+        display: flex;
+        align-items: center;
     }
     .folder-path h2 {
         margin: 0;
         font-size: 1.2em;
+        cursor: pointer;
+        flex-grow: 1;
+        margin-left: 30px; // アイコンとの間隔を確保
+    }
+    .folder-icon {
+        font-size: 1.5em;
+        margin-right: 10px;
     }
     ul {
         list-style-type: none;
@@ -22,20 +33,56 @@
         width: 20px;
         margin-right: 5px;
     }
+    .search-container {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        margin-bottom: 10px;
+    }
+    #search-form {
+        flex: 1 0 100%;
+        margin-bottom: 10px;
+    }
+    #filter-options {
+        display: flex;
+        align-items: center;
+    }
+    #filter-options label {
+        margin-right: 15px;
+    }
+    @media (min-width: 768px) {
+        #search-form {
+            flex: 0 1 auto;
+            margin-right: 20px;
+            margin-bottom: 0;
+        }
+        #filter-options {
+            flex: 1;
+        }
+    }
 </style>
 
 <div class="folder-path">
-    <h2>現在のフォルダ: {{ full_path }}</h2>
+    <span class="folder-icon">📁</span>
+    <h2 id="currentPath" onclick="copyToClipboard('currentPath')" title="{{ full_path }}">現在のフォルダ: {{ full_path }}</h2>
 </div>
 
 {% if parent_path is not none %}
 <a href="{{ url_for('view_file', file_path=parent_path) }}">上の階層へ</a>
 {% endif %}
 
-<form id="search-form">
-    <input type="text" id="search-input" placeholder="このページ内を検索">
-    <button type="submit">検索</button>
-</form>
+<div class="search-container">
+    <form id="search-form">
+        <input type="text" id="search-input" placeholder="このページ内を検索">
+        <button type="submit">検索</button>
+    </form>
+    <div id="filter-options">
+        <label><input type="radio" name="filter" value="md+svg" checked> MD+SVG</label>
+        <label><input type="radio" name="filter" value="md"> MD</label>
+        <label><input type="radio" name="filter" value="svg"> SVG</label>
+        <label><input type="radio" name="filter" value="all"> 全て</label>
+    </div>
+</div>
 
 <h3>フォルダ:</h3>
 <ul>
@@ -67,5 +114,43 @@ document.getElementById('search-form').addEventListener('submit', function(e) {
         }
     });
 });
+
+function copyToClipboard(elementId) {
+    var element = document.getElementById(elementId);
+    var textArea = document.createElement("textarea");
+    textArea.value = element.textContent.replace('現在のフォルダ: ', '');
+    document.body.appendChild(textArea);
+    textArea.select();
+    document.execCommand('copy');
+    document.body.removeChild(textArea);
+    
+    element.style.backgroundColor = '#90EE90';
+    setTimeout(function() {
+        element.style.backgroundColor = '#f0f0f0';
+    }, 500);
+}
+
+function applyFilter() {
+    var selectedFilter = document.querySelector('input[name="filter"]:checked').value;
+    var items = document.querySelectorAll('ul li');
+    items.forEach(function(item) {
+        var fileName = item.textContent.toLowerCase();
+        if (selectedFilter === 'all' ||
+            (selectedFilter === 'md+svg' && (fileName.endsWith('.md') || fileName.endsWith('.svg'))) ||
+            (selectedFilter === 'md' && fileName.endsWith('.md')) ||
+            (selectedFilter === 'svg' && fileName.endsWith('.svg'))) {
+            item.style.display = '';
+        } else {
+            item.style.display = 'none';
+        }
+    });
+}
+
+document.querySelectorAll('input[name="filter"]').forEach(function(radio) {
+    radio.addEventListener('change', applyFilter);
+});
+
+// 初期表示時にフィルターを適用
+applyFilter();
 </script>
 {% endblock %}
