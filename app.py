@@ -264,61 +264,78 @@ def view_mindmap(file_path):
 
 @app.route('/<path:invalid_path>')
 def handle_invalid_path(invalid_path):
-    """
-    無効なパスへのアクセスを処理し、適切にリダイレクトまたはエラーを表示する関数
-
-    Args:
-        invalid_path (str): アクセスされたパス
-
-    Returns:
-        redirect: 適切なURLにリダイレクト、またはフォルダを開く、または404エラーページ
-    """
     app.logger.info(f"handle_invalid_path関数が呼び出されました。invalid_path: {repr(invalid_path)}")
 
-    # ベースディレクトリのパスを正規表現でエスケープ
-    escaped_base_dir = re.escape(BASE_DIR)
+    # パスの正規化
+    normalized_path = normalize_path(invalid_path)
     
-    # ベースディレクトリのパスを除去
-    match = re.match(f'^{escaped_base_dir}/?(.*)$', invalid_path)
-    if match:
-        relative_path = match.group(1)
-        # ファイルビューアのパスを構築
-        viewer_path = url_for('view_file', file_path=relative_path)
-        flash('無効なURLです。正しいページにリダイレクトします。', 'warning')
-        return redirect(viewer_path)
-    
-    # ベースディレクトリのパスが含まれていない場合
-    full_path = os.path.join(BASE_DIR, invalid_path)
-    app.logger.info(f"構築されたfull_path: {repr(full_path)}")
-
-    if os.path.exists(full_path):
-        if os.path.isdir(full_path):
-            folder_path = full_path
+    # ネットワークパスの場合
+    if normalized_path.startswith('//') or normalized_path.startswith('\\\\'):
+        folder_path = os.path.dirname(normalized_path)
+    else:
+        # ローカルパスの場合
+        if os.path.isabs(normalized_path):
+            folder_path = os.path.dirname(normalized_path)
         else:
+            # BASE_DIRを使用せずに、ルートからのパスとして扱う
+            full_path = os.path.abspath(os.path.join('/', normalized_path))
             folder_path = os.path.dirname(full_path)
-        
-        app.logger.info(f"開こうとしているfolder_path: {repr(folder_path)}")
 
+    app.logger.info(f"開こうとしているfolder_path: {repr(folder_path)}")
+
+    try:
         if os.path.exists(folder_path):
-            try:
-                if IS_WINDOWS:
-                    # Windowsの場合、バックスラッシュを使用
-                    folder_path = folder_path.replace('/', '\\')
-                    subprocess.Popen(['explorer', folder_path], shell=True)
-                else:
-                    subprocess.Popen(['open', folder_path])
-                flash(f'フォルダを開きました: {folder_path}', 'info')
-                return redirect(url_for('index'))
-            except Exception as e:
-                app.logger.error(f"フォルダを開く際にエラーが発生しました: {str(e)}")
-                flash(f'フォルダを開く際にエラーが発生しました: {str(e)}', 'error')
-                return redirect(url_for('index'))
-    
-    # パスが存在しない場合は404エラー
-    app.logger.error(f"指定されたパスが存在しません: {full_path}")
-    flash('指定されたページは存在しません。', 'error')
-    return render_template('404.html'), 404
+            if IS_WINDOWS:
+                # Windowsの場合、バックスラッシュを使用
+                folder_path = folder_path.replace('/', '\\')
+                subprocess.Popen(['explorer', folder_path])
+            else:
+                subprocess.Popen(['open', folder_path])
+            flash(f'フォルダを開きました: {folder_path}', 'success')
+        else:
+            flash(f'フォルダが見つかりません: {folder_path}', 'error')
+    except Exception as e:
+        app.logger.error(f"エラーが発生しました: {str(e)}")
+        flash(f'エラーが発生しました: {str(e)}', 'error')
 
+    # 元のページにリダイレクト
+    return redirect(request.referrer or url_for('index'))
+
+@app.route('/open-path', methods=['POST'])
+def open_path():
+    data = request.json
+    path = data.get('path')
+    app.logger.info(f"受信したpath: {repr(path)}")
+    
+    if not path:
+        app.logger.error("パスが指定されていません。")
+        return jsonify({'success': False, 'error': 'パスが指定されていません。'})
+    
+    try:
+        # ネットワークパスの場合は直接使用
+        if path.startswith('\\\\') or path.startswith('//'):
+            folder_path = os.path.dirname(path) if os.path.isfile(path) else path
+        else:
+            # ローカルパスの場合、BASE_DIRからの相対パスとして扱う
+            full_path = os.path.abspath(os.path.join(BASE_DIR, path))
+            folder_path = os.path.dirname(full_path) if os.path.isfile(full_path) else full_path
+
+        app.logger.info(f"開こうとしているfolder_path: {repr(folder_path)}")
+        
+        if os.path.exists(folder_path):
+            if platform.system() == 'Windows':
+                subprocess.Popen(['explorer', folder_path])
+            else:
+                subprocess.Popen(['open', folder_path])
+            return jsonify({'success': True, 'message': f'フォルダを開きました: {folder_path}'})
+        else:
+            return jsonify({'success': False, 'error': f'フォルダが見つかりません: {folder_path}'})
+    except PermissionError:
+        app.logger.error(f"アクセス拒否: {folder_path}")
+        return jsonify({'success': False, 'error': f'アクセス拒否: {folder_path}'})
+    except Exception as e:
+        app.logger.error(f"エラーが発生しました: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)})
 
 if __name__ == '__main__':
     app.secret_key = 'your_secret_key_here'  # フラッシュメッセージのために必要
