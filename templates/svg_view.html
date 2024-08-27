@@ -144,12 +144,25 @@ function openFolder() {
 }
 
 function openJupyter() {
-    const basePath = '{{ BASE_DIR }}';
-    const filePath = '{{ full_path | trim }}';
-    const folderPath = filePath.substring(0, filePath.lastIndexOf('/'));
-    const relativePath = folderPath.replace(basePath, '').replace(/^\//, '');
-    const jupyterURL = 'http://localhost:8888/lab/tree/' + encodeURIComponent(relativePath);
-    window.open(jupyterURL, '_blank');
+    fetch('/open-jupyter', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ path: '{{ full_path | trim }}' }),
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // サーバーサイドで処理が成功した場合、何もしない
+        } else {
+            alert('エラーが発生しました: ' + data.error);
+        }
+    })
+    .catch((error) => {
+        console.error('Error:', error);
+        alert('エラーが発生しました。');
+    });
 }
 
 document.addEventListener('DOMContentLoaded', function() {

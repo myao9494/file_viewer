@@ -15,6 +15,7 @@ from markdown import markdown
 import json
 import html
 import os.path
+import webbrowser
 
 app = Flask(__name__, static_folder='static')
 
@@ -30,6 +31,9 @@ def normalize_path(path):
 mac_BASE_DIR = r"/Users/sudoupousei/000_work"  # Windowsの場合
 win_BASE_DIR = r"C:\Users\kabu_server\000_work"
 BASE_DIR = normalize_path(mac_BASE_DIR if not IS_WINDOWS else win_BASE_DIR)
+
+# JupyterのベースURLを設定
+JUPYTER_BASE_URL =  'http://localhost:8888/lab/tree/' 
 
 @app.route('/')
 def index():
@@ -132,8 +136,22 @@ def view_file(file_path):
         content = render_csv(full_path)
         return render_template('csv_view.html', content=content, file_path=file_path, full_path=full_path, BASE_DIR=BASE_DIR)
 
+    # ipynbファイルの場合
+    if file_extension == '.ipynb':
+        # ファイルパスをベースディレクトリからの相対パスに変換
+        relative_path = os.path.relpath(full_path, BASE_DIR)
+        # JupyterのURLを構築
+        jupyter_url = f"{JUPYTER_BASE_URL}/{relative_path}"
+        
+        # ブラウザでJupyterのURLを開く
+        webbrowser.open(jupyter_url)
+        
+        # ユーザーに通知を返す
+        flash('Jupyter Notebookを開きました。', 'info')
+        return redirect(url_for('index'))
+
     # テキストファイルまたは特定の拡張子の場合
-    if mime_type and mime_type.startswith('text/') or file_extension in ['.txt', '.py', '.js', '.css', '.json', '.ipynb', '.license', '.yml', '.yaml', '.xml', '.ini', '.cfg', '.conf']:
+    if mime_type and mime_type.startswith('text/') or file_extension in ['.txt', '.py', '.js', '.css', '.json', '.license', '.yml', '.yaml', '.xml', '.ini', '.cfg', '.conf']:
         content = get_file_content(full_path, 'text')
         return render_template('view_file.html', content=content, file_path=file_path, full_path=full_path)
 
@@ -289,7 +307,7 @@ def handle_invalid_path(invalid_path):
                     subprocess.Popen(['explorer', folder_path], shell=True)
                 else:
                     subprocess.Popen(['open', folder_path])
-                flash(f'��ォルダを開きました: {folder_path}', 'info')
+                flash(f'フォルダを開きました: {folder_path}', 'info')
                 return redirect(url_for('index'))
             except Exception as e:
                 app.logger.error(f"フォルダを開く際にエラーが発生しました: {str(e)}")
@@ -300,6 +318,7 @@ def handle_invalid_path(invalid_path):
     app.logger.error(f"指定されたパスが存在しません: {full_path}")
     flash('指定されたページは存在しません。', 'error')
     return render_template('404.html'), 404
+
 
 if __name__ == '__main__':
     app.secret_key = 'your_secret_key_here'  # フラッシュメッセージのために必要
