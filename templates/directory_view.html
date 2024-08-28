@@ -95,10 +95,12 @@
         <button type="submit">検索</button>
     </form>
     <div id="filter-options">
-        <label><input type="radio" name="filter" value="md+svg" checked> MD+SVG</label>
+        <label><input type="radio" name="filter" value="md+svg+csv" checked> MD+SVG+CSV</label>
         <label><input type="radio" name="filter" value="md"> MD</label>
         <label><input type="radio" name="filter" value="svg"> SVG</label>
+        <label><input type="radio" name="filter" value="csv"> CSV</label>
         <label><input type="radio" name="filter" value="all"> 全て</label>
+        <label><input type="checkbox" id="hide-folders" checked> フォルダを非表示</label>
         <form id="depth-form" style="display: inline-block; margin-left: 15px;">
             <label for="depth">階層数:</label>
             <input type="number" id="depth" name="depth" value="{{ depth }}" min="0" style="width: 50px;">
@@ -149,38 +151,56 @@ document.addEventListener('DOMContentLoaded', function() {
     function applyFilter() {
         console.log('applyFilter function called');
         var selectedFilter = document.querySelector('input[name="filter"]:checked').value;
+        var hideFolders = document.getElementById('hide-folders').checked;
         console.log('Selected filter:', selectedFilter);
+        console.log('Hide folders:', hideFolders);
         var items = document.querySelectorAll('.folder-list li, .file-list li');
         items.forEach(function(item) {
             var itemPath = item.querySelector('a').getAttribute('href').split('/view/')[1];
             var shouldShow = true;
 
-            // .view_ignoreルールを適用
-            fetch('/check_ignore?path=' + encodeURIComponent(itemPath))
-                .then(response => response.json())
-                .then(data => {
-                    if (data.ignored) {
-                        shouldShow = false;
-                    } else if (item.classList.contains('file')) {
-                        var fileName = item.querySelector('a').textContent.toLowerCase();
-                        shouldShow = (selectedFilter === 'all' ||
-                            (selectedFilter === 'md+svg' && (fileName.endsWith('.md') || fileName.endsWith('.svg'))) ||
-                            (selectedFilter === 'md' && fileName.endsWith('.md')) ||
-                            (selectedFilter === 'svg' && fileName.endsWith('.svg')));
-                    }
-                    item.style.display = shouldShow ? '' : 'none';
-                });
+            if (hideFolders && item.classList.contains('folder')) {
+                shouldShow = false;
+            } else {
+                // .view_ignoreルールを適用
+                fetch('/check_ignore?path=' + encodeURIComponent(itemPath))
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.ignored) {
+                            shouldShow = false;
+                        } else if (item.classList.contains('file')) {
+                            var fileName = item.querySelector('a').textContent.toLowerCase();
+                            shouldShow = (selectedFilter === 'all' ||
+                                (selectedFilter === 'md+svg+csv' && (fileName.endsWith('.md') || fileName.endsWith('.svg') || fileName.endsWith('.csv'))) ||
+                                (selectedFilter === 'md' && fileName.endsWith('.md')) ||
+                                (selectedFilter === 'svg' && fileName.endsWith('.svg')) ||
+                                (selectedFilter === 'csv' && fileName.endsWith('.csv')));
+                        }
+                        item.style.display = shouldShow ? '' : 'none';
+                    });
+            }
+            item.style.display = shouldShow ? '' : 'none';
         });
     }
 
-    // ラジオボタンのイベントリスナーを設定
-    document.querySelectorAll('input[name="filter"]').forEach(function(radio) {
-        console.log('Adding event listener to radio button:', radio.value);
-        radio.addEventListener('change', function() {
-            console.log('Radio button changed:', this.value);
+    // ラジオボタンとチェックボックスのイベントリスナーを設定
+    document.querySelectorAll('input[name="filter"], #hide-folders').forEach(function(input) {
+        console.log('Adding event listener to input:', input.value || input.id);
+        input.addEventListener('change', function() {
+            console.log('Input changed:', this.value || this.id);
             applyFilter();
+            // フォルダ非表示の状態をローカルストレージに保存
+            if (this.id === 'hide-folders') {
+                localStorage.setItem('hideFolders', this.checked);
+            }
         });
     });
+
+    // ページ読み込み時にフォルダ非表示の状態を復元
+    var hideFolders = localStorage.getItem('hideFolders');
+    if (hideFolders !== null) {
+        document.getElementById('hide-folders').checked = hideFolders === 'true';
+    }
 
     // 初期表示時にフィルターを適用
     console.log('Applying initial filter');
