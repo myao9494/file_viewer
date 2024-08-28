@@ -8,7 +8,30 @@
 </head>
 <body>
     <h1>ファイルビューワー</h1>
-    <p>ベースディレクトリ: {{ base_dir }}</p>
-    <a href="{{ url_for('load_files') }}" class="button">ファイルの読み込み</a>
+    <form id="base-dir-form">
+        <label for="base-dir">ベースディレクトリ：</label>
+        <input type="text" id="base-dir" name="base_dir" value="{{ base_dir }}" required>
+        <button type="submit">更新</button>
+    </form>
+    <div id="message"></div>
+    <a href="{{ url_for('load_files') }}">ファイル一覧を表示</a>
+
+    <script>
+    document.getElementById('base-dir-form').addEventListener('submit', function(e) {
+        e.preventDefault();
+        fetch('/set_base_dir', {
+            method: 'POST',
+            body: new FormData(this),
+        })
+        .then(response => response.json())
+        .then(data => {
+            document.getElementById('message').textContent = data.message;
+            if (data.success) {
+                // 成功した場合、入力フィールドの値を更新
+                document.getElementById('base-dir').value = data.base_dir;
+            }
+        });
+    });
+    </script>
 </body>
 </html>

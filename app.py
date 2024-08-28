@@ -1,7 +1,7 @@
 import os
 import fnmatch
 import platform
-from flask import Flask, render_template, request, send_file, abort, url_for, Response, send_from_directory, jsonify, redirect, flash
+from flask import Flask, render_template, request, send_file, abort, url_for, Response, send_from_directory, jsonify, redirect, flash, session
 import re
 import csv
 from utils.file_handler import get_file_content, get_file_list
@@ -25,6 +25,9 @@ IS_WINDOWS = platform.system() == 'Windows'
 # パスの区切り文字を統一する関数を追加
 def normalize_path(path):
     return path.replace('\\', '/')
+
+# グローバル変数としてBASE_DIRを定義
+global BASE_DIR
 
 # ベースディレクトリの設定
 
@@ -395,7 +398,25 @@ def check_ignore():
     is_ignored = should_ignore(path, ignored_patterns)
     return jsonify({'ignored': is_ignored})
 
+@app.route('/set_base_dir', methods=['POST'])
+def set_base_dir():
+    global BASE_DIR
+    new_base_dir = request.form.get('base_dir')
+    if os.path.isdir(new_base_dir):
+        BASE_DIR = normalize_path(new_base_dir)
+        # セッションにBASE_DIRを保存
+        session['BASE_DIR'] = BASE_DIR
+        return jsonify({'success': True, 'message': 'ベースディレクトリが更新されました。', 'base_dir': BASE_DIR})
+    else:
+        return jsonify({'success': False, 'message': '無効なディレクトリパスです。'})
+
+@app.before_request
+def before_request():
+    global BASE_DIR
+    # セッションからBASE_DIRを取得（存在しない場合はデフォルト値を使用）
+    BASE_DIR = session.get('BASE_DIR', BASE_DIR)
+
 if __name__ == '__main__':
-    app.secret_key = 'your_secret_key_here'  # フラッシュメッセージのために必要
+    app.secret_key = 'your_secret_key_here'  # セッション用の秘密鍵
     # デバッグモードでアプリケーションを実行
     app.run(debug=True, host='0.0.0.0', port=5001)
