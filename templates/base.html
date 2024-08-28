@@ -61,18 +61,20 @@
     <script>
     document.getElementById('showDirectoryBtn').addEventListener('click', function() {
         var currentPath = window.location.pathname;
-        if (currentPath === '/view//' || currentPath === '/view') {
-            // ルートディレクトリの場合、/viewにリダイレクト
-            window.location.href = '/view';
-        } else {
-            var match = currentPath.match(/^\/view\/(.*)/);
-            if (match) {
-                var filePath = match[1];
-                var directoryPath = filePath.split('/').slice(0, -1).join('/') || '/';
+        if (currentPath.startsWith('/view/')) {
+            var filePath = currentPath.substring(6); // '/view/'の長さは6
+            if (filePath.includes('.')) {
+                // ファイルを表示している場合、現在のディレクトリを表示
+                var directoryPath = filePath.split('/').slice(0, -1).join('/');
                 window.location.href = '/view/' + directoryPath;
             } else {
-                alert('現在のページのディレクトリを特定できません。');
+                // ディレクトリを表示している場合、カスタムイベントを発火
+                var event = new Event('showDirectoryBtnClicked');
+                document.dispatchEvent(event);
             }
+        } else {
+            // '/view'以外のページの場合、ルートディレクトリに移動
+            window.location.href = '/view';
         }
     });
     </script>

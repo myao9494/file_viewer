@@ -77,10 +77,12 @@
 </style>
 
 <div class="folder-path">
-    <span class="folder-icon">📁</span>
     <h2 id="currentPath">
         現在のフォルダ: <span class="path-text" onclick="copyToClipboard('currentPath')" title="{{ full_path }}">{{ full_path }}</span>
     </h2>
+    <!-- {% if parent_path is not none %}
+    <button id="showDirectoryBtn" onclick="goToParentDirectory()">上の階層へ</button>
+    {% endif %} -->
 </div>
 
 {% if parent_path is not none %}
@@ -218,6 +220,20 @@ document.addEventListener('DOMContentLoaded', function() {
         console.log('currentPath clicked');
         copyToClipboard('currentPath');
     });
+
+    // showDirectoryBtnのクリックイベントを処理
+    document.getElementById('showDirectoryBtn').addEventListener('click', function() {
+        goToParentDirectory();
+    });
+
+    // 上の階層へ移動する関数
+    window.goToParentDirectory = function() {
+        {% if parent_path is not none %}
+        window.location.href = "{{ url_for('view_file', file_path=parent_path) }}";
+        {% else %}
+        console.log('既にルートディレクトリにいます。');
+        {% endif %}
+    }
 });
 </script>
 {% endblock %}
