@@ -66,7 +66,7 @@ def load_files():
 def view_file(file_path):
     app.logger.info(f"view_file関数が呼び出されました。file_path: {repr(file_path)}")
 
-    depth = int(request.args.get('depth', 0))  # デフォルトを0に変更
+    depth = int(request.args.get('depth', 0))
 
     # 末尾のスラッシュを削除
     if file_path.endswith('/'):
@@ -75,34 +75,30 @@ def view_file(file_path):
     # file_pathが空の場合、ルートディレクトリを表示
     if not file_path:
         full_path = BASE_DIR
+        current_item = 'Root'
     else:
-        # 先頭のラッシュを除去（もし存在する場合）
         file_path = file_path.lstrip('/')
         full_path = normalize_path(os.path.join(BASE_DIR, file_path))
+        file_name = os.path.basename(file_path)
+        folder_name = os.path.basename(os.path.dirname(file_path))
+        current_item = f"{file_name} - {folder_name}" if folder_name else file_name
 
     app.logger.info(f"full_path: {full_path}")
 
     if not os.path.exists(full_path):
         app.logger.error(f"ファイルが存在しません: {full_path}")
-        abort(404)  # ファイルが存在しない場合は404エラー
+        abort(404)
 
     # ディレクトリの場合
     if os.path.isdir(full_path):
         app.logger.info(f"ディレクトリを表示します: {full_path}")
         folders, files = get_items_with_depth(full_path, depth, file_path)
         parent_path = os.path.dirname(file_path) if file_path != '' else None
-        return render_template('directory_view.html', folders=folders, files=files, current_path=file_path, parent_path=parent_path, full_path=full_path, depth=depth)
+        return render_template('directory_view.html', folders=folders, files=files, current_path=file_path, parent_path=parent_path, full_path=full_path, depth=depth, current_item=current_item)
 
     # ファイルの場合
     file_extension = os.path.splitext(full_path)[1].lower()
     
-    # ファイルタイプごとのレンダリング方法を定義
-    renderers = {
-        '.md': ('markdown_view.html', render_markdown),
-        '.csv': ('csv_view.html', render_csv),
-        '.html': ('view_file.html', lambda path: get_file_content(path, 'html')),
-    }
-
     # MIMEタイプを取得
     mime_type, _ = mimetypes.guess_type(full_path)
 
@@ -111,12 +107,12 @@ def view_file(file_path):
         with open(full_path, 'r', encoding='utf-8') as f:
             svg_content = f.read()
         svg_content = svg_content.replace('<svg', '<svg id="svg-content"', 1)
-        return render_template('svg_view.html', svg_content=svg_content, file_path=file_path, full_path=full_path, BASE_DIR=BASE_DIR)
+        return render_template('svg_view.html', svg_content=svg_content, file_path=file_path, full_path=full_path, BASE_DIR=BASE_DIR, current_item=current_item)
 
     # 画像ファイルの場合
     if mime_type and mime_type.startswith('image/'):
         app.logger.info(f"Rendering image: {file_path}")
-        return render_template('image_view.html', file_path=file_path, full_path=full_path)
+        return render_template('image_view.html', file_path=file_path, full_path=full_path, current_item=current_item)
 
     # PDFファイル場合
     if file_extension == '.pdf':
@@ -126,12 +122,12 @@ def view_file(file_path):
     if file_extension == '.md':
         content = render_markdown(full_path)
         folder_path = os.path.dirname(full_path)
-        return render_template('markdown_view.html', content=content, file_path=file_path, full_path=full_path, folder_path=folder_path, BASE_DIR=BASE_DIR)
+        return render_template('markdown_view.html', content=content, file_path=file_path, full_path=full_path, folder_path=folder_path, BASE_DIR=BASE_DIR, current_item=current_item)
 
     # CSVファイルの場合
     if file_extension == '.csv':
         content = render_csv(full_path)
-        return render_template('csv_view.html', content=content, file_path=file_path, full_path=full_path, BASE_DIR=BASE_DIR)
+        return render_template('csv_view.html', content=content, file_path=file_path, full_path=full_path, BASE_DIR=BASE_DIR, current_item=current_item)
 
     # ipynbファイルの場合
     if file_extension == '.ipynb':
@@ -150,7 +146,7 @@ def view_file(file_path):
     # テキストファイルまたは特定の拡張子の場合
     if mime_type and mime_type.startswith('text/') or file_extension in ['.txt', '.py', '.js', '.css', '.json', '.license', '.yml', '.yaml', '.xml', '.ini', '.cfg', '.conf']:
         content = get_file_content(full_path, 'text')
-        return render_template('view_file.html', content=content, file_path=file_path, full_path=full_path)
+        return render_template('view_file.html', content=content, file_path=file_path, full_path=full_path, current_item=current_item)
 
     # その他のファイルはダウンロード
     return send_file(full_path, as_attachment=True)
@@ -369,7 +365,7 @@ def get_items_with_depth(root_path, depth, current_path):
                 })
 
         if current_depth == 0 and depth == 0:
-            break  # 現在のフォルダのみを処理
+            break  # 現在のフォルダのを処
 
     folders.sort(key=lambda x: x['relative_path'].lower())
     files.sort(key=lambda x: x['relative_path'].lower())
