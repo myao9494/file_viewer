@@ -148,20 +148,26 @@ document.addEventListener('DOMContentLoaded', function() {
         console.log('applyFilter function called');
         var selectedFilter = document.querySelector('input[name="filter"]:checked').value;
         console.log('Selected filter:', selectedFilter);
-        var files = document.querySelectorAll('.file-list li');
-        files.forEach(function(file) {
-            var fileName = file.querySelector('a').textContent.toLowerCase();
-            console.log('Processing file:', fileName);
-            if (selectedFilter === 'all' ||
-                (selectedFilter === 'md+svg' && (fileName.endsWith('.md') || fileName.endsWith('.svg'))) ||
-                (selectedFilter === 'md' && fileName.endsWith('.md')) ||
-                (selectedFilter === 'svg' && fileName.endsWith('.svg'))) {
-                file.style.display = '';
-                console.log('File displayed');
-            } else {
-                file.style.display = 'none';
-                console.log('File hidden');
-            }
+        var items = document.querySelectorAll('.folder-list li, .file-list li');
+        items.forEach(function(item) {
+            var itemPath = item.querySelector('a').getAttribute('href').split('/view/')[1];
+            var shouldShow = true;
+
+            // .view_ignoreルールを適用
+            fetch('/check_ignore?path=' + encodeURIComponent(itemPath))
+                .then(response => response.json())
+                .then(data => {
+                    if (data.ignored) {
+                        shouldShow = false;
+                    } else if (item.classList.contains('file')) {
+                        var fileName = item.querySelector('a').textContent.toLowerCase();
+                        shouldShow = (selectedFilter === 'all' ||
+                            (selectedFilter === 'md+svg' && (fileName.endsWith('.md') || fileName.endsWith('.svg'))) ||
+                            (selectedFilter === 'md' && fileName.endsWith('.md')) ||
+                            (selectedFilter === 'svg' && fileName.endsWith('.svg')));
+                    }
+                    item.style.display = shouldShow ? '' : 'none';
+                });
         });
     }
 

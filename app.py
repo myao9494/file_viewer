@@ -6,7 +6,7 @@ import re
 import csv
 from utils.file_handler import get_file_content, get_file_list
 from utils.search import search_files
-from utils.file_utils import filter_files
+from utils.file_utils import filter_files, should_ignore, load_view_ignore
 from utils.markdown_renderer import render_markdown
 from utils.csv_renderer import render_csv
 import mimetypes
@@ -53,7 +53,7 @@ def load_files():
     Returns:
         str: レンダリングされたHTMLテンプレート
     """
-    # すべてのファ
+    # すべてのファイルを取得
     all_files = get_file_list(BASE_DIR)
     # フィルタリングを適用
     files = filter_files(all_files, BASE_DIR)
@@ -166,18 +166,18 @@ def raw_file(file_path):
 @app.route('/search')
 def search():
     """
-    ファイル検索を行う関数
+    ファイル検索関数
 
     Returns:
-        str: 検索結果含むレンダリングされたHTMLンプレート
+        str: 検索結果含むレンダリングされたHTMLテンプレート
     """
     # クエリパラメータから検索語を取得
     query = request.args.get('q', '')
     # ファイル検索を実行
     results = search_files(BASE_DIR, query)
-    # 検結果をフィルタリング
+    # 検索結果をフィルタリング
     filtered_results = filter_files(results, BASE_DIR)
-    # 検索含むindex.htmlテンプレートをレンダリング
+    # 検索むindex.htmlテンプレートをレンダリング
     return render_template('index.html', files=filtered_results, search_query=query)
 
 @app.route('/open-in-code', methods=['POST'])
@@ -197,7 +197,7 @@ def open_in_code():
             subprocess.Popen([vscode_path, normalize_path(os.path.dirname(file_path))])
             return jsonify({'success': True})
         else:
-            return jsonify({'success': False, 'error': 'Visual Studio Codeが見つかりま���ん。'})
+            return jsonify({'success': False, 'error': 'Visual Studio Codeが見つかりません。'})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)})
 
@@ -237,7 +237,7 @@ def view_mindmap(file_path):
         file_path (str): 処理するファイルのパス
 
     Returns:
-        str: インドマップを表示するHTMLページ
+        str: マインドマップを表示するHTMLページ
     """
     app.logger.info(f"view_mindmap関数が呼び出されました。元のfile_path: {repr(file_path)}")
     
@@ -274,7 +274,7 @@ def handle_invalid_path(invalid_path):
         if os.path.isabs(normalized_path):
             folder_path = os.path.dirname(normalized_path)
         else:
-            # BASE_DIRを使用せずに、ルートからのパスとして扱う
+            # BASE_DIRを使用せず、ルートからのパスとして扱う
             full_path = os.path.abspath(os.path.join('/', normalized_path))
             folder_path = os.path.dirname(full_path)
 
@@ -295,7 +295,7 @@ def handle_invalid_path(invalid_path):
         app.logger.error(f"エラーが発生しました: {str(e)}")
         flash(f'エラーが発生しました: {str(e)}', 'error')
 
-    # 元のページにリダイレクト
+    # 元ページにリダイレクト
     return redirect(request.referrer or url_for('index'))
 
 @app.route('/open-path', methods=['POST'])
@@ -374,6 +374,30 @@ def get_items_with_depth(root_path, depth, current_path):
     folders.sort(key=lambda x: x['relative_path'].lower())
     files.sort(key=lambda x: x['relative_path'].lower())
     return folders, files
+
+@app.route('/get_filtered_items/<path:file_path>')
+def get_filtered_items(file_path):
+    full_path = normalize_path(os.path.join(BASE_DIR, file_path))
+    if not os.path.exists(full_path) or not os.path.isdir(full_path):
+        return jsonify({'error': '無効なパス'}), 400
+
+    all_folders, all_files = get_items_with_depth(full_path, depth=0, current_path=file_path)
+    
+    # フォルダとファイルの両方に対してフィルタリングを適用
+    filtered_folders = filter_files(all_folders, BASE_DIR)
+    filtered_files = filter_files(all_files, BASE_DIR)
+
+    return jsonify({
+        'folders': filtered_folders,
+        'files': filtered_files
+    })
+
+@app.route('/check_ignore')
+def check_ignore():
+    path = request.args.get('path', '')
+    ignored_patterns = load_view_ignore()
+    is_ignored = should_ignore(path, ignored_patterns)
+    return jsonify({'ignored': is_ignored})
 
 if __name__ == '__main__':
     app.secret_key = 'your_secret_key_here'  # フラッシュメッセージのために必要

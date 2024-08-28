@@ -26,6 +26,11 @@
             display: block;
         }
     </style>
+    <!-- 以下の行を追加 -->
+    <script>
+        window.d3 = d3;
+        window.markmap = window.markmap || {};
+    </script>
 </head>
 <body>
     <div class="mkdocs-markmap">
@@ -36,39 +41,49 @@
 
     <script>
     (function initializeMarkmap() {
-        const { Transformer } = window.markmap;
-        const transformer = new Transformer();
-        const assets = transformer.getAssets();
-        const loading = Promise.all([
-            assets.styles && markmap.loadCSS(assets.styles),
-            assets.scripts && markmap.loadJS(assets.scripts),
-        ]);
+        // エラーハンドリングを追加
+        try {
+            const { Transformer } = window.markmap;
+            if (!Transformer) {
+                throw new Error('Transformer not found. Make sure markmap-lib is loaded correctly.');
+            }
+            const transformer = new Transformer();
+            const assets = transformer.getAssets();
+            const loading = Promise.all([
+                assets.styles && window.markmap.loadCSS(assets.styles),
+                assets.scripts && window.markmap.loadJS(assets.scripts),
+            ]);
 
-        function parseData(content) {
-            const { root, frontmatter } = transformer.transform(content);
-            let options = markmap.deriveOptions(frontmatter?.markmap);
-            options = Object.assign({
-                fitRatio: 0.95,
-                color: (node) => node.depth % 2 ? '#4CAF50' : '#2196F3',
-            }, options);
-            return { root, options };
+            function parseData(content) {
+                const { root, frontmatter } = transformer.transform(content);
+                let options = markmap.deriveOptions(frontmatter?.markmap);
+                options = Object.assign({
+                    fitRatio: 0.95,
+                    color: (node) => node.depth % 2 ? '#4CAF50' : '#2196F3',
+                }, options);
+                return { root, options };
+            }
+
+            function renderMarkmap(el) {
+                let svg = el.querySelector('svg');
+                if (svg) return;
+                const content = el.querySelector('markmap-data').textContent;
+                el.innerHTML = '<svg>';
+                svg = el.firstChild;
+                const { root, options } = parseData(content);
+                const m = markmap.Markmap.create(svg, options, root);
+                m.fit();
+            }
+
+            loading.then(() => {
+                const el = document.querySelector('.mkdocs-markmap');
+                renderMarkmap(el);
+            }).catch(error => {
+                console.error('マインドマップの初期化中にエラーが発生しました:', error);
+            });
+        } catch (error) {
+            console.error('マインドマップの初期化中に予期せぬエラーが発生しました:', error);
         }
-
-        function renderMarkmap(el) {
-            let svg = el.querySelector('svg');
-            if (svg) return;
-            const content = el.querySelector('markmap-data').textContent;
-            el.innerHTML = '<svg>';
-            svg = el.firstChild;
-            const { root, options } = parseData(content);
-            const m = markmap.Markmap.create(svg, options, root);
-            m.fit();
-        }
-
-        loading.then(() => {
-            const el = document.querySelector('.mkdocs-markmap');
-            renderMarkmap(el);
-        });
     })();
     </script>
 </body>
