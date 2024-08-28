@@ -17,6 +17,20 @@
         flex-grow: 1;
         margin-left: 30px;
     }
+    .folder-path .path-text {
+        transition: background-color 0.3s ease;
+    }
+    .folder-path .path-text:active {
+        background-color: #90EE90;  /* 薄い緑色 */
+    }
+    @keyframes flash-green {
+        0% { background-color: transparent; }
+        50% { background-color: #90EE90; }
+        100% { background-color: transparent; }
+    }
+    .flash-green {
+        animation: flash-green 0.5s;
+    }
     .folder-icon {
         font-size: 1.5em;
         margin-right: 10px;
@@ -64,7 +78,9 @@
 
 <div class="folder-path">
     <span class="folder-icon">📁</span>
-    <h2 id="currentPath" onclick="copyToClipboard('currentPath')" title="{{ full_path }}">現在のフォルダ: {{ full_path }}</h2>
+    <h2 id="currentPath">
+        現在のフォルダ: <span class="path-text" onclick="copyToClipboard('currentPath')" title="{{ full_path }}">{{ full_path }}</span>
+    </h2>
 </div>
 
 {% if parent_path is not none %}
@@ -176,13 +192,18 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     // クリップボードにコピーする機能
-    function copyToClipboard(elementId) {
-        var element = document.getElementById(elementId);
-        var text = element.textContent;
+    window.copyToClipboard = function(elementId) {
+        var element = document.getElementById(elementId).querySelector('.path-text');
+        var text = element.getAttribute('title') || element.textContent;
         navigator.clipboard.writeText(text).then(function() {
             console.log('Copying to clipboard was successful!');
+            element.classList.add('flash-green');
+            setTimeout(function() {
+                element.classList.remove('flash-green');
+            }, 500);
         }, function(err) {
             console.error('Could not copy text: ', err);
+            alert('コピーに失敗しました。');
         });
     }
 
