@@ -74,15 +74,26 @@
             flex: 1;
         }
     }
+    .button-container {
+        display: flex;
+        align-items: center;
+        margin-right: 5px; /* ボタンの右側に余白を追加 */
+        margin-left: 40px; /* ボタンの右側に余白を追加 */
+    }
+    .button-container button {
+        margin-right: 5px; /* ボタン間の余白 */
+    }
 </style>
 
 <div class="folder-path">
+    <div class="button-container">
+        <button onclick="openInCode()" title="Codeで開く"><i class="fas fa-code"></i></button>
+        <button onclick="openFolder()" title="フォルダを開く"><i class="fas fa-folder-open"></i></button>
+        <button onclick="openJupyter()" title="Jupyterで開く"><i class="fas fa-book"></i></button>
+    </div>
     <h2 id="currentPath">
         現在のフォルダ: <span class="path-text" onclick="copyToClipboard('currentPath')" title="{{ full_path }}">{{ full_path }}</span>
     </h2>
-    <!-- {% if parent_path is not none %}
-    <button id="showDirectoryBtn" onclick="goToParentDirectory()">上の階層へ</button>
-    {% endif %} -->
 </div>
 
 {% if parent_path is not none %}
@@ -253,6 +264,70 @@ document.addEventListener('DOMContentLoaded', function() {
         {% else %}
         console.log('既にルートディレクトリにいます。');
         {% endif %}
+    }
+
+    window.openInCode = function() {
+        var filePath = '{{ full_path | trim }}';
+        fetch('/open-in-code', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ path: filePath }),
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                // alert('ファイルがCodeで開かれました。');
+            } else {
+                alert('エラーが発生しました: ' + data.error);
+            }
+        })
+        .catch((error) => {
+            console.error('Error:', error);
+            alert('エラー発生しました。');
+        });
+    }
+
+    window.openFolder = function() {
+        var filePath = '{{ full_path | safe }}';
+        filePath = filePath.replace(/\\/g, '/');
+        
+        fetch('/open-folder', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ path: filePath }),
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                console.log('フォルダが開かれました。');
+            } else {
+                alert('エラーが発生しました: ' + data.error);
+            }
+        })
+        .catch((error) => {
+            console.error('Error:', error);
+            alert('エラーが発生しました。');
+        });
+    }
+
+    window.openJupyter = function() {
+        const basePath = '{{ BASE_DIR }}' || '/Users/sudoupousei/000_work';
+        const filePath = '{{ full_path | trim }}';
+        
+        const baseDir = basePath.split('/').pop();
+        let relativePath = '';
+        if (filePath.includes(baseDir)) {
+            relativePath = filePath.split(baseDir)[1].replace(/^\//, '');
+        } else {
+            relativePath = filePath.replace(basePath, '').replace(/^\//, '');
+        }
+        
+        const jupyterURL = 'http://localhost:8888/lab/tree/' + encodeURIComponent(relativePath);
+        window.open(jupyterURL, '_blank');
     }
 });
 </script>
