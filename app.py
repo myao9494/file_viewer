@@ -416,6 +416,26 @@ def before_request():
     # セッションからBASE_DIRを取得（存在しない場合はデフォルト値を使用）
     BASE_DIR = session.get('BASE_DIR', BASE_DIR)
 
+@app.route('/open-jupyter', methods=['POST'])
+def open_jupyter():
+    data = request.json
+    file_path = data.get('path')
+    if not file_path:
+        return jsonify({'success': False, 'error': 'ファイルパスが指定されていません。'})
+    
+    try:
+        # ファイルパスをベースディレクトリからの相対パスに変換
+        relative_path = os.path.relpath(file_path, BASE_DIR)
+        # JupyterのURLを構築
+        jupyter_url = f"{JUPYTER_BASE_URL}/{relative_path}"
+        
+        # ブラウザでJupyterのURLを開く
+        webbrowser.open(jupyter_url)
+        
+        return jsonify({'success': True})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
+
 if __name__ == '__main__':
     app.secret_key = 'your_secret_key_here'  # セッション用の秘密鍵
     # デバッグモードでアプリケーションを実行

@@ -14,7 +14,7 @@ def load_view_ignore():
         with open(view_ignore_path, 'r', encoding='utf-8') as f:
             # 空行とコメント行を除外してパターンを読み込む
             patterns = [line.strip() for line in f if line.strip() and not line.startswith('#')]
-        print("読み込まれたパターン:", patterns)  # デバッグ出力
+        # print("読み込まれたパターン:", patterns)  # デバッグ出力
         return patterns
     return []
 
@@ -48,6 +48,9 @@ def should_ignore(path, patterns):
             return True
     return False
 
+import os
+import pandas as pd
+
 def filter_files(files, base_dir):
     """
     ファイルリストをフィルタリングする関数
@@ -61,13 +64,18 @@ def filter_files(files, base_dir):
     """
     ignored_patterns = load_view_ignore()
     print("無視するパターン:", ignored_patterns)  # デバッグ出力
-    filtered_files = []
-    for file in files:
-        # ベースディレクトリからの相対パスを取得
-        relative_path = os.path.relpath(file, base_dir)
-        if not should_ignore(relative_path, ignored_patterns):
-            filtered_files.append(file)
-        else:
-            print(f"フィルタリングされたファイル: {relative_path}")  # デバッグ出力
+    
+    # DataFrameを作成
+    df = pd.DataFrame({'file': files})
+    
+    # 相対パスを計算して新しい列に追加
+    df['relative_path'] = df['file'].apply(lambda x: os.path.relpath(x, base_dir))
+    
+    # 無視するかどうかを判定する新しい列を追加
+    df['should_ignore'] = df['relative_path'].apply(lambda x: should_ignore(x, ignored_patterns))
+    
+    # 無視しないファイルのみを抽出
+    filtered_files = df[df['should_ignore'] == False]['file'].tolist()
+    
     print(f"フィルタリング後のファイル数: {len(filtered_files)}")  # デバッグ出力
     return filtered_files
