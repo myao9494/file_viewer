@@ -159,45 +159,54 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
 
-    // フィルター機能
+    // フィルター機能の最適化
     function applyFilter() {
         console.log('applyFilter function called');
         var selectedFilter = document.querySelector('input[name="filter"]:checked').value;
         var hideFolders = document.getElementById('hide-folders').checked;
         console.log('Selected filter:', selectedFilter);
         console.log('Hide folders:', hideFolders);
+        
         var items = document.querySelectorAll('.folder-list li, .file-list li');
+        var promises = [];
+
         items.forEach(function(item) {
             var itemPath = item.querySelector('a').getAttribute('href').split('/view/')[1];
-            var shouldShow = true;
-
+            
             if (hideFolders && item.classList.contains('folder')) {
-                shouldShow = false;
+                item.style.display = 'none';
             } else {
-                // .view_ignoreルールを適用
-                fetch('/check_ignore?path=' + encodeURIComponent(itemPath))
-                    .then(response => response.json())
-                    .then(data => {
-                        if (data.ignored) {
-                            shouldShow = false;
-                        } else if (item.classList.contains('file')) {
-                            var fileName = item.querySelector('a').textContent.toLowerCase();
-                            shouldShow = (selectedFilter === 'all' ||
-                                (selectedFilter === 'md+svg+csv+pdf' && (fileName.endsWith('.md') || fileName.endsWith('.svg') || fileName.endsWith('.csv') || fileName.endsWith('.pdf'))) ||
-                                (selectedFilter === 'md' && fileName.endsWith('.md')) ||
-                                (selectedFilter === 'svg' && fileName.endsWith('.svg')) ||
-                                (selectedFilter === 'csv' && fileName.endsWith('.csv')) ||
-                                (selectedFilter === 'pdf' && fileName.endsWith('.pdf')));
-                        }
-                        item.style.display = shouldShow ? '' : 'none';
-                    });
+                promises.push(
+                    fetch('/check_ignore?path=' + encodeURIComponent(itemPath))
+                        .then(response => response.json())
+                        .then(data => {
+                            if (data.ignored) {
+                                item.style.display = 'none';
+                            } else if (item.classList.contains('file')) {
+                                var fileName = item.querySelector('a').textContent.toLowerCase();
+                                var shouldShow = (selectedFilter === 'all' ||
+                                    (selectedFilter === 'md+svg+csv+pdf' && (fileName.endsWith('.md') || fileName.endsWith('.svg') || fileName.endsWith('.csv') || fileName.endsWith('.pdf'))) ||
+                                    (selectedFilter === 'md' && fileName.endsWith('.md')) ||
+                                    (selectedFilter === 'svg' && fileName.endsWith('.svg')) ||
+                                    (selectedFilter === 'csv' && fileName.endsWith('.csv')) ||
+                                    (selectedFilter === 'pdf' && fileName.endsWith('.pdf')));
+                                item.style.display = shouldShow ? '' : 'none';
+                            } else {
+                                item.style.display = '';
+                            }
+                        })
+                );
             }
-            item.style.display = shouldShow ? '' : 'none';
+        });
+
+        Promise.all(promises).then(() => {
+            console.log('All items processed');
         });
     }
 
     // ラジオボタンとチェックボックスのイベントリスナーを設定
-    document.querySelectorAll('input[name="filter"], #hide-folders').forEach(function(input) {
+    var filterInputs = document.querySelectorAll('input[name="filter"], #hide-folders');
+    filterInputs.forEach(function(input) {
         console.log('Adding event listener to input:', input.value || input.id);
         input.addEventListener('change', function() {
             console.log('Input changed:', this.value || this.id);

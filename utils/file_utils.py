@@ -1,5 +1,7 @@
 import os
 import fnmatch
+import re
+import pandas as pd
 
 def load_view_ignore():
     """
@@ -15,41 +17,41 @@ def load_view_ignore():
             # 空行とコメント行を除外してパターンを読み込む
             patterns = [line.strip() for line in f if line.strip() and not line.startswith('#')]
         # print("読み込まれたパターン:", patterns)  # デバッグ出力
-        return patterns
+        return compile_patterns(patterns)
     return []
 
-def should_ignore(path, patterns):
+def compile_patterns(patterns):
+    compiled_patterns = []
+    for pattern in patterns:
+        if pattern.endswith('/**'):
+            compiled_patterns.append(('dir_all', re.compile(re.escape(pattern[:-3]))))
+        elif pattern.endswith('/'):
+            compiled_patterns.append(('dir', re.compile(r'(^|/)' + re.escape(pattern[:-1]) + r'(/|$)')))
+        else:
+            compiled_patterns.append(('file', re.compile(fnmatch.translate(pattern))))
+    return compiled_patterns
+
+def should_ignore(path, compiled_patterns):
     """
     指定されたパスが無視すべきかどうかを判断する関数
 
     Args:
         path (str): チェックするファイルパス
-        patterns (list): 無視するパターンのリスト
+        compiled_patterns (list): コンパイル済みのパターンのリスト
 
     Returns:
         bool: パスが無視すべき場合はTrue、そうでない場合はFalse
     """
-    path_parts = path.split(os.sep)
-    for pattern in patterns:
-        if pattern.endswith('/**'):
-            # ディレクトリとその中身すべてを無視するパターン
-            base_pattern = pattern[:-3]
-            if any(part.startswith(base_pattern) for part in path_parts):
-                print(f"無視: {path} (パターン: {pattern})")  # デバッグ出力
+    for pattern_type, pattern in compiled_patterns:
+        if pattern_type == 'dir_all':
+            if pattern.search(path):
                 return True
-        elif pattern.endswith('/'):
-            # ディレクトリを無視するパターン
-            if any(part == pattern[:-1] for part in path_parts):
-                print(f"無視: {path} (パターン: {pattern})")  # デバッグ出力
+        elif pattern_type == 'dir':
+            if pattern.search(path):
                 return True
-        elif fnmatch.fnmatch(path, pattern) or any(fnmatch.fnmatch(part, pattern) for part in path_parts):
-            # ファイル名やディレクトリ名にマッチするパターン
-            print(f"無視: {path} (パターン: {pattern})")  # デバッグ出力
+        elif pattern.match(path):
             return True
     return False
-
-import os
-import pandas as pd
 
 def filter_files(files, base_dir):
     """
@@ -63,7 +65,6 @@ def filter_files(files, base_dir):
         list: フィルタリング後のファイルリスト
     """
     ignored_patterns = load_view_ignore()
-    print("無視するパターン:", ignored_patterns)  # デバッグ出力
     
     # DataFrameを作成
     df = pd.DataFrame({'file': files})
@@ -75,7 +76,7 @@ def filter_files(files, base_dir):
     df['should_ignore'] = df['relative_path'].apply(lambda x: should_ignore(x, ignored_patterns))
     
     # 無視しないファイルのみを抽出
-    filtered_files = df[df['should_ignore'] == False]['file'].tolist()
+    filtered_files = df[~df['should_ignore']]['file'].tolist()
     
     print(f"フィルタリング後のファイル数: {len(filtered_files)}")  # デバッグ出力
     return filtered_files
