@@ -38,10 +38,10 @@
     </style>
 </head>
 <body>
-    <!-- ディレクトリ表示ボタンをアイコンに変更 -->
-    <button id="showDirectoryBtn" title="ディレクトリを表示">
+    <!-- ディレクトリ表示ボタンをリンクに変更し、動的なhrefを設定 -->
+    <a id="showDirectoryBtn" title="ディレクトリを表示" href="/view" role="button">
         <i class="fas fa-folder-open"></i>
-    </button>
+    </a>
 
     <!-- headerブロック: ページヘッダーをPythonコードから挿入可能 -->
     {% block header %}{% endblock %}
@@ -59,23 +59,36 @@
     
     <!-- ディレクトリ表示機能のためのJavaScript -->
     <script>
-    document.getElementById('showDirectoryBtn').addEventListener('click', function() {
+    document.addEventListener('DOMContentLoaded', function() {
+        var showDirectoryBtn = document.getElementById('showDirectoryBtn');
         var currentPath = window.location.pathname;
-        if (currentPath.startsWith('/view/')) {
-            var filePath = currentPath.substring(6); // '/view/'の長さは6
-            if (filePath.includes('.')) {
-                // ファイルを表示している場合、現在のディレクトリを表示
-                var directoryPath = filePath.split('/').slice(0, -1).join('/');
-                window.location.href = '/view/' + directoryPath;
+
+        function updateHref() {
+            if (currentPath.startsWith('/view/')) {
+                var filePath = currentPath.substring(6); // '/view/'の長さは6
+                if (filePath.includes('.')) {
+                    // ファイルを表示している場合、現在のディレクトリを表示
+                    var directoryPath = filePath.split('/').slice(0, -1).join('/');
+                    showDirectoryBtn.href = '/view/' + directoryPath;
+                } else {
+                    // ディレクトリを表示している場合、現在のパスを維持
+                    showDirectoryBtn.href = currentPath;
+                }
             } else {
-                // ディレクトリを表示している場合、カスタムイベントを発火
-                var event = new Event('showDirectoryBtnClicked');
-                document.dispatchEvent(event);
+                // '/view'以外のページの場合、ルートディレクトリに移動
+                showDirectoryBtn.href = '/view';
             }
-        } else {
-            // '/view'以外のページの場合、ルートディレクトリに移動
-            window.location.href = '/view';
         }
+
+        updateHref();
+
+        showDirectoryBtn.addEventListener('click', function(event) {
+            if (currentPath.startsWith('/view/') && !currentPath.substring(6).includes('.')) {
+                event.preventDefault();
+                var customEvent = new Event('showDirectoryBtnClicked');
+                document.dispatchEvent(customEvent);
+            }
+        });
     });
     </script>
 </body>
