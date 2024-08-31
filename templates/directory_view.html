@@ -106,10 +106,11 @@
         <button type="submit">検索</button>
     </form>
     <div id="filter-options">
-        <label><input type="radio" name="filter" value="md+svg+csv" checked> MD+SVG+CSV</label>
+        <label><input type="radio" name="filter" value="md+svg+csv+pdf" checked> MD+SVG+CSV+PDF</label>
         <label><input type="radio" name="filter" value="md"> MD</label>
         <label><input type="radio" name="filter" value="svg"> SVG</label>
         <label><input type="radio" name="filter" value="csv"> CSV</label>
+        <label><input type="radio" name="filter" value="pdf"> PDF</label>
         <label><input type="radio" name="filter" value="all"> 全て</label>
         <label><input type="checkbox" id="hide-folders" checked> フォルダを非表示</label>
         <form id="depth-form" style="display: inline-block; margin-left: 15px;">
@@ -182,10 +183,11 @@ document.addEventListener('DOMContentLoaded', function() {
                         } else if (item.classList.contains('file')) {
                             var fileName = item.querySelector('a').textContent.toLowerCase();
                             shouldShow = (selectedFilter === 'all' ||
-                                (selectedFilter === 'md+svg+csv' && (fileName.endsWith('.md') || fileName.endsWith('.svg') || fileName.endsWith('.csv'))) ||
+                                (selectedFilter === 'md+svg+csv+pdf' && (fileName.endsWith('.md') || fileName.endsWith('.svg') || fileName.endsWith('.csv') || fileName.endsWith('.pdf'))) ||
                                 (selectedFilter === 'md' && fileName.endsWith('.md')) ||
                                 (selectedFilter === 'svg' && fileName.endsWith('.svg')) ||
-                                (selectedFilter === 'csv' && fileName.endsWith('.csv')));
+                                (selectedFilter === 'csv' && fileName.endsWith('.csv')) ||
+                                (selectedFilter === 'pdf' && fileName.endsWith('.pdf')));
                         }
                         item.style.display = shouldShow ? '' : 'none';
                     });
