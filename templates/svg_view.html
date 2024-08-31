@@ -170,7 +170,28 @@ document.addEventListener('DOMContentLoaded', function() {
     var folderPath = filePath.substring(0, filePath.lastIndexOf('/'));
     document.getElementById('folderPath').textContent = folderPath;
     document.getElementById('folderPath').title = folderPath;
+
+    // SVG内のネットワークパスを修正
+    fixSvgNetworkPaths();
 });
+
+// SVG内のネットワークパスを修正する関数
+function fixSvgNetworkPaths() {
+    const svgElement = document.querySelector('svg');
+    if (svgElement) {
+        const images = svgElement.querySelectorAll('image');
+        images.forEach(image => {
+            let href = image.getAttribute('xlink:href') || image.getAttribute('href');
+            if (href && href.startsWith('\\\\')) {
+                // ネットワークパスをエンコード
+                const encodedPath = encodeURIComponent(href);
+                const newHref = `/network-image?path=${encodedPath}`;
+                image.setAttribute('xlink:href', newHref);
+                image.setAttribute('href', newHref);
+            }
+        });
+    }
+}
 
 let scale = 1;
 const svgContent = document.getElementById('svg-content');

@@ -437,6 +437,15 @@ def open_jupyter():
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)})
 
+@app.route('/network-image')
+def network_image():
+    path = request.args.get('path')
+    decoded_path = urllib.parse.unquote(path)
+    # ここでネットワークパスから画像を読み込み、送信する処理を実装
+    # 注意: セキュリティを考慮し、アクセス可能なパスを制限することを推奨
+    return send_file(decoded_path, mimetype='image/png')
+
+
 if __name__ == '__main__':
     app.secret_key = 'your_secret_key_here'  # セッション用の秘密鍵
     # デバッグモードでアプリケーションを実行
