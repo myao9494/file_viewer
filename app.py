@@ -190,8 +190,9 @@ def open_in_code():
         if IS_WINDOWS:
             vscode_path = r'C:\Users\kabu_server\AppData\Local\Programs\Microsoft VS Code\Code.exe'
         else:
-            vscode_path = '/Applications/Visual Studio Code.app/Contents/Resources/app/bin/code'
-        
+            # vscode_path = '/Applications/Visual Studio Code.app/Contents/Resources/app/bin/code'
+            vscode_path = '/Applications/Cursor.app/Contents/MacOS/Cursor'
+
         if os.path.exists(vscode_path):
             subprocess.Popen([vscode_path, normalize_path(os.path.dirname(file_path))])
             return jsonify({'success': True})
