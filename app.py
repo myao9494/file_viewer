@@ -36,7 +36,7 @@ win_BASE_DIR = r"C:\Users\kabu_server\000_work"
 BASE_DIR = normalize_path(mac_BASE_DIR if not IS_WINDOWS else win_BASE_DIR)
 
 # JupyterのベースURLを設定
-JUPYTER_BASE_URL =  'http://localhost:8888/lab/tree/' 
+JUPYTER_BASE_URL =  'http://localhost:8888/lab/tree' 
 
 @app.route('/')
 def index():
@@ -427,8 +427,15 @@ def open_jupyter():
     try:
         # ファイルパスをベースディレクトリからの相対パスに変換
         relative_path = os.path.relpath(file_path, BASE_DIR)
+        # 'file_viewer'を含まない相対パスを作成
+        cleaned_path = relative_path.replace('file_viewer/', '')
+        
+        # .ipynbの拡張子がない場合、ディレクトリパスを使用
+        if not cleaned_path.endswith('.ipynb'):
+            cleaned_path = os.path.dirname(cleaned_path)
+        
         # JupyterのURLを構築
-        jupyter_url = f"{JUPYTER_BASE_URL}/{relative_path}"
+        jupyter_url = f"{JUPYTER_BASE_URL}/{cleaned_path}"
         
         # ブラウザでJupyterのURLを開く
         webbrowser.open(jupyter_url)

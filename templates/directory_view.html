@@ -106,11 +106,12 @@
         <button type="submit">検索</button>
     </form>
     <div id="filter-options">
-        <label><input type="radio" name="filter" value="md+svg+csv+pdf" checked> MD+SVG+CSV+PDF</label>
+        <label><input type="radio" name="filter" value="md+svg+csv+pdf+ipynb" checked> MD+SVG+CSV+PDF+IPYNB</label>
         <label><input type="radio" name="filter" value="md"> MD</label>
         <label><input type="radio" name="filter" value="svg"> SVG</label>
         <label><input type="radio" name="filter" value="csv"> CSV</label>
         <label><input type="radio" name="filter" value="pdf"> PDF</label>
+        <label><input type="radio" name="filter" value="ipynb"> IPYNB</label>
         <label><input type="radio" name="filter" value="all"> 全て</label>
         <label><input type="checkbox" id="hide-folders" checked> フォルダを非表示</label>
         <form id="depth-form" style="display: inline-block; margin-left: 15px;">
@@ -185,11 +186,12 @@ document.addEventListener('DOMContentLoaded', function() {
                             } else if (item.classList.contains('file')) {
                                 var fileName = item.querySelector('a').textContent.toLowerCase();
                                 var shouldShow = (selectedFilter === 'all' ||
-                                    (selectedFilter === 'md+svg+csv+pdf' && (fileName.endsWith('.md') || fileName.endsWith('.svg') || fileName.endsWith('.csv') || fileName.endsWith('.pdf'))) ||
+                                    (selectedFilter === 'md+svg+csv+pdf+ipynb' && (fileName.endsWith('.md') || fileName.endsWith('.svg') || fileName.endsWith('.csv') || fileName.endsWith('.pdf') || fileName.endsWith('.ipynb'))) ||
                                     (selectedFilter === 'md' && fileName.endsWith('.md')) ||
                                     (selectedFilter === 'svg' && fileName.endsWith('.svg')) ||
                                     (selectedFilter === 'csv' && fileName.endsWith('.csv')) ||
-                                    (selectedFilter === 'pdf' && fileName.endsWith('.pdf')));
+                                    (selectedFilter === 'pdf' && fileName.endsWith('.pdf')) ||
+                                    (selectedFilter === 'ipynb' && fileName.endsWith('.ipynb')));
                                 item.style.display = shouldShow ? '' : 'none';
                             } else {
                                 item.style.display = '';
@@ -325,21 +327,60 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    window.openJupyter = function() {
-        const basePath = '{{ BASE_DIR }}' || '/Users/sudoupousei/000_work';
-        const filePath = '{{ full_path | trim }}';
+    // window.openJupyter = function() {
+    //     const basePath = '{{ BASE_DIR }}' || '/Users/sudoupousei/000_work';
+    //     const filePath = '{{ full_path | trim }}';
         
-        const baseDir = basePath.split('/').pop();
-        let relativePath = '';
-        if (filePath.includes(baseDir)) {
-            relativePath = filePath.split(baseDir)[1].replace(/^\//, '');
+    //     const baseDir = basePath.split('/').pop();
+    //     let relativePath = '';
+    //     if (filePath.includes(baseDir)) {
+    //         relativePath = filePath.split(baseDir)[1].replace(/^\//, '');
+    //     } else {
+    //         relativePath = filePath.replace(basePath, '').replace(/^\//, '');
+    //     }
+        
+    //     const jupyterURL = 'http://localhost:8888/lab/tree/' + encodeURIComponent(relativePath);
+    //     window.open(jupyterURL, '_blank');
+    // }
+
+    function openFile(path) {
+        if (path.toLowerCase().endsWith('.ipynb')) {
+            openJupyter(path);
         } else {
-            relativePath = filePath.replace(basePath, '').replace(/^\//, '');
+            window.location.href = '/view/' + path;
         }
-        
-        const jupyterURL = 'http://localhost:8888/lab/tree/' + encodeURIComponent(relativePath);
-        window.open(jupyterURL, '_blank');
     }
+
+    function openJupyter(path) {
+        fetch('/open-jupyter', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ path: path }),
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert('Jupyter Notebookを開きました。');
+            } else {
+                alert('エラー: ' + data.error);
+            }
+        })
+        .catch((error) => {
+            console.error('Error:', error);
+            alert('Jupyter Notebookを開く際にエラーが発生しました。');
+        });
+    }
+
+    // ファイルリストの各項目にクリックイベントを追加
+    document.querySelectorAll('.file-list li').forEach(function(item) {
+        item.addEventListener('click', function(e) {
+            e.preventDefault();
+            var path = this.querySelector('a').getAttribute('href').replace('/view/', '');
+            openFile(path);
+        });
+    });
 });
 </script>
 {% endblock %}
