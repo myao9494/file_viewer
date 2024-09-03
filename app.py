@@ -16,15 +16,21 @@ import json
 import html
 import os.path
 import webbrowser
+# import urllib.parse
+
 
 app = Flask(__name__, static_folder='static')
 
 # OSの種類を判別
 IS_WINDOWS = platform.system() == 'Windows'
 
-# パスの区切り文字を統一する関数を追加
+# パスの区切り文字を統一する関数を追加import urllib.parse
+
 def normalize_path(path):
-    return path.replace('\\', '/')
+    n_path = path.replace('\\', '/')
+    n_path = os.path.normpath(path)
+    # n_path = path.replace("%5C","/")
+    return n_path
 
 # グローバル変数としてBASE_DIRを定義
 global BASE_DIR
@@ -354,8 +360,8 @@ def get_items_with_depth(root_path, depth, current_path):
                 relative_to_current = os.path.relpath(full_path, root_path)
                 folders.append({
                     'is_dir': True,
-                    'path': os.path.join(current_path, relative_to_current),
-                    'relative_path': relative_to_current
+                    'path': normalize_path(os.path.join(current_path, relative_to_current)),
+                    'relative_path': normalize_path(relative_to_current)
                 })
             
         if current_depth <= depth:
@@ -364,12 +370,12 @@ def get_items_with_depth(root_path, depth, current_path):
                 relative_to_current = os.path.relpath(full_path, root_path)
                 files.append({
                     'is_dir': False,
-                    'path': os.path.join(current_path, relative_to_current),
-                    'relative_path': relative_to_current
+                    'path': normalize_path(os.path.join(current_path, relative_to_current)),
+                    'relative_path': normalize_path(relative_to_current)
                 })
 
         if current_depth == 0 and depth == 0:
-            break  # 現在のフォルダのを処
+            break  # 現在のフォルダのみ処理
 
     folders.sort(key=lambda x: x['relative_path'].lower())
     files.sort(key=lambda x: x['relative_path'].lower())
