@@ -16,6 +16,7 @@ import json
 import html
 import os.path
 import webbrowser
+import pathlib
 # import urllib.parse
 
 
@@ -27,9 +28,10 @@ IS_WINDOWS = platform.system() == 'Windows'
 # パスの区切り文字を統一する関数を追加import urllib.parse
 
 def normalize_path(path):
-    n_path = path.replace('\\', '/')
-    n_path = os.path.normpath(path)
+    # n_path = path.replace('\\', '/')
+    # n_path = os.path.normpath(path)
     # n_path = path.replace("%5C","/")
+    n_path = pathlib.Path(path).as_posix()
     return n_path
 
 # グローバル変数としてBASE_DIRを定義
@@ -200,10 +202,16 @@ def open_in_code():
             vscode_path = '/Applications/Cursor.app/Contents/MacOS/Cursor'
 
         if os.path.exists(vscode_path):
-            subprocess.Popen([vscode_path, normalize_path(os.path.dirname(file_path))])
+            normalized_path = normalize_path(file_path)
+            if os.path.isfile(normalized_path):
+                # ファイルの場合、そのファイルが含まれるディレクトリを開く
+                subprocess.Popen([vscode_path, os.path.dirname(normalized_path)])
+            else:
+                # ディレクトリの場合、そのディレクトリを直接開く
+                subprocess.Popen([vscode_path, normalized_path])
             return jsonify({'success': True})
         else:
-            return jsonify({'success': False, 'error': 'Visual Studio Codeが見つかりません。'})
+            return jsonify({'success': False, 'error': 'Visual Studio Code/Cursorが見つかりません。'})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)})
 
