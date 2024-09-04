@@ -17,7 +17,7 @@ import html
 import os.path
 import webbrowser
 import pathlib
-# import urllib.parse
+import urllib.parse
 
 
 app = Flask(__name__, static_folder='static')
@@ -277,37 +277,40 @@ def view_mindmap(file_path):
 def handle_invalid_path(invalid_path):
     app.logger.info(f"handle_invalid_path関数が呼び出されました。invalid_path: {repr(invalid_path)}")
 
-    # パスの正規化
-    normalized_path = normalize_path(invalid_path)
-    
+    # faviconリクエストの場合は何もしない
+    if invalid_path == 'favicon.ico':
+        abort(404)
+
     # ネットワークパスの場合
-    if normalized_path.startswith('//') or normalized_path.startswith('\\\\'):
-        folder_path = os.path.dirname(normalized_path)
+    if invalid_path.startswith('//') or invalid_path.startswith('\\\\'):
+        folder_path = os.path.dirname(invalid_path)
     else:
         # ローカルパスの場合
-        if os.path.isabs(normalized_path):
-            folder_path = os.path.dirname(normalized_path)
+        if os.path.isabs(invalid_path):
+            folder_path = os.path.dirname(invalid_path)
         else:
             # BASE_DIRを使用せず、ルートからのパスとして扱う
-            full_path = os.path.abspath(os.path.join('/', normalized_path))
+            full_path = os.path.abspath(os.path.join('/', invalid_path))
             folder_path = os.path.dirname(full_path)
 
     app.logger.info(f"開こうとしているfolder_path: {repr(folder_path)}")
 
-    try:
-        if os.path.exists(folder_path):
-            if IS_WINDOWS:
-                # Windowsの場合、バックスラッシュを使用
-                folder_path = folder_path.replace('/', '\\')
+    # ここでFinderを開く処理を削除または条件付きにする
+    # 例えば、特定の条件下でのみFinderを開くようにする
+    if folder_path != '/' and os.path.exists(folder_path):
+        try:
+            if platform.system() == 'Darwin':  # macOS
+                subprocess.Popen(['open', folder_path])
+            elif platform.system() == 'Windows':
                 subprocess.Popen(['explorer', folder_path])
             else:
-                subprocess.Popen(['open', folder_path])
+                subprocess.Popen(['xdg-open', folder_path])
             flash(f'フォルダを開きました: {folder_path}', 'success')
-        else:
-            flash(f'フォルダが見つかりません: {folder_path}', 'error')
-    except Exception as e:
-        app.logger.error(f"エラーが発生しました: {str(e)}")
-        flash(f'エラーが発生しました: {str(e)}', 'error')
+        except Exception as e:
+            app.logger.error(f"エラーが発生しました: {str(e)}")
+            flash(f'エラーが発生しました: {str(e)}', 'error')
+    else:
+        flash(f'無効なパス: {invalid_path}', 'error')
 
     # 元ページにリダイレクト
     return redirect(request.referrer or url_for('index'))
@@ -466,6 +469,38 @@ def network_image():
     # 注意: セキュリティを考慮し、アクセス可能なパスを制限することを推奨
     return send_file(decoded_path, mimetype='image/png')
 
+@app.route('/open-local-file')
+def open_local_file():
+    path = request.args.get('path')
+    decoded_path = urllib.parse.unquote(path)
+    
+    app.logger.info(f"Opening file: {decoded_path}")
+    
+    if not os.path.exists(decoded_path):
+        app.logger.error(f"File not found: {decoded_path}")
+        abort(404)
+
+    mime_type, _ = mimetypes.guess_type(decoded_path)
+    app.logger.info(f"MIME type: {mime_type}")
+
+    if mime_type == 'application/pdf':
+        app.logger.info("Sending PDF file")
+        return send_file(decoded_path, mimetype='application/pdf')
+    elif not decoded_path.startswith(BASE_DIR):
+        app.logger.info("File is outside BASE_DIR")
+        try:
+            if platform.system() == 'Darwin':  # macOS
+                subprocess.Popen(['open', '-a', 'Preview', decoded_path])
+            elif platform.system() == 'Windows':
+                os.startfile(decoded_path)
+            else:  # Linux
+                subprocess.Popen(['xdg-open', decoded_path])
+            return jsonify({'success': True, 'message': 'ファイルを開きました'})
+        except Exception as e:
+            return jsonify({'success': False, 'error': str(e)})
+    else:
+        app.logger.info("Sending file within BASE_DIR")
+        return send_file(decoded_path)
 
 if __name__ == '__main__':
     app.secret_key = 'your_secret_key_here'  # セッション用の秘密鍵

@@ -172,25 +172,42 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('folderPath').title = folderPath;
 
     // SVG内のネットワークパスを修正
-    fixSvgNetworkPaths();
+    fixSvgPaths();
 });
 
-// SVG内のネットワークパスを修正する関数
-function fixSvgNetworkPaths() {
+
+function fixSvgPaths() {
     const svgElement = document.querySelector('svg');
     if (svgElement) {
         const images = svgElement.querySelectorAll('image');
-        images.forEach(image => {
-            let href = image.getAttribute('xlink:href') || image.getAttribute('href');
-            if (href && href.startsWith('\\\\')) {
-                // ネットワークパスをエンコード
-                const encodedPath = encodeURIComponent(href);
-                const newHref = `/network-image?path=${encodedPath}`;
-                image.setAttribute('xlink:href', newHref);
-                image.setAttribute('href', newHref);
-            }
-        });
+        images.forEach(processElement);
+
+        // a要素の処理
+        const links = svgElement.querySelectorAll('a');
+        links.forEach(processElement);
     }
+}
+
+function processElement(element) {
+    let href = element.getAttribute('xlink:href') || element.getAttribute('href');
+    if (href) {
+        if (href.startsWith('\\\\')) {
+            // ネットワークパスをエンコード
+            const encodedPath = encodeURIComponent(href);
+            const newHref = `/network-image?path=${encodedPath}`;
+            setHref(element, newHref);
+        } else if (href.startsWith('/') && !href.startsWith('/static/')) {
+            // ローカルパスを特別なURLに変換
+            const encodedPath = encodeURIComponent(href);
+            const newHref = `/open-local-file?path=${encodedPath}`;
+            setHref(element, newHref);
+        }
+    }
+}
+
+function setHref(element, newHref) {
+    element.setAttribute('xlink:href', newHref);
+    element.setAttribute('href', newHref);
 }
 
 let scale = 1;
