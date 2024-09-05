@@ -218,29 +218,45 @@ def open_in_code():
 @app.route('/open-folder', methods=['POST'])
 def open_folder():
     data = request.json
-    file_path = data.get('path')
-    app.logger.info(f"受信したfile_path: {repr(file_path)}")
-    
-    if not file_path:
-        return jsonify({'success': False, 'error': 'ファイルパスが指定されていません。'})
+    folder_path = data.get('path')
     
     try:
-        folder_path = os.path.dirname(file_path)
-        app.logger.info(f"開こうとしているfolder_path: {repr(folder_path)}")
-        
-        if os.path.exists(folder_path):
-            if IS_WINDOWS:
-                # Windowsの場合、バックスラッシュを使用
-                folder_path = folder_path.replace('/', '\\')
-                subprocess.Popen(['explorer', folder_path])
-            else:
-                subprocess.Popen(['open', folder_path])
-            return jsonify({'success': True})
-        else:
-            return jsonify({'success': False, 'error': f'フォルダが見つかりません: {folder_path}'})
+        # フォルダを開くコマンドを実行
+        if platform.system() == "Windows":
+            os.startfile(folder_path)
+        elif platform.system() == "Darwin":  # macOS
+            subprocess.Popen(["open", folder_path])
+        else:  # Linux
+            subprocess.Popen(["xdg-open", folder_path])
+        return jsonify({"success": True})
     except Exception as e:
-        app.logger.error(f"エラーが発生しました: {str(e)}")
-        return jsonify({'success': False, 'error': str(e)})
+        return jsonify({"success": False, "error": str(e)})
+# @app.route('/open-folder', methods=['POST'])
+# def open_folder():
+#     data = request.json
+#     file_path = data.get('path')
+#     app.logger.info(f"受信したfile_path: {repr(file_path)}")
+    
+#     if not file_path:
+#         return jsonify({'success': False, 'error': 'ファイルパスが指定されていません。'})
+    
+#     try:
+#         folder_path = os.path.dirname(file_path)
+#         app.logger.info(f"開こうとしているfolder_path: {repr(folder_path)}")
+        
+#         if os.path.exists(folder_path):
+#             if IS_WINDOWS:
+#                 # Windowsの場合、バックスラッシュを使用
+#                 folder_path = folder_path.replace('/', '\\')
+#                 subprocess.Popen(['explorer', folder_path])
+#             else:
+#                 subprocess.Popen(['open', folder_path])
+#             return jsonify({'success': True})
+#         else:
+#             return jsonify({'success': False, 'error': f'フォルダが見つかりません: {folder_path}'})
+#     except Exception as e:
+#         app.logger.error(f"エラーが発生しました: {str(e)}")
+#         return jsonify({'success': False, 'error': str(e)})
 
 @app.route('/mindmap/<path:file_path>')
 def view_mindmap(file_path):
@@ -445,7 +461,7 @@ def open_jupyter():
         # ファイルパスをベースディレクトリからの相対パスに変換
         relative_path = os.path.relpath(file_path, BASE_DIR)
         # 'file_viewer'を含まない相対パスを作成
-        cleaned_path = relative_path.replace('file_viewer/', '')
+        cleaned_path = relative_path.replace('file_viewer/', '').replace('file_viewer-main/', '')
         
         # .ipynbの拡張子がない場合、ディレクトリパスを使用
         if not cleaned_path.endswith('.ipynb'):

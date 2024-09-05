@@ -145,6 +145,14 @@
                 margin-left: 30px; /* 小さい画面では少し狭くする */
             }
         }
+
+        #markdown-container {
+            width: 100%;
+            overflow: hidden;
+        }
+        #markdown-content {
+            transform-origin: 0 0;
+        }
     </style>
 </head>
 <body>
@@ -165,8 +173,10 @@
     </div>
     
     <!-- 元のマークダウンコンテンツ表示部分 -->
-    <div class="markdown-body">
-        {{ content|safe }}
+    <div id="markdown-container">
+        <div id="markdown-content" class="markdown-body">
+            {{ content|safe }}
+        </div>
     </div>
 
     <script src="{{ url_for('static', filename='js/resize.js') }}"></script>
@@ -401,6 +411,44 @@
                 console.error('コピーに失敗しまた:', err);
             });
         }
+
+        let scale = 0.9; // 初期スケールを90%に設定
+        const markdownContent = document.getElementById('markdown-content');
+        const markdownContainer = document.getElementById('markdown-container');
+
+        function updateMarkdownContentSize() {
+            markdownContainer.style.width = `${window.innerWidth}px`;
+            markdownContainer.style.height = `${window.innerHeight}px`;
+            applyTransform();
+        }
+
+        function applyTransform() {
+            markdownContent.style.transform = `scale(${scale})`;
+            document.getElementById('size-input').value = Math.round(scale * 100);
+        }
+
+        markdownContainer.addEventListener('wheel', function(e) {
+            if (e.ctrlKey) {
+                e.preventDefault();
+                const zoomSensitivity = 0.001;
+                const delta = e.deltaY > 0 ? -zoomSensitivity : zoomSensitivity;
+                scale = Math.min(Math.max(0.1, scale + delta), 2);
+                applyTransform();
+            }
+        });
+
+        document.getElementById('size-input').addEventListener('change', function(e) {
+            scale = e.target.value / 100;
+            applyTransform();
+        });
+
+        // 初期化時にMarkdownサイズを設定
+        document.addEventListener('DOMContentLoaded', function() {
+            updateMarkdownContentSize();
+        });
+
+        // ウィンドウのリサイズ時にMarkdownサイズを再計算
+        window.addEventListener('resize', updateMarkdownContentSize);
     });
     </script>
 </body>
