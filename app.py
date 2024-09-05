@@ -218,19 +218,32 @@ def open_in_code():
 @app.route('/open-folder', methods=['POST'])
 def open_folder():
     data = request.json
-    folder_path = data.get('path')
+    file_path = data.get('path')
+    app.logger.info(f"受信したfile_path: {repr(file_path)}")
+    
+    if not file_path:
+        return jsonify({'success': False, 'error': 'ファイルパスが指定されていません。'})
     
     try:
-        # フォルダを開くコマンドを実行
-        if platform.system() == "Windows":
-            os.startfile(folder_path)
-        elif platform.system() == "Darwin":  # macOS
-            subprocess.Popen(["open", folder_path])
-        else:  # Linux
-            subprocess.Popen(["xdg-open", folder_path])
-        return jsonify({"success": True})
+        # file_pathがファイルの場合は親ディレクトリを、ディレクトリの場合はそのまま使用
+        folder_path = os.path.dirname(file_path) if os.path.isfile(file_path) else file_path
+        app.logger.info(f"開こうとしているfolder_path: {repr(folder_path)}")
+        
+        if os.path.exists(folder_path):
+            if platform.system() == "Windows":
+                # Windowsの場合、バックスラッシュを使用
+                folder_path = folder_path.replace('/', '\\')
+                subprocess.Popen(['explorer', folder_path])
+            elif platform.system() == "Darwin":  # macOS
+                subprocess.Popen(["open", folder_path])
+            else:  # Linux
+                subprocess.Popen(["xdg-open", folder_path])
+            return jsonify({'success': True})
+        else:
+            return jsonify({'success': False, 'error': f'フォルダが見つかりません: {folder_path}'})
     except Exception as e:
-        return jsonify({"success": False, "error": str(e)})
+        app.logger.error(f"エラーが発生しました: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)})
 # @app.route('/open-folder', methods=['POST'])
 # def open_folder():
 #     data = request.json
