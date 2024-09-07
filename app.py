@@ -89,7 +89,7 @@ def view_file(file_path):
         current_item = 'Root'
     else:
         file_path = file_path.lstrip('/')
-        full_path = normalize_path(os.path.join(BASE_DIR, file_path))
+        full_path = os.path.normpath(os.path.join(BASE_DIR, file_path))
         file_name = os.path.basename(file_path)
         folder_name = os.path.basename(os.path.dirname(file_path))
         current_item = f"{file_name} - {folder_name}" if folder_name else file_name
@@ -203,12 +203,33 @@ def open_in_code():
 
         if os.path.exists(vscode_path):
             normalized_path = normalize_path(file_path)
-            if os.path.isfile(normalized_path):
-                # ファイルの場合、そのファイルが含まれるディレクトリを開く
-                subprocess.Popen([vscode_path, os.path.dirname(normalized_path)])
+            target_path = os.path.dirname(normalized_path) if os.path.isfile(normalized_path) else normalized_path
+            
+            if IS_WINDOWS:
+                # Windowsの場合
+                subprocess.Popen([vscode_path, target_path])
+                # PowerShellを使用してウィンドウをアクティブにする
+                # powershell_command = f'(New-Object -ComObject WScript.Shell).AppActivate("Visual Studio Code")'
+                # subprocess.Popen(["powershell", "-Command", powershell_command])
             else:
-                # ディレクトリの場合、そのディレクトリを直接開く
-                subprocess.Popen([vscode_path, normalized_path])
+                # macOSの場合
+                subprocess.Popen([vscode_path, target_path])
+                # AppleScriptを使用してウィンドウをアクティブにしてフルスクリーンにする
+                apple_script = '''
+                tell application "Cursor"
+                    activate
+                end tell
+                
+                tell application "System Events"
+                    tell process "Cursor"
+                        set frontmost to true
+                        delay 1
+                        keystroke "f" using {command down, control down}
+                    end tell
+                end tell
+                '''
+                subprocess.run(["osascript", "-e", apple_script])
+            
             return jsonify({'success': True})
         else:
             return jsonify({'success': False, 'error': 'Visual Studio Code/Cursorが見つかりません。'})
@@ -467,27 +488,40 @@ def before_request():
 def open_jupyter():
     data = request.json
     file_path = data.get('path')
+    app.logger.info(f"Received file_path: {file_path}")
+    
     if not file_path:
+        app.logger.warning("No file path specified")
         return jsonify({'success': False, 'error': 'ファイルパスが指定されていません。'})
     
     try:
         # ファイルパスをベースディレクトリからの相対パスに変換
         relative_path = os.path.relpath(file_path, BASE_DIR)
+        app.logger.debug(f"Relative path: {relative_path}")
+
         # 'file_viewer'を含まない相対パスを作成
-        cleaned_path = relative_path.replace('file_viewer/', '').replace('file_viewer-main/', '')
+        # cleaned_path = relative_path.replace('viewer/', '').replace('viewer-main/', '')
+        cleaned_path = relative_path
+        app.logger.debug(f"Cleaned path: {cleaned_path}")
         
-        # .ipynbの拡張子がない場合、ディレクトリパスを使用
-        if not cleaned_path.endswith('.ipynb'):
+        if cleaned_path.endswith('.ipynb'):
+            app.logger.debug(f"Opening .ipynb file: {cleaned_path}")
+        elif os.path.isfile(os.path.join(BASE_DIR, cleaned_path)):
             cleaned_path = os.path.dirname(cleaned_path)
+            app.logger.debug(f"Opening folder for non-.ipynb file: {cleaned_path}")
+        else:
+            app.logger.debug(f"Opening folder: {cleaned_path}")
         
         # JupyterのURLを構築
         jupyter_url = f"{JUPYTER_BASE_URL}/{cleaned_path}"
+        app.logger.info(f"Opening Jupyter URL: {jupyter_url}")
         
         # ブラウザでJupyterのURLを開く
         webbrowser.open(jupyter_url)
         
         return jsonify({'success': True})
     except Exception as e:
+        app.logger.error(f"Error occurred while opening Jupyter: {str(e)}", exc_info=True)
         return jsonify({'success': False, 'error': str(e)})
 
 @app.route('/network-image')

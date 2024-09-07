@@ -191,16 +191,47 @@ function fixSvgPaths() {
 function processElement(element) {
     let href = element.getAttribute('xlink:href') || element.getAttribute('href');
     if (href) {
-        if (href.startsWith('\\\\')) {
+        const baseDirPath = '{{ BASE_DIR }}'.replace(/\\/g, '/');  // バックスラッシュをスラッシュに変換
+        const currentFilePath = '{{ full_path }}'.replace(/\\/g, '/');
+        const currentDir = currentFilePath.substring(0, currentFilePath.lastIndexOf('/'));
+
+        // バックスラッシュをスラッシュに変換
+        href = href.replace(/\\/g, '/');
+
+        if (href.startsWith('//')) {
             // ネットワークパスをエンコード
             const encodedPath = encodeURIComponent(href);
             const newHref = `/network-image?path=${encodedPath}`;
             setHref(element, newHref);
-        } else if (href.startsWith('/') && !href.startsWith('/static/')) {
-            // ローカルパスを特別なURLに変換
-            const encodedPath = encodeURIComponent(href);
-            const newHref = `/open-local-file?path=${encodedPath}`;
-            setHref(element, newHref);
+        } else if (href.startsWith('/')) {
+            // 絶対パスの場合
+            if (href.startsWith(baseDirPath)) {
+                // BASE_DIR内のパスの場合、view_fileエンドポイントを使用
+                const relativePath = href.slice(baseDirPath.length);
+                const encodedPath = relativePath.replace(/^\/+/, '').split('/').map(encodeURIComponent).join('/');
+                const newHref = `/view/${encodedPath}`;
+                setHref(element, newHref);
+            } else {
+                // BASE_DIR外の絶対パスの場合、open-local-fileエンドポイントを使用
+                const encodedPath = href.split('/').map(encodeURIComponent).join('/');
+                const newHref = `/open-local-file?path=${encodedPath}`;
+                setHref(element, newHref);
+            }
+        } else if (!href.startsWith('http')) {
+            // 相対パスの場合
+            const fullPath = `${currentDir}/${href}`;
+            if (fullPath.startsWith(baseDirPath)) {
+                // BASE_DIR内のパスの場合、view_fileエンドポイントを使用
+                const relativePath = fullPath.slice(baseDirPath.length);
+                const encodedPath = relativePath.replace(/^\/+/, '').split('/').map(encodeURIComponent).join('/');
+                const newHref = `/view/${encodedPath}`;
+                setHref(element, newHref);
+            } else {
+                // BASE_DIR外のパスの場合、open-local-fileエンドポイントを使用
+                const encodedPath = fullPath.split('/').map(encodeURIComponent).join('/');
+                const newHref = `/open-local-file?path=${encodedPath}`;
+                setHref(element, newHref);
+            }
         }
     }
 }

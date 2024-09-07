@@ -327,21 +327,29 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    // window.openJupyter = function() {
-    //     const basePath = '{{ BASE_DIR }}' || '/Users/sudoupousei/000_work';
-    //     const filePath = '{{ full_path | trim }}';
-        
-    //     const baseDir = basePath.split('/').pop();
-    //     let relativePath = '';
-    //     if (filePath.includes(baseDir)) {
-    //         relativePath = filePath.split(baseDir)[1].replace(/^\//, '');
-    //     } else {
-    //         relativePath = filePath.replace(basePath, '').replace(/^\//, '');
-    //     }
-        
-    //     const jupyterURL = 'http://localhost:8888/lab/tree/' + encodeURIComponent(relativePath);
-    //     window.open(jupyterURL, '_blank');
-    // }
+    window.openJupyter = function() {
+        var filePath = '{{ full_path | trim }}';
+        console.log('Opening Jupyter Notebook for path:', filePath);  // この行を追加
+        fetch('/open-jupyter', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ path: filePath }),
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                console.log('Jupyter Notebookが開かれました。');
+            } else {
+                alert('エラーが発生しました: ' + data.error);
+            }
+        })
+        .catch((error) => {http://localhost:8888/lab/tree
+            console.error('Error:', error);
+            alert('Jupyter Notebookを開く際にエラーが発生しました。');
+        });
+    }
 
     function openFile(path) {
         if (path.toLowerCase().endsWith('.ipynb')) {
