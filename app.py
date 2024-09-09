@@ -42,7 +42,7 @@ global BASE_DIR
 mac_BASE_DIR = r"/Users/sudoupousei/000_work"  # Windowsの場合
 win_BASE_DIR = r"C:\Users\kabu_server\000_work"
 BASE_DIR = normalize_path(mac_BASE_DIR if not IS_WINDOWS else win_BASE_DIR)
-
+app.jinja_env.globals['BASE_DIR'] = BASE_DIR
 # JupyterのベースURLを設定
 JUPYTER_BASE_URL =  'http://localhost:8888/lab/tree' 
 
@@ -564,6 +564,17 @@ def open_local_file():
     else:
         app.logger.info("Sending file within BASE_DIR")
         return send_file(decoded_path)
+
+@app.route('/check-path-type', methods=['POST'])
+def check_path_type():
+    data = request.json
+    path = data.get('path')
+    if os.path.isfile(path):
+        return jsonify({'type': 'file'})
+    elif os.path.isdir(path):
+        return jsonify({'type': 'folder'})
+    else:
+        return jsonify({'type': 'invalid'})
 
 if __name__ == '__main__':
     app.secret_key = 'your_secret_key_here'  # セッション用の秘密鍵

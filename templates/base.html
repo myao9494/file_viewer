@@ -18,33 +18,72 @@
     <!-- オンライン版（コメントアウト） -->
     <!-- <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css"> -->
     <style>
-        #showDirectoryBtn {
+        .top-bar {
             position: fixed;
-            top: 10px;
-            left: 10px;
+            top: 5px;
+            left: 5px;
+            right: 5px;
             z-index: 1000;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            background-color: rgba(255, 255, 255, 0.9);
+            padding: 5px;
+            border-radius: 3px;
+        }
+        .top-buttons {
+            display: flex;
+            gap: 5px;
+        }
+        .top-buttons a, .top-buttons button {
             background: none;
             border: none;
-            font-size: 24px;
+            font-size: 16px;
             color: #333;
             cursor: pointer;
-            padding: 5px;
-            border-radius: 50%;
+            padding: 3px;
+            border-radius: 3px;
             transition: background-color 0.3s;
+            width: 24px;
+            height: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
-        #showDirectoryBtn:hover {
+        .top-buttons a:hover, .top-buttons button:hover {
             background-color: rgba(0, 0, 0, 0.1);
+        }
+        .folder-path {
+            flex-grow: 1;
+            display: flex;
+            align-items: center;
+            font-size: 14px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .container {
+            padding-top: 40px;
         }
     </style>
 </head>
 <body>
-    <!-- ディレクトリ表示ボタンをリンクに変更し、動的なhrefを設定 -->
-    <a id="showDirectoryBtn" title="ディレクトリを表示" href="/view" role="button">
-        <i class="fas fa-folder-open"></i>
-    </a>
+    <!-- ディレクトリ表示ボタンとクリップボードから開くボタンを含むコンテナ -->
+    <div class="top-bar">
+        <div class="top-buttons">
+            <a id="showDirectoryBtn" title="ディレクトリを表示" href="/view" role="button">
+                <i class="fas fa-folder-open"></i>
+            </a>
+            <button id="openFromClipboardBtn" title="クリップボードから開く" onclick="openFromClipboard()">
+                <i class="fas fa-clipboard"></i>
+            </button>
+        </div>
+        {% block folder_path %}{% endblock %}
+    </div>
 
     <!-- headerブロック: ページヘッダーをPythonコードから挿入可能 -->
     {% block header %}{% endblock %}
+    <!-- コンテンツ用のコンテナ -->
     <div class="container">
         <main>
             <!-- contentブロック: メインコンテンツをPythonコードから挿入 -->
@@ -90,6 +129,54 @@
             }
         });
     });
+
+    function openFromClipboard() {
+        navigator.clipboard.readText().then(function(clipText) {
+            fetch('/check-path-type', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ path: clipText }),
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.type === 'file' || data.type === 'folder') {
+                    openInViewer(clipText);
+                } else {
+                    alert('無効なパスです。');
+                }
+            })
+            .catch((error) => {
+                console.error('Error:', error);
+                alert('エラーが発生しました。');
+            });
+        }).catch(function(err) {
+            console.error('クリップボードからテキストを読み取れませんでした: ', err);
+            alert('クリップボードからテキストを読み取れませんでした。');
+        });
+    }
+
+    function openInViewer(path) {
+        // BASE_DIRを取得（サーバーから提供される必要があります）
+        const baseDir = '{{ BASE_DIR }}';
+        
+        // パスをBASE_DIRからの相対パスに変換
+        let relativePath = path;
+        if (path.startsWith(baseDir)) {
+            relativePath = path.slice(baseDir.length);
+        }
+        
+        // パスの先頭のスラッシュを削除
+        relativePath = relativePath.replace(/^[/\\]+/, '');
+        
+        // パスの各部分をエンコード
+        const encodedPath = relativePath.split(/[/\\]/).map(encodeURIComponent).join('/');
+        
+        // 新しいURLを生成して開く
+        const newUrl = `/view/${encodedPath}`;
+        window.location.href = newUrl;
+    }
     </script>
 </body>
 </html>
