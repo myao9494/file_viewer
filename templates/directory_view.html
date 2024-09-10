@@ -77,11 +77,22 @@
     .button-container {
         display: flex;
         align-items: center;
-        margin-right: 5px; /* ボタンの右側に余白を追加 */
+        margin-right: 5px; /* ボタンの右側に余��追加 */
         margin-left: 40px; /* ボタンの右側に余白を追加 */
     }
     .button-container button {
         margin-right: 5px; /* ボタン間の余白 */
+    }
+    .filter-btn {
+        margin-right: 5px;
+        padding: 5px 10px;
+        border: 1px solid #ccc;
+        background-color: #f8f8f8;
+        cursor: pointer;
+    }
+    .filter-btn.active {
+        background-color: #007bff;
+        color: white;
     }
 </style>
 
@@ -106,14 +117,16 @@
         <button type="submit">検索</button>
     </form>
     <div id="filter-options">
-        <label><input type="radio" name="filter" value="md+svg+csv+pdf+ipynb" checked> MD+SVG+CSV+PDF+IPYNB</label>
-        <label><input type="radio" name="filter" value="md"> MD</label>
-        <label><input type="radio" name="filter" value="svg"> SVG</label>
-        <label><input type="radio" name="filter" value="csv"> CSV</label>
-        <label><input type="radio" name="filter" value="pdf"> PDF</label>
-        <label><input type="radio" name="filter" value="ipynb"> IPYNB</label>
-        <label><input type="radio" name="filter" value="all"> 全て</label>
-        <label><input type="checkbox" id="hide-folders" checked> フォルダを非表示</label>
+        <button class="filter-btn active" data-filter="md+svg+csv+pdf+ipynb+py+docx+xlsx+pptx">よく使うもの</button>
+        <button class="filter-btn" data-filter="md">MD</button>
+        <button class="filter-btn" data-filter="svg">SVG</button>
+        <button class="filter-btn" data-filter="csv">CSV</button>
+        <button class="filter-btn" data-filter="pdf">PDF</button>
+        <button class="filter-btn" data-filter="ipynb">IPYNB</button>
+        <button class="filter-btn" data-filter="py">PY</button>
+        <button class="filter-btn" data-filter="docx+xlsx+pptx">MS Office</button>
+        <button class="filter-btn" data-filter="all">全て</button>
+        <button id="toggle-folders" class="filter-btn">フォルダを非表示</button>
         <form id="depth-form" style="display: inline-block; margin-left: 15px;">
             <label for="depth">階層数:</label>
             <input type="number" id="depth" name="depth" value="{{ depth }}" min="0" style="width: 50px;">
@@ -160,13 +173,32 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
 
-    // フィルター機能の最適化
-    function applyFilter() {
-        console.log('applyFilter function called');
-        var selectedFilter = document.querySelector('input[name="filter"]:checked').value;
-        var hideFolders = document.getElementById('hide-folders').checked;
-        console.log('Selected filter:', selectedFilter);
-        console.log('Hide folders:', hideFolders);
+    let hideFolders = false;
+
+    // フィルターボタンのイベントリスナーを設定
+    document.querySelectorAll('.filter-btn').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            if (this.id !== 'toggle-folders') {
+                document.querySelectorAll('.filter-btn').forEach(b => {
+                    if (b.id !== 'toggle-folders') b.classList.remove('active');
+                });
+                this.classList.add('active');
+                applyFilter(this.dataset.filter);
+            }
+        });
+    });
+
+    // フォルダ表示切り替えボタンのイベントリスナーを設定
+    document.getElementById('toggle-folders').addEventListener('click', function() {
+        hideFolders = !hideFolders;
+        this.classList.toggle('active');
+        this.textContent = hideFolders ? 'フォルダを表示' : 'フォルダを非表示';
+        applyFilter(document.querySelector('.filter-btn.active').dataset.filter);
+    });
+
+    // フィルター適用関数を更新
+    function applyFilter(selectedFilter) {
+        console.log('applyFilter function called with filter:', selectedFilter);
         
         var items = document.querySelectorAll('.folder-list li, .file-list li');
         var promises = [];
@@ -186,12 +218,7 @@ document.addEventListener('DOMContentLoaded', function() {
                             } else if (item.classList.contains('file')) {
                                 var fileName = item.querySelector('a').textContent.toLowerCase();
                                 var shouldShow = (selectedFilter === 'all' ||
-                                    (selectedFilter === 'md+svg+csv+pdf+ipynb' && (fileName.endsWith('.md') || fileName.endsWith('.svg') || fileName.endsWith('.csv') || fileName.endsWith('.pdf') || fileName.endsWith('.ipynb'))) ||
-                                    (selectedFilter === 'md' && fileName.endsWith('.md')) ||
-                                    (selectedFilter === 'svg' && fileName.endsWith('.svg')) ||
-                                    (selectedFilter === 'csv' && fileName.endsWith('.csv')) ||
-                                    (selectedFilter === 'pdf' && fileName.endsWith('.pdf')) ||
-                                    (selectedFilter === 'ipynb' && fileName.endsWith('.ipynb')));
+                                    (selectedFilter.split('+').some(ext => fileName.endsWith('.' + ext))));
                                 item.style.display = shouldShow ? '' : 'none';
                             } else {
                                 item.style.display = '';
@@ -206,29 +233,9 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    // ラジオボタンとチェックボックスのイベントリスナーを設定
-    var filterInputs = document.querySelectorAll('input[name="filter"], #hide-folders');
-    filterInputs.forEach(function(input) {
-        console.log('Adding event listener to input:', input.value || input.id);
-        input.addEventListener('change', function() {
-            console.log('Input changed:', this.value || this.id);
-            applyFilter();
-            // フォルダ非表示の状態をローカルストレージに保存
-            if (this.id === 'hide-folders') {
-                localStorage.setItem('hideFolders', this.checked);
-            }
-        });
-    });
-
-    // ページ読み込み時にフォルダ非表示の状態を復元
-    var hideFolders = localStorage.getItem('hideFolders');
-    if (hideFolders !== null) {
-        document.getElementById('hide-folders').checked = hideFolders === 'true';
-    }
-
     // 初期表示時にフィルターを適用
     console.log('Applying initial filter');
-    applyFilter();
+    applyFilter('md+svg+csv+pdf+ipynb+py+docx+xlsx+pptx');
 
     // 階層数の入力フィールドのイベントリスナーを設定
     document.getElementById('depth').addEventListener('change', function() {
@@ -345,7 +352,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 alert('エラーが発生しました: ' + data.error);
             }
         })
-        .catch((error) => {http://localhost:8888/lab/tree
+        .catch((error) => {
             console.error('Error:', error);
             alert('Jupyter Notebookを開く際にエラーが発生しました。');
         });

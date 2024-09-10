@@ -113,6 +113,20 @@ def view_file(file_path):
     # MIMEタイプを取得
     mime_type, _ = mimetypes.guess_type(full_path)
 
+    # MS Officeファイルの場合
+    if file_extension in ['.docx', '.xlsx', '.pptx', '.doc', '.xls', '.ppt']:
+        if open_with_default_app(full_path):
+            return jsonify({'success': True, 'message': 'ファイルを開きました'})
+        else:
+            return jsonify({'success': False, 'error': 'ファイルを開けませんでした'})
+
+    # BASEディレクトリにないファイルの場合
+    if not full_path.startswith(BASE_DIR):
+        if open_with_default_app(full_path):
+            return jsonify({'success': True, 'message': 'ファイルを開きました'})
+        else:
+            return jsonify({'success': False, 'error': 'ファイルを開けませんでした'})
+
     # SVGファイルの場合
     if file_extension == '.svg':
         with open(full_path, 'r', encoding='utf-8') as f:
@@ -161,6 +175,20 @@ def view_file(file_path):
 
     # その他のファイルはダウンロード
     return send_file(full_path, as_attachment=True)
+
+def open_with_default_app(file_path):
+    """ファイルをOSのデフォルトアプリケーションで開く"""
+    try:
+        if platform.system() == "Windows":
+            os.startfile(file_path)
+        elif platform.system() == "Darwin":  # macOS
+            subprocess.run(["open", file_path], check=True)
+        else:  # Linux
+            subprocess.run(["xdg-open", file_path], check=True)
+        return True
+    except Exception as e:
+        app.logger.error(f"ファイルを開く際にエラーが発生しました: {str(e)}")
+        return False
 
 @app.route('/raw/<path:file_path>')
 def raw_file(file_path):
@@ -500,8 +528,8 @@ def open_jupyter():
         app.logger.debug(f"Relative path: {relative_path}")
 
         # 'file_viewer'を含まない相対パスを作成
-        # cleaned_path = relative_path.replace('viewer/', '').replace('viewer-main/', '')
-        cleaned_path = relative_path
+        cleaned_path = relative_path.replace('/viewer/', '/').replace('/viewer-main/', '/').replace('/file_viewer/', '/',1)
+        # cleaned_path = relative_path
         app.logger.debug(f"Cleaned path: {cleaned_path}")
         
         if cleaned_path.endswith('.ipynb'):
@@ -528,9 +556,17 @@ def open_jupyter():
 def network_image():
     path = request.args.get('path')
     decoded_path = urllib.parse.unquote(path)
-    # ここでネットワークパスから画像を読み込み、送信する処理を実装
-    # 注意: セキュリティを考慮し、アクセス可能なパスを制限することを推奨
-    return send_file(decoded_path, mimetype='image/png')
+    
+    if IS_WINDOWS:
+        decoded_path = decoded_path.replace("/", "\\")
+        try:
+            os.startfile(decoded_path)
+            return jsonify({'success': True, 'message': '画像を開きました'})
+        except Exception as e:
+            return jsonify({'success': False, 'error': str(e)})
+    else:
+        # Windowsでない場合は元の処理を維持
+        return send_file(decoded_path, mimetype='image/png')
 
 @app.route('/open-local-file')
 def open_local_file():
@@ -541,29 +577,22 @@ def open_local_file():
     
     if not os.path.exists(decoded_path):
         app.logger.error(f"File not found: {decoded_path}")
-        abort(404)
+        return jsonify({'success': False, 'error': 'ファイルが見つかりません'}), 404
 
     mime_type, _ = mimetypes.guess_type(decoded_path)
     app.logger.info(f"MIME type: {mime_type}")
 
-    if mime_type == 'application/pdf':
-        app.logger.info("Sending PDF file")
-        return send_file(decoded_path, mimetype='application/pdf')
-    elif not decoded_path.startswith(BASE_DIR):
-        app.logger.info("File is outside BASE_DIR")
-        try:
-            if platform.system() == 'Darwin':  # macOS
-                subprocess.Popen(['open', '-a', 'Preview', decoded_path])
-            elif platform.system() == 'Windows':
-                os.startfile(decoded_path)
-            else:  # Linux
-                subprocess.Popen(['xdg-open', decoded_path])
-            return jsonify({'success': True, 'message': 'ファイルを開きました'})
-        except Exception as e:
-            return jsonify({'success': False, 'error': str(e)})
-    else:
-        app.logger.info("Sending file within BASE_DIR")
-        return send_file(decoded_path)
+    try:
+        if platform.system() == 'Darwin':  # macOS
+            subprocess.Popen(['open', decoded_path])
+        elif platform.system() == 'Windows':
+            os.startfile(decoded_path)
+        else:  # Linux
+            subprocess.Popen(['xdg-open', decoded_path])
+        return '', 204  # 成功を示すステータスコードを返しますが、コンテンツは返しません
+    except Exception as e:
+        app.logger.error(f"Error opening file: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 @app.route('/check-path-type', methods=['POST'])
 def check_path_type():

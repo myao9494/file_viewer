@@ -1,5 +1,12 @@
-<svg host="65bd71144e" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" version="1.1" width="121px" height="32px" viewBox="-0.5 -0.5 121 32" content="&lt;mxfile&gt;&lt;diagram id=&quot;jAX03o9-D4P7P2WEgm79&quot; name=&quot;ページ1&quot;&gt;jZLBboMwDIafJncg09pex2hXab0UaT1OEfFIpEBQ6hbY0y8sSSFCk3ZB9mc7tn9DaN4MB8M6cdIcFMkSPhD6SrJsl2ztdwKjA5un1IHaSO7QApTyGzxMPL1JDtcoEbVWKLsYVrptocKIMWN0H6d9aRV37VgNK1BWTK3pRXIUjm6zzczfQNYidE6fdy7SsJDsN7kKxnW/QLQgNDdao7OaIQc1aRd0cXX7P6KPwQy0+J+CzBXcmbr53fbH9+Lz41hcirMfEcewdy8kQtmxavJ7e1pCXwQ2ynqpNdfN/Tx3MAjDAvlhDqAbQDPalCG+8Bi7/axyGqQTC4WpZ8wftn48PO9uDb9+cGeZf2OLf5UWPw==&lt;/diagram&gt;&lt;/mxfile&gt;">
-    <defs/>
+<svg host="65bd71144e" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" version="1.1" width="181px" height="281px" viewBox="-0.5 -0.5 181 281" content="&lt;mxfile&gt;&lt;diagram id=&quot;jAX03o9-D4P7P2WEgm79&quot; name=&quot;ページ1&quot;&gt;1ZXfb5swEMf/Gh4n8SOF5rUp6SptmrRo62Pk4gt4NT5km5Dsr5+JTcAlrTJpfdgL8n18d/Z9vyCCZFUfHiRpqq9IgQdxSA9Bch/E8TJbmGcPjhZky8yCUjJqUTSCDfsNDoaOtoyC8hI1Ites8WGBQkChPUakxM5P2yH3T21ICTOwKQif0ydGdWXpbZyN/DOwshpOjtKl3anJkOwmURWh2E1QkgfJSiJqu6oPK+C9doMutm79xu75YhKEvqYgtgV7wls32/rxS779+Zg/5d/dFfVxmLurmIZNQ4o+7oy1QXJX6ZqbKDLL+eHuPnuQGg4T5C7zAFiDlkeTcvAdPvphN6ocDdJVE4UTx4gztjw3Hmc3Czf+KfyhQH57/tW/HnHIyTNwW0oIsb04Ey8WKU00K0w9q42zym4PCiaTeZy4E8UktoICdQJdpd9MrAuSvqlf5uuXXalf+vf6mXAi4buSFkq9ltRVG75WLcW2wVYBM1EYhtsO5YtZ7hiH7Z5BB7JPG0w4dxscuHnXgR0KvUKO8hQmpn+Ym9y7nm9c2sLEvlNoXNjx05dZMUpBGKaMcUyUfUb4b9w6ezG87rdzv9ILdi0+1K6SCK0/1UTpXvgrfbvHTnAktN+ZNxisSv9bq1LfqfjmwpcVfZhVBo3/hFP65Mea5H8A&lt;/diagram&gt;&lt;/mxfile&gt;">
+    <defs>
+        <clipPath id="mx-clip-118-178-44-24-0">
+            <rect x="118" y="178" width="44" height="24"/>
+        </clipPath>
+        <clipPath id="mx-clip-58-248-94-24-0">
+            <rect x="58" y="248" width="94" height="24"/>
+        </clipPath>
+    </defs>
     <g>
         <rect x="0" y="0" width="120" height="30" fill="rgb(255, 255, 255)" stroke="rgb(0, 0, 0)" pointer-events="all"/>
         <g transform="translate(-0.5 -0.5)">
@@ -18,6 +25,41 @@
                 </text>
             </switch>
         </g>
+        <a xlink:href="static/images">
+            <rect x="60" y="60" width="120" height="60" rx="9" ry="9" fill="rgb(255, 255, 255)" stroke="rgb(0, 0, 0)" pointer-events="all"/>
+            <g transform="translate(-0.5 -0.5)">
+                <switch>
+                    <foreignObject pointer-events="none" width="100%" height="100%" requiredFeatures="http://www.w3.org/TR/SVG11/feature#Extensibility" style="overflow: visible; text-align: left;">
+                        <div xmlns="http://www.w3.org/1999/xhtml" style="display: flex; align-items: unsafe center; justify-content: unsafe center; width: 118px; height: 1px; padding-top: 90px; margin-left: 61px;">
+                            <div data-drawio-colors="color: rgb(0, 0, 0); " style="box-sizing: border-box; font-size: 0px; text-align: center;">
+                                <div style="display: inline-block; font-size: 12px; font-family: Helvetica; color: rgb(0, 0, 0); line-height: 1.2; pointer-events: all; white-space: normal; overflow-wrap: normal;">
+                                    aaa
+                                </div>
+                            </div>
+                        </div>
+                    </foreignObject>
+                    <text x="120" y="94" fill="rgb(0, 0, 0)" font-family="Helvetica" font-size="12px" text-anchor="middle">
+                        aaa
+                    </text>
+                </switch>
+            </g>
+        </a>
+        <a xlink:href="/Users/sudoupousei/000_work/file_viewer/static/css">
+            <rect x="110" y="170" width="60" height="40" rx="6" ry="6" fill="rgb(255, 255, 255)" stroke="rgb(0, 0, 0)" pointer-events="all"/>
+            <g fill="#0000EE" font-family="Helvetica" text-decoration="underline" clip-path="url(#mx-clip-118-178-44-24-0)" text-anchor="middle" font-size="12px">
+                <text x="139.5" y="194.5">
+                    css
+                </text>
+            </g>
+        </a>
+        <a xlink:href="/Users/sudoupousei/Downloads/gantt-master">
+            <rect x="50" y="240" width="110" height="40" rx="6" ry="6" fill="rgb(255, 255, 255)" stroke="rgb(0, 0, 0)" pointer-events="all"/>
+            <g fill="#0000EE" font-family="Helvetica" text-decoration="underline" clip-path="url(#mx-clip-58-248-94-24-0)" text-anchor="middle" font-size="12px">
+                <text x="104.5" y="264.5">
+                    gantt-master
+                </text>
+            </g>
+        </a>
     </g>
     <switch>
         <g requiredFeatures="http://www.w3.org/TR/SVG11/feature#Extensibility"/>

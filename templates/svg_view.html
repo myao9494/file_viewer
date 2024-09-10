@@ -190,7 +190,7 @@ function fixSvgPaths() {
 
 function processElement(element) {
     let href = element.getAttribute('xlink:href') || element.getAttribute('href');
-    if (href) {
+    if (href && !href.startsWith('data:')) {  // data: URLの場合は処理をスキップ
         const baseDirPath = '{{ BASE_DIR }}'.replace(/\\/g, '/');  // バックスラッシュをスラッシュに変換
         const currentFilePath = '{{ full_path }}'.replace(/\\/g, '/');
         const currentDir = currentFilePath.substring(0, currentFilePath.lastIndexOf('/'));
@@ -198,14 +198,14 @@ function processElement(element) {
         // バックスラッシュをスラッシュに変換
         href = href.replace(/\\/g, '/');
 
-        if (href.startsWith('//')) {
+        if (href.startsWith('//') || href.startsWith('\\\\')) {
             // ネットワークパスをエンコード
             const encodedPath = encodeURIComponent(href);
             const newHref = `/network-image?path=${encodedPath}`;
             setHref(element, newHref);
-        } else if (href.startsWith('/')) {
-            // 絶対パスの場合
-            if (href.startsWith(baseDirPath)) {
+        } else if (href.startsWith('/') || /^[A-Za-z]:/.test(href)) {
+            // 絶対パスの場合（Windowsのドライブレターを含む）
+            if (href.toLowerCase().startsWith(baseDirPath.toLowerCase())) {
                 // BASE_DIR内のパスの場合、view_fileエンドポイントを使用
                 const relativePath = href.slice(baseDirPath.length);
                 const encodedPath = relativePath.replace(/^\/+/, '').split('/').map(encodeURIComponent).join('/');
@@ -220,7 +220,7 @@ function processElement(element) {
         } else if (!href.startsWith('http')) {
             // 相対パスの場合
             const fullPath = `${currentDir}/${href}`;
-            if (fullPath.startsWith(baseDirPath)) {
+            if (fullPath.toLowerCase().startsWith(baseDirPath.toLowerCase())) {
                 // BASE_DIR内のパスの場合、view_fileエンドポイントを使用
                 const relativePath = fullPath.slice(baseDirPath.length);
                 const encodedPath = relativePath.replace(/^\/+/, '').split('/').map(encodeURIComponent).join('/');
