@@ -59,7 +59,7 @@ def index():
 @app.route('/load_files')
 def load_files():
     """
-    ファイルリストを読み込んで表示する関数
+    ファイルリストを���み込んで表示する関数
 
     Returns:
         str: レンダリングされたHTMLテンプレート
@@ -336,7 +336,7 @@ def view_mindmap(file_path):
     # ファイル名とディレクトリを分離
     directory, file_name = os.path.split(file_path)
     
-    # ディレクトリとファイル名を結合（スラッシュを確実に挿入）
+    # ディレクトリとファイル名を結合（スラッシュ��確実に挿入）
     file_path = os.path.join(directory, file_name)
 
     app.logger.info(f"修正後のfile_path: {repr(file_path)}")
@@ -601,16 +601,29 @@ def open_local_file():
         app.logger.error(f"Error opening file: {str(e)}")
         return jsonify({'success': False, 'error': str(e)}), 500
 
-@app.route('/check-path-type', methods=['POST'])
-def check_path_type():
+# @app.route('/check-path-type', methods=['POST'])
+# def check_path_type():
+#     data = request.json
+#     path = data.get('path')
+#     if os.path.isfile(path):
+#         return jsonify({'type': 'file'})
+#     elif os.path.isdir(path):
+#         return jsonify({'type': 'folder'})
+#     else:
+#         return jsonify({'type': 'invalid'})
+
+@app.route('/normalize-path', methods=['POST'])
+def normalize_path_endpoint():
     data = request.json
     path = data.get('path')
-    if os.path.isfile(path):
-        return jsonify({'type': 'file'})
-    elif os.path.isdir(path):
-        return jsonify({'type': 'folder'})
-    else:
-        return jsonify({'type': 'invalid'})
+    if not path:
+        return jsonify({'success': False, 'error': 'パスが指定されていません。'})
+    
+    try:
+        normalized_path = normalize_path(path)
+        return jsonify({'success': True, 'normalized_path': normalized_path})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
 
 if __name__ == '__main__':
     app.secret_key = 'your_secret_key_here'  # セッション用の秘密鍵

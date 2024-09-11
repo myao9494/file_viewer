@@ -132,23 +132,24 @@
 
     function openFromClipboard() {
         navigator.clipboard.readText().then(function(clipText) {
-            fetch('/check-path-type', {
+            // サーバーサイドでパスを正規化
+            fetch('/normalize-path', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({ path: clipText }),
+                body: JSON.stringify({ path: clipText })
             })
             .then(response => response.json())
             .then(data => {
-                if (data.type === 'file' || data.type === 'folder') {
-                    openInViewer(clipText);
+                if (data.success) {
+                    openInViewer(data.normalized_path);
                 } else {
-                    alert('無効なパスです。');
+                    alert('パスの正規化に失敗しました: ' + data.error);
                 }
             })
-            .catch((error) => {
-                console.error('Error:', error);
+            .catch(error => {
+                console.error('エラー:', error);
                 alert('エラーが発生しました。');
             });
         }).catch(function(err) {
@@ -171,7 +172,7 @@
         relativePath = relativePath.replace(/^[/\\]+/, '');
         
         // パスの各部分をエンコード
-        const encodedPath = relativePath.split(/[/\\]/).map(encodeURIComponent).join('/');
+        const encodedPath = relativePath.split('/').map(encodeURIComponent).join('/');
         
         // 新しいURLを生成して開く
         const newUrl = `/view/${encodedPath}`;
