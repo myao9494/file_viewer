@@ -565,8 +565,15 @@ def network_image():
         except Exception as e:
             return jsonify({'success': False, 'error': str(e)})
     else:
-        # Windowsでない場合は元の処理を維持
-        return send_file(decoded_path, mimetype='image/png')
+        # Windowsでない場合
+        try:
+            if platform.system() == "Darwin":  # macOS
+                subprocess.run(["open", decoded_path], check=True)
+            else:  # Linux
+                subprocess.run(["xdg-open", decoded_path], check=True)
+            return jsonify({'success': True, 'message': '画像を開きました'})
+        except Exception as e:
+            return jsonify({'success': False, 'error': str(e)})
 
 @app.route('/open-local-file')
 def open_local_file():

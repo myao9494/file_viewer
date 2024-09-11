@@ -199,10 +199,13 @@ function processElement(element) {
         href = href.replace(/\\/g, '/');
 
         if (href.startsWith('//') || href.startsWith('\\\\')) {
-            // ネットワークパスをエンコード
-            const encodedPath = encodeURIComponent(href);
-            const newHref = `/network-image?path=${encodedPath}`;
-            setHref(element, newHref);
+            // ネットワークパスの場合、クリックイベントを追加
+            element.onclick = function(e) {
+                e.preventDefault();
+                openNetworkImage(href);
+            };
+            element.removeAttribute('xlink:href');
+            element.removeAttribute('href');
         } else if (href.startsWith('/') || /^[A-Za-z]:/.test(href)) {
             // 絶対パスの場合（Windowsのドライブレターを含む）
             if (href.toLowerCase().startsWith(baseDirPath.toLowerCase())) {
@@ -239,6 +242,22 @@ function processElement(element) {
 function setHref(element, newHref) {
     element.setAttribute('xlink:href', newHref);
     element.setAttribute('href', newHref);
+}
+
+function openNetworkImage(path) {
+    fetch(`/network-image?path=${encodeURIComponent(path)}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                console.log(data.message);
+            } else {
+                alert('エラーが発生しました: ' + data.error);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('エラーが発生しました。');
+        });
 }
 
 let scale = 1;
