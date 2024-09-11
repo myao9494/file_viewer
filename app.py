@@ -89,7 +89,7 @@ def view_file(file_path):
         current_item = 'Root'
     else:
         file_path = file_path.lstrip('/')
-        full_path = os.path.normpath(os.path.join(BASE_DIR, file_path))
+        full_path = normalize_path(os.path.join(BASE_DIR, file_path))
         file_name = os.path.basename(file_path)
         folder_name = os.path.basename(os.path.dirname(file_path))
         current_item = f"{file_name} - {folder_name}" if folder_name else file_name
@@ -112,20 +112,6 @@ def view_file(file_path):
     
     # MIMEタイプを取得
     mime_type, _ = mimetypes.guess_type(full_path)
-
-    # MS Officeファイルの場合
-    if file_extension in ['.docx', '.xlsx', '.pptx', '.doc', '.xls', '.ppt']:
-        if open_with_default_app(full_path):
-            return jsonify({'success': True, 'message': 'ファイルを開きました'})
-        else:
-            return jsonify({'success': False, 'error': 'ファイルを開けませんでした'})
-
-    # BASEディレクトリにないファイルの場合
-    if not full_path.startswith(BASE_DIR):
-        if open_with_default_app(full_path):
-            return jsonify({'success': True, 'message': 'ファイルを開きました'})
-        else:
-            return jsonify({'success': False, 'error': 'ファイルを開けませんでした'})
 
     # SVGファイルの場合
     if file_extension == '.svg':
@@ -172,6 +158,20 @@ def view_file(file_path):
     if mime_type and mime_type.startswith('text/') or file_extension in ['.txt', '.py', '.js', '.css', '.json', '.license', '.yml', '.yaml', '.xml', '.ini', '.cfg', '.conf']:
         content = get_file_content(full_path, 'text')
         return render_template('view_file.html', content=content, file_path=file_path, full_path=full_path, current_item=current_item)
+
+    # MS Officeファイルの場合
+    if file_extension in ['.docx', '.xlsx', '.pptx', '.doc', '.xls', '.ppt']:
+        if open_with_default_app(full_path):
+            return jsonify({'success': True, 'message': 'ファイルを開きました'})
+        else:
+            return jsonify({'success': False, 'error': 'ファイルを開けませんでした'})
+
+    # BASEディレクトリにないファイルの場合
+    if not full_path.startswith(BASE_DIR):
+        if open_with_default_app(full_path):
+            return jsonify({'success': True, 'message': 'ファイルを開きました'})
+        else:
+            return jsonify({'success': False, 'error': 'ファイルを開けませんでした'})
 
     # その他のファイルはダウンロード
     return send_file(full_path, as_attachment=True)
