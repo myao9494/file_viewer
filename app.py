@@ -59,7 +59,7 @@ def index():
 @app.route('/load_files')
 def load_files():
     """
-    ファイルリストを���み込んで表示する関数
+    ファイルリストを読み込んで表示する関数
 
     Returns:
         str: レンダリングされたHTMLテンプレート
@@ -336,7 +336,7 @@ def view_mindmap(file_path):
     # ファイル名とディレクトリを分離
     directory, file_name = os.path.split(file_path)
     
-    # ディレクトリとファイル名を結合（スラッシュ��確実に挿入）
+    # ディレクトリとファイル名を結合（スラッシュを確実に挿入）
     file_path = os.path.join(directory, file_name)
 
     app.logger.info(f"修正後のfile_path: {repr(file_path)}")

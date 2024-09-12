@@ -60,6 +60,9 @@
         display: block;
         transform-origin: 0 0;
     }
+    .clickable-element {
+        cursor: pointer;
+    }
 </style>
 {% endblock %}
 
@@ -154,7 +157,8 @@ function openJupyter() {
     .then(response => response.json())
     .then(data => {
         if (data.success) {
-            // サーバーサイドで処理が成功した場合、何もしない
+            // サーバーサイドで処理が成功した場合、メッセージを表示
+            console.log('Jupyterが新しいタブで開かれました。');
         } else {
             alert('エラーが発生しました: ' + data.error);
         }
@@ -198,6 +202,22 @@ function processElement(element) {
         // バックスラッシュをスラッシュに変換
         href = href.replace(/\\/g, '/');
 
+        // file:プロトコルを無視する
+        href = href.replace(/^file:\/\//, '');
+
+        // ネットワークドライブの変換
+        const networkDriveMap = {
+            'X:': '//nas/work'
+            // 他のネットワークドライブのマッピングをここに追加
+        };
+
+        for (const [drive, path] of Object.entries(networkDriveMap)) {
+            if (href.startsWith(drive)) {
+                href = href.replace(drive, path);
+                break;
+            }
+        }
+
         if (href.startsWith('//') || href.startsWith('\\\\')) {
             // ネットワークパスの場合、クリックイベントを追加
             element.onclick = function(e) {
@@ -206,6 +226,7 @@ function processElement(element) {
             };
             element.removeAttribute('xlink:href');
             element.removeAttribute('href');
+            element.classList.add('clickable-element');
         } else if (href.startsWith('/') || /^[A-Za-z]:/.test(href)) {
             // 絶対パスの場合（Windowsのドライブレターを含む）
             if (href.toLowerCase().startsWith(baseDirPath.toLowerCase())) {
@@ -220,6 +241,7 @@ function processElement(element) {
                 const newHref = `/open-local-file?path=${encodedPath}`;
                 setHref(element, newHref);
             }
+            element.classList.add('clickable-element');
         } else if (!href.startsWith('http')) {
             // 相対パスの場合
             const fullPath = `${currentDir}/${href}`;
@@ -235,6 +257,7 @@ function processElement(element) {
                 const newHref = `/open-local-file?path=${encodedPath}`;
                 setHref(element, newHref);
             }
+            element.classList.add('clickable-element');
         }
     }
 }
