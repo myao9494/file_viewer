@@ -530,8 +530,7 @@ def open_jupyter():
         app.logger.debug(f"Relative path: {relative_path}")
 
         # 'file_viewer'を含まない相対パスを作成
-        cleaned_path = relative_path.replace('/viewer/', '/').replace('/viewer-main/', '/').replace('/file_viewer/', '/',1)
-        # cleaned_path = relative_path
+        cleaned_path = relative_path.replace('/viewer/', '/').replace('/viewer-main/', '/').replace('/file_viewer/', '/',1).replace('file_view_main/', '')
         app.logger.debug(f"Cleaned path: {cleaned_path}")
         
         if cleaned_path.endswith('.ipynb'):
