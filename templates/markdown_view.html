@@ -430,9 +430,9 @@
         markdownContainer.addEventListener('wheel', function(e) {
             if (e.ctrlKey) {
                 e.preventDefault();
-                const zoomSensitivity = 0.001;
+                const zoomSensitivity = 0.03; // SVGと同じ感度に変更
                 const delta = e.deltaY > 0 ? -zoomSensitivity : zoomSensitivity;
-                scale = Math.min(Math.max(0.1, scale + delta), 2);
+                scale = Math.min(Math.max(0.1, scale * (1 + delta)), 5); // 最大値を5に変更
                 applyTransform();
             }
         });
