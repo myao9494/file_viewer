@@ -1,9 +1,9 @@
 import os
-import fnmatch
+# import fnmatch
 import platform
 from flask import Flask, render_template, request, send_file, abort, url_for, Response, send_from_directory, jsonify, redirect, flash, session
-import re
-import csv
+# import re
+# import csv
 from utils.file_handler import get_file_content, get_file_list
 from utils.search import search_files
 from utils.file_utils import filter_files, should_ignore, load_view_ignore
@@ -12,12 +12,14 @@ from utils.csv_renderer import render_csv
 import mimetypes
 import subprocess
 from markdown import markdown
-import json
-import html
-import os.path
+# import json
+# import html
+# import os.path
 import webbrowser
 import pathlib
 import urllib.parse
+import zipfile
+import io
 
 
 app = Flask(__name__, static_folder='static')
@@ -624,6 +626,36 @@ def normalize_path_endpoint():
         return jsonify({'success': True, 'normalized_path': normalized_path})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)})
+
+@app.route('/download/<path:file_path>')
+def download_file(file_path):
+    full_path = normalize_path(os.path.join(BASE_DIR, file_path))
+    if os.path.isfile(full_path):
+        return send_file(full_path, as_attachment=True)
+    else:
+        abort(404)
+
+@app.route('/download-zip/<path:folder_path>')
+def download_zip(folder_path):
+    full_path = normalize_path(os.path.join(BASE_DIR, folder_path))
+    if not os.path.isdir(full_path):
+        abort(404)
+
+    memory_file = io.BytesIO()
+    with zipfile.ZipFile(memory_file, 'w', zipfile.ZIP_DEFLATED) as zf:
+        for root, _, files in os.walk(full_path):
+            for file in files:
+                file_path = os.path.join(root, file)
+                arcname = os.path.relpath(file_path, full_path)
+                zf.write(file_path, arcname)
+
+    memory_file.seek(0)
+    return send_file(
+        memory_file,
+        mimetype='application/zip',
+        as_attachment=True,
+        download_name=f'{os.path.basename(folder_path)}.zip'
+    )
 
 if __name__ == '__main__':
     app.secret_key = 'your_secret_key_here'  # セッション用の秘密鍵
