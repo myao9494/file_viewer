@@ -94,8 +94,8 @@
     <script type="text/javascript" src="/static/js/tabulator.min.js"></script> <!-- ローカルJS -->
 </head>
 <body>
-    <h1>{{ file_path }}</h1>
-    
+    <!-- <h1>{{ file_path }}</h1> -->
+    <div class="full-path" id="fullPath" onclick="copyToClipboard()">{{ full_path | trim }}</div>
     <div style="display: flex; align-items: center;">
         <button id="showAllColumns" class="toggle-column">全列表示</button>
         <button id="hideAllColumns" class="toggle-column">全列非表示</button>
@@ -116,6 +116,21 @@
     </div>
 
     <script>
+        function copyToClipboard() {
+            var fullPath = document.getElementById('fullPath');
+            var textArea = document.createElement("textarea");
+            textArea.value = fullPath.textContent.trim();
+            document.body.appendChild(textArea);
+            textArea.select();
+            document.execCommand('copy');
+            document.body.removeChild(textArea);
+            
+            // コピー成功のフィードバック
+            fullPath.style.backgroundColor = '#90EE90';
+            setTimeout(function() {
+                fullPath.style.backgroundColor = '#f0f0f0';
+            }, 500);
+        }
         // データから列の幅を計算する関数
         function calculateColumnWidths(data) {
             const widths = {};
