@@ -3,7 +3,7 @@ import os
 import platform
 from flask import Flask, render_template, request, send_file, abort, url_for, Response, send_from_directory, jsonify, redirect, flash, session
 # import re
-# import csv
+import csv
 from utils.file_handler import get_file_content, get_file_list
 from utils.search import search_files
 from utils.file_utils import filter_files, should_ignore, load_view_ignore
@@ -138,9 +138,20 @@ def view_file(file_path):
         return render_template('markdown_view.html', content=content, file_path=file_path, full_path=full_path, folder_path=folder_path, BASE_DIR=BASE_DIR, current_item=current_item)
 
     # CSVファイルの場合
+    # CSVファイルの場合
     if file_extension == '.csv':
         content = render_csv(full_path)
-        return render_template('csv_view.html', content=content, file_path=file_path, full_path=full_path, BASE_DIR=BASE_DIR, current_item=current_item)
+        return render_template('data_table_view_tabulator.html', content=content, file_path=file_path, full_path=full_path, BASE_DIR=BASE_DIR, current_item=current_item)
+    # if file_extension == '.csv':
+    #     content = render_csv(full_path)
+    #     return render_template('data_table_view.html', content=content, file_path=file_path, full_path=full_path, BASE_DIR=BASE_DIR, current_item=current_item)
+    
+    # if file_extension == '.csv':
+    #     content = render_csv(full_path)
+    #     return render_template('ag_grid_view.html', content=content, file_path=file_path, full_path=full_path, BASE_DIR=BASE_DIR, current_item=current_item)
+    # if file_extension == '.csv':
+    #     content = render_csv(full_path)
+    #     return render_template('csv_view.html', content=content, file_path=file_path, full_path=full_path, BASE_DIR=BASE_DIR, current_item=current_item)
 
     # ipynbファイルの場合
     if file_extension == '.ipynb':
@@ -655,6 +666,11 @@ def download_zip(folder_path):
         as_attachment=True,
         download_name=f'{os.path.basename(folder_path)}.zip'
     )
+
+def render_csv(file_path):
+    with open(file_path, mode='r', encoding='utf-8') as file:
+        reader = csv.DictReader(file)
+        return [row for row in reader]
 
 if __name__ == '__main__':
     app.secret_key = 'your_secret_key_here'  # セッション用の秘密鍵

@@ -1,0 +1,223 @@
+{% extends "base.html" %}
+
+{% block content %}
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ file_path }}</title>
+    <link href="/static/css/tabulator.min.css" rel="stylesheet"> <!-- ローカルCSS -->
+    <style>
+        .toggle-column {
+            background-color: blue; /* ONの色 */
+            color: white; /* テキストの色 */
+            border: none;
+            border-radius: 5px;
+            padding: 10px 15px;
+            margin: 5px;
+            cursor: pointer;
+            transition: background-color 0.3s, color 0.3s;
+            line-height: 25px; /* ボタンの高さに合わせて中央揃え */
+        }
+        .toggle-column.inactive {
+            background-color: lightgray; /* OFFの色 */
+            color: black; /* テキストの色 */
+        }
+        #searchInput {
+            margin: 10px 0;
+            padding: 10px;
+            width: calc(100% - 120px); /* ズーム%のスペースを考慮 */
+            box-sizing: border-box;
+        }
+        #table-size-input {
+            margin-right: 20px; /* 右側のマージンを追加 */
+            width: 80px; /* 幅を適宜設定 */
+        }
+        #table-container {
+            overflow: hidden;
+            touch-action: none;
+            transform-origin: top left; /* スケーリングの基準を左上に設定 */
+            transition: transform 0.3s; /* スムーズなズーム */
+            width: 200%; /* コンテナの幅を200%に固定 */
+        }
+        #dataTable {
+            width: auto; /* 自動幅調整 */
+            height: auto;
+        }
+        #columnControls {
+            transform-origin: top left; /* スケーリングの基準を左上に設定 */
+            transition: transform 0.3s; /* スムーズなズーム */
+        }
+        body > div.container > main > div:nth-child(8) {
+            height: 25px; /* 高さを25pxに設定 */
+            font-size: 11px; /* フォントサイズを11pxに設定 */
+        }
+        body > div.container > main > div:nth-child(8) * {
+            height: 25px; /* 内部要素の高さも25pxに設定 */
+            box-sizing: border-box; /* ボックスモデルを調整 */
+        }
+        #showAllColumns, #hideAllColumns {
+            background-color: rgb(76, 201, 76); /* 薄い緑色 */
+            color: rgb(43, 39, 39); /* テキストの色 */
+            border: none;
+            border-radius: 5px;
+            padding: 10px 15px;
+            margin: 5px;
+            cursor: pointer;
+            transition: background-color 0.3s, color 0.3s; /* ここはそのまま */
+            line-height: 25px; /* ボタンの高さに合わせて中央揃え */
+            height: 25px; /* 高さを25pxに設定 */
+            display: flex; /* フレックスボックスを使用 */
+            align-items: center; /* 縦方向中央揃え */
+            justify-content: center; /* 横方向中央揃え */
+            width: 130px;
+            font-size: 11px;
+        }
+
+        #showAllColumns:hover, #hideAllColumns:hover {
+            background-color: rgb(200, 255, 200); /* ホバー時の色 */
+        }
+
+        #showAllColumns:active, #hideAllColumns:active {
+            background-color: rgb(255, 255, 157); /* 押したときの色 */
+            /* transitionはここでは不要 */
+        }
+        body > div.container > main > div:nth-child(8) > label {
+            white-space: nowrap; /* 改行を防ぐ */
+            width: 70px; /* 幅を適宜設定 */
+            display: inline-block; /* 幅を適用するためにインラインブロックに設定 */
+            text-align: right; /* 右寄せ */
+            font-size: 15px;
+        }
+    </style>
+    <script type="text/javascript" src="/static/js/tabulator.min.js"></script> <!-- ローカルJS -->
+</head>
+<body>
+    <h1>{{ file_path }}</h1>
+    
+    <div style="display: flex; align-items: center;">
+        <button id="showAllColumns" class="toggle-column">全列表示</button>
+        <button id="hideAllColumns" class="toggle-column">全列非表示</button>
+        <label for="table-size-input" style="margin-right: 10px;">ズーム (%): </label>
+        <input type="number" id="table-size-input" value="80" min="50" max="200" step="5" style="width: 80px;">
+        <input type="text" id="searchInput" placeholder="検索...">
+    </div>
+
+    <!-- 列の表示をコントロールするボタン -->
+    <div id="columnControls">
+        {% for key in content[0].keys() %}
+        <button class="toggle-column" data-field="{{ key }}">{{ key }}</button>
+        {% endfor %}
+    </div>
+
+    <div id="table-container">
+        <div id="dataTable"></div>
+    </div>
+
+    <script>
+        // データから列の幅を計算する関数
+        function calculateColumnWidths(data) {
+            const widths = {};
+            data.forEach(row => {
+                for (const key in row) {
+                    const length = Math.min(String(row[key]).length, 50); // 最大幅を50文字に制限
+                    if (!widths[key] || length > widths[key]) {
+                        widths[key] = length;
+                    }
+                }
+            });
+            return widths;
+        }
+
+        // Tabulatorの設定
+        const data = {{ content|tojson }};
+        const columnWidths = calculateColumnWidths(data);
+
+        var table = new Tabulator("#dataTable", {
+            data: data, // データをJSON形式で渡す
+            layout: "fitColumns", // 列の幅を自動調整
+            columns: [
+                {% for key in content[0].keys() %}
+                { title: "{{ key }}", field: "{{ key }}", width: (columnWidths["{{ key }}"] * 10) }, // 幅を計算
+                {% endfor %}
+            ],
+        });
+
+        // 検索機能
+        document.getElementById("searchInput").addEventListener("input", function() {
+            const searchTerm = this.value.toLowerCase();
+            table.setFilter(function(data) {
+                return Object.values(data).some(value => 
+                    String(value).toLowerCase().includes(searchTerm)
+                );
+            });
+        });
+
+        // 列の表示をコントロールするボタンのイベントリスナー
+        document.querySelectorAll('#columnControls .toggle-column').forEach(function(button) {
+            button.addEventListener('click', function() {
+                var field = this.getAttribute('data-field');
+                // 現在の列の表示状態を取得
+                var isVisible = table.getColumn(field).isVisible();
+                if (isVisible) {
+                    table.hideColumn(field); // 列を非表示
+                    this.classList.add('inactive'); // ボタンを非アクティブに
+                } else {
+                    table.showColumn(field); // 列を表示
+                    this.classList.remove('inactive'); // ボタンをアクティブに
+                }
+            });
+        });
+
+        // 全列表示ボタンのイベントリスナー
+        document.getElementById("showAllColumns").addEventListener("click", function() {
+            table.getColumns().forEach(column => {
+                column.show(); // 全列を表示
+                document.querySelector(`button[data-field="${column.getField()}"]`).classList.remove('inactive'); // ボタンをアクティブに
+            });
+        });
+
+        // 全列非表示ボタンのイベントリスナー
+        document.getElementById("hideAllColumns").addEventListener("click", function() {
+            table.getColumns().forEach(column => {
+                column.hide(); // 全列を非表示
+                document.querySelector(`button[data-field="${column.getField()}"]`).classList.add('inactive'); // ボタンを非アクティブに
+            });
+        });
+
+        // テーブルサイズ調整機能
+        let scale = 0.8; // デフォルトを80%に設定
+        const tableContainer = document.getElementById('table-container');
+        const columnControls = document.getElementById('columnControls');
+
+        document.getElementById('table-size-input').addEventListener('change', function(e) {
+            scale = e.target.value / 100;
+            tableContainer.style.transform = `scale(${scale})`; // スケーリングを適用
+            tableContainer.style.transformOrigin = 'top left'; // スケーリングの基準を左上に設定
+            columnControls.style.transform = `scale(${scale})`; // 列コントロールのスケーリングを適用
+            columnControls.style.transformOrigin = 'top left'; // スケーリングの基準を左上に設定
+        });
+
+        // ズーム機能の追加
+        tableContainer.addEventListener('wheel', function(e) {
+            if (e.ctrlKey) {
+                e.preventDefault();
+                const zoomSensitivity = 0.1; // ズームの感度を調整
+                scale += (e.deltaY > 0 ? -zoomSensitivity : zoomSensitivity);
+                scale = Math.min(Math.max(0.5, scale), 2); // ズームの範囲を制限
+                tableContainer.style.transform = `scale(${scale})`;
+                tableContainer.style.transformOrigin = 'top left'; // スケーリングの基準を左上に設定
+                columnControls.style.transform = `scale(${scale})`; // 列コントロールのスケーリングを適用
+                columnControls.style.transformOrigin = 'top left'; // スケーリングの基準を左上に設定
+                document.getElementById('table-size-input').value = Math.round(scale * 100); // ズームの数を更新
+            }
+        });
+
+        // 初期ズームの設定
+        tableContainer.style.transform = `scale(${scale})`;
+        columnControls.style.transform = `scale(${scale})`; // 初期ズームの設定
+    </script>
+</body>
+</html>
+{% endblock %}
