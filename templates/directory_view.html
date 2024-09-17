@@ -77,7 +77,7 @@
     .button-container {
         display: flex;
         align-items: center;
-        margin-right: 5px; /* ボタンの右側に余��追加 */
+        margin-right: 5px; /* ボタンの右側に余追加 */
         margin-left: 40px; /* ボタンの右側に余白を追加 */
     }
     .button-container button {
@@ -101,6 +101,7 @@
         <button onclick="openInCode()" title="Codeで開く"><i class="fas fa-code"></i></button>
         <button onclick="openFolder()" title="フォルダを開く"><i class="fas fa-folder-open"></i></button>
         <button onclick="openJupyter()" title="Jupyterで開く"><i class="fas fa-book"></i></button>
+        <button onclick="createFolder()" title="フォルダ作成"><i class="fas fa-folder-plus"></i></button>
     </div>
     <h2 id="currentPath">
         現在のフォルダ: <span class="path-text" onclick="copyToClipboard('currentPath')" title="{{ full_path }}">{{ full_path }}</span>
@@ -397,6 +398,37 @@ document.addEventListener('DOMContentLoaded', function() {
             openFile(path);
         });
     });
+
+    window.createFolder = function() {
+        var folderName = prompt("新しいフォルダの名前を入力してください：", "New Folder");
+        if (folderName === null) {
+            return; // ユーザーがキャンセルした場合
+        }
+        
+        fetch('/create-folder', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ 
+                path: '{{ full_path }}',
+                folderName: folderName
+            }),
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert('フォルダが作成されました。');
+                location.reload();
+            } else {
+                alert('エラーが発生しました: ' + data.error);
+            }
+        })
+        .catch((error) => {
+            console.error('Error:', error);
+            alert('エラーが発生しました。');
+        });
+    }
 });
 </script>
 {% endblock %}

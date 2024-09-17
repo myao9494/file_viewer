@@ -20,6 +20,7 @@ import pathlib
 import urllib.parse
 import zipfile
 import io
+import shutil
 
 
 app = Flask(__name__, static_folder='static')
@@ -44,6 +45,12 @@ global BASE_DIR
 mac_BASE_DIR = r"/Users/sudoupousei/000_work"  # Windowsの場合
 win_BASE_DIR = r"C:\Users\kabu_server\000_work"
 BASE_DIR = normalize_path(mac_BASE_DIR if not IS_WINDOWS else win_BASE_DIR)
+
+# テンプレートフォルダの設定
+mac_TEMPLATE_FOLDER = r"/Users/sudoupousei/000_work/template_folder"
+win_TEMPLATE_FOLDER = r"F:\000_work\template_folder"
+TEMPLATE_FOLDER = normalize_path(mac_TEMPLATE_FOLDER if not IS_WINDOWS else win_TEMPLATE_FOLDER)
+
 app.jinja_env.globals['BASE_DIR'] = BASE_DIR
 # JupyterのベースURLを設定
 JUPYTER_BASE_URL =  'http://localhost:8888/lab/tree' 
@@ -114,6 +121,10 @@ def view_file(file_path):
     
     # MIMEタイプを取得
     mime_type, _ = mimetypes.guess_type(full_path)
+
+    # .xdwファイルの場合
+    if file_extension == '.xdw':
+        return send_file(full_path, as_attachment=True)
 
     # SVGファイルの場合
     if file_extension == '.svg':
@@ -666,6 +677,32 @@ def download_zip(folder_path):
         as_attachment=True,
         download_name=f'{os.path.basename(folder_path)}.zip'
     )
+
+@app.route('/create-folder', methods=['POST'])
+def create_folder():
+    data = request.json
+    target_path = data.get('path')
+    folder_name = data.get('folderName')
+    if not target_path or not folder_name:
+        return jsonify({'success': False, 'error': 'パスまたはフォルダ名が指定されていません。'})
+    
+    try:
+        if not os.path.exists(TEMPLATE_FOLDER):
+            return jsonify({'success': False, 'error': 'テンプレートフォルダが見つかりません。'})
+        
+        new_folder_path = os.path.join(target_path, folder_name)
+        counter = 1
+        while os.path.exists(new_folder_path):
+            new_folder_name = f'{folder_name} ({counter})'
+            new_folder_path = os.path.join(target_path, new_folder_name)
+            counter += 1
+        
+        shutil.copytree(TEMPLATE_FOLDER, new_folder_path)
+        
+        return jsonify({'success': True, 'message': 'フォルダが作成されました。'})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
+
 
 def render_csv(file_path):
     with open(file_path, mode='r', encoding='utf-8') as file:
