@@ -248,6 +248,8 @@ def open_in_code():
             vscode_path = '/Applications/Cursor.app/Contents/MacOS/Cursor'
 
         if os.path.exists(vscode_path):
+            # URLデコードを行う
+            decoded_path = urllib.parse.unquote(file_path)
             normalized_path = normalize_path(file_path)
             target_path = os.path.dirname(normalized_path) if os.path.isfile(normalized_path) else normalized_path
             
@@ -300,9 +302,10 @@ def open_in_code2():
         else:
             return jsonify({'success': False, 'error': 'サポートされていないOSです。'})
 
-
         if os.path.exists(vscode_path):
-            normalized_path = normalize_path(file_path)
+            # URLデコードを行う
+            decoded_path = urllib.parse.unquote(file_path)
+            normalized_path = normalize_path(decoded_path)
             cleaned_path = normalized_path.replace('/viewer/', '/').replace('/viewer-main/', '/').replace('/file_viewer/', '/',1).replace('file_view_main/', '')
             
             target_path = os.path.join(BASE_DIR, cleaned_path)
@@ -321,12 +324,12 @@ def open_in_code2():
                 subprocess.Popen([vscode_path, target_path])
                 # AppleScriptを使用してウィンドウをアクティブにしてフルスクリーンにする
                 apple_script = '''
-                tell application "Cursor"
+                tell application "Code"
                     activate
                 end tell
                 
                 tell application "System Events"
-                    tell process "Cursor"
+                    tell process "Code"
                         set frontmost to true
                         delay 1
                         keystroke "f" using {command down, control down}
@@ -337,7 +340,7 @@ def open_in_code2():
             
             return jsonify({'success': True})
         else:
-            return jsonify({'success': False, 'error': 'Visual Studio Code/Cursorが見つかりません。'})
+            return jsonify({'success': False, 'error': 'Visual Studio Codeが見つかりません。'})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)})
 
