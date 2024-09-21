@@ -1,0 +1,280 @@
+{% extends "base.html" %}
+
+{% block head %}
+{{ super() }}
+<script src="{{ url_for('static', filename='js/Sortable.min.js') }}"></script>
+<style>
+    .container {
+        display: flex;
+        height: calc(100vh - 150px);
+    }
+    .controls {
+        margin-bottom: 0;
+        padding-bottom: 0;
+    }
+    .image-grid-container {
+        flex: 3;
+        overflow-y: auto;
+    }
+    .image-grid {
+        display: grid;
+        gap: 20px;
+        padding: 20px;
+        grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+        align-content: start;
+    }
+    .image-grid.small { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
+    .image-grid.medium { grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); }
+    .image-grid.large { grid-template-columns: repeat(auto-fill, minmax(350px, 1fr)); }
+    .unwanted-images {
+        flex: 1;
+        min-width: 200px;
+        border-left: 1px solid #ccc;
+        padding: 20px;
+        display: flex;
+        flex-direction: column;
+    }
+    .unwanted-images-container {
+        border: 3px dashed #ccc;
+        padding: 20px;
+        flex-grow: 1;
+        overflow-y: auto;
+        min-height: 200px;
+        display: flex;
+        flex-wrap: wrap;
+        align-content: flex-start;
+        gap: 10px;
+    }
+    .image-item {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        border: 2px solid #ccc;
+        padding: 10px;
+        background-color: #fff;
+        transition: border-color 0.3s;
+    }
+    .unwanted-images .image-item {
+        max-width: 150px;
+        width: 150px;
+        height: 150px;
+        overflow: hidden;
+        margin-bottom: 0;
+        flex-shrink: 0;
+    }
+    .unwanted-images .image-item img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
+    .unwanted-images .image-path {
+        font-size: 0.7em;
+        max-height: 3em;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        display: -webkit-box;
+        -webkit-line-clamp: 3;
+        -webkit-box-orient: vertical;
+        margin-top: 2px;
+    }
+    .image-item:hover {
+        border-color: #007bff;
+    }
+    .image-item img {
+        width: 100%;
+        height: auto;
+        object-fit: cover;
+    }
+    .image-path {
+        word-break: break-all;
+        text-align: center;
+        margin-top: 10px;
+        font-size: 0.8em;
+    }
+    .btn {
+        padding: 5px 10px;
+        margin-right: 10px;
+        cursor: pointer;
+        margin-bottom: 2px;
+        padding-top: 2px;
+        padding-bottom: 2px;
+    }
+    .btn.active {
+        background-color: #007bff;
+        color: white;
+    }
+    .sortable-ghost {
+        opacity: 0.5;
+    }
+    .image-item.selected {
+        border: 2px solid #007bff;
+        box-shadow: 0 0 10px rgba(0, 123, 255, 0.5);
+    }
+    .select-overlay {
+        position: absolute;
+        top: 5px;
+        left: 5px;
+        background-color: rgba(0, 123, 255, 0.7);
+        color: white;
+        padding: 2px 5px;
+        border-radius: 3px;
+        font-size: 0.8em;
+    }
+
+    /* メインコンテナのpadding-topを調整 */
+    body > div.container > main > div.container {
+        padding-top: 0;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- <h1>画像ツール</h1> -->
+<div class="controls">
+    <button class="btn size-btn" data-size="small">小</button>
+    <button class="btn size-btn active" data-size="medium">中</button>
+    <button class="btn size-btn" data-size="large">大</button>
+    <button class="btn" id="togglePath">ファイル名切替</button>
+    <button id="copyToClipboard" class="btn">選択画像をクリップボードにコピー</button>
+</div>
+<div class="container">
+    <div class="image-grid-container">
+        <div class="image-grid medium" id="image-grid">
+            {% for path, encoded_path in zipped_paths %}
+            <div class="image-item" data-full-path="{{ path }}" data-file-name="{{ path.split('/')[-1] }}" data-encoded-path="{{ encoded_path }}">
+                <div class="select-overlay" style="display: none;">選択済</div>
+                <img src="{{ url_for('raw_file', file_path=encoded_path) }}" alt="画像">
+                <div class="image-path">{{ path }}</div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    <div class="unwanted-images">
+        <h2>不要画像</h2>
+        <div class="unwanted-images-container" id="unwanted-grid"></div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const sizeButtons = document.querySelectorAll('.size-btn');
+    const imageGrid = document.querySelector('.image-grid');
+    const unwantedGrid = document.getElementById('unwanted-grid');
+    const togglePathBtn = document.getElementById('togglePath');
+    let showFullPath = true;
+    let selectedImages = new Set();
+
+    // サイズ変更機能
+    sizeButtons.forEach(button => {
+        button.addEventListener('click', function() {
+            const size = this.getAttribute('data-size');
+            imageGrid.className = `image-grid ${size}`;
+            sizeButtons.forEach(btn => btn.classList.remove('active'));
+            this.classList.add('active');
+        });
+    });
+
+    // パス表示切替機能
+    togglePathBtn.addEventListener('click', function() {
+        showFullPath = !showFullPath;
+        document.querySelectorAll('.image-path').forEach(pathElement => {
+            const item = pathElement.closest('.image-item');
+            pathElement.textContent = showFullPath ? item.dataset.fullPath : item.dataset.fileName;
+        });
+    });
+
+    // ドラッグ&ドロップによる並び替え機能
+    new Sortable(imageGrid, {
+        animation: 150,
+        ghostClass: 'sortable-ghost',
+        group: 'shared',
+        onAdd: function(evt) {
+            const item = evt.item;
+            // 不要画像エリアから戻された時のスタイルリセット
+            item.style.width = '';
+            item.style.height = '';
+            item.style.maxWidth = '';
+            
+            const img = item.querySelector('img');
+            img.style.width = '100%';
+            img.style.height = 'auto';
+            img.style.objectFit = '';
+            
+            const path = item.querySelector('.image-path');
+            path.style.fontSize = '';
+            path.style.maxHeight = '';
+            path.style.overflow = '';
+            path.style.textOverflow = '';
+            path.style.display = '';
+            path.style.webkitLineClamp = '';
+            path.style.webkitBoxOrient = '';
+            path.style.marginTop = '';
+        }
+    });
+
+    new Sortable(unwantedGrid, {
+        animation: 150,
+        ghostClass: 'sortable-ghost',
+        group: 'shared',
+        onAdd: function(evt) {
+            const item = evt.item;
+            item.style.width = '150px';
+            item.style.height = '150px';
+            item.style.maxWidth = '150px';
+            
+            const img = item.querySelector('img');
+            img.style.width = '100%';
+            img.style.height = '100%';
+            img.style.objectFit = 'cover';
+            
+            const path = item.querySelector('.image-path');
+            path.style.fontSize = '0.7em';
+            path.style.maxHeight = '3em';
+            path.style.overflow = 'hidden';
+            path.style.textOverflow = 'ellipsis';
+            path.style.display = '-webkit-box';
+            path.style.webkitLineClamp = '3';
+            path.style.webkitBoxOrient = 'vertical';
+            path.style.marginTop = '2px';
+        }
+    });
+
+    // 画像クリック時の処理
+    document.addEventListener('click', function(e) {
+        const clickedImage = e.target.closest('.image-item');
+        if (clickedImage) {
+            const encodedPath = clickedImage.dataset.encodedPath;
+            window.location.href = `/view/${encodedPath}`;
+        }
+    });
+
+    // クリップボードコピー機能
+    document.getElementById('copyToClipboard').addEventListener('click', function() {
+        const imageItems = document.querySelectorAll('#image-grid .image-item');
+        const imagePaths = Array.from(imageItems).map(item => item.dataset.encodedPath);
+        
+        fetch('/copy-images-to-clipboard', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ paths: imagePaths }),
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert('全ての画像がクリップボードにコピーされました。');
+            } else {
+                alert('ラーが発生しました: ' + data.error);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('エラーが発生しました。');
+        });
+    });
+});
+</script>
+{% endblock %}

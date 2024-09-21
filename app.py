@@ -21,7 +21,9 @@ import urllib.parse
 import zipfile
 import io
 import shutil
-
+from itertools import zip_longest  # この行を追加
+import pyperclip
+from PIL import Image
 
 app = Flask(__name__, static_folder='static')
 
@@ -213,14 +215,6 @@ def open_with_default_app(file_path):
     except Exception as e:
         app.logger.error(f"ファイルを開く際にエラーが発生しました: {str(e)}")
         return False
-
-@app.route('/raw/<path:file_path>')
-def raw_file(file_path):
-    full_path = normalize_path(os.path.join(BASE_DIR, file_path))
-    if os.path.exists(full_path):
-        return send_file(full_path)
-    else:
-        abort(404)
 
 @app.route('/search')
 def search():
@@ -763,6 +757,48 @@ def create_folder():
         return jsonify({'success': False, 'error': str(e)})
 
 
+@app.route('/image-tools', methods=['POST'])
+def image_tools():
+    data = request.json
+    image_paths = data.get('paths', [])
+    
+    if not image_paths:
+        return jsonify({'success': False, 'error': '画像が選択されていません。'})
+    
+    # セッションに画像パスを保存
+    session['image_paths'] = image_paths
+    
+    return jsonify({'success': True, 'redirect': url_for('view_image_tools')})
+
+
+@app.route('/view-image-tools')
+def view_image_tools():
+    image_paths = session.get('image_paths', [])
+    if not image_paths:
+        return redirect(url_for('index'))
+    
+    full_paths = [os.path.join(BASE_DIR, path) for path in image_paths]
+    encoded_paths = [urllib.parse.quote(path.replace(BASE_DIR, '').lstrip('/')) for path in full_paths]
+    
+    # zipオブジェクトを作成して渡す
+    zipped_paths = list(zip(full_paths, encoded_paths))
+    
+    return render_template('image_tools.html', zipped_paths=zipped_paths, BASE_DIR=BASE_DIR)
+
+# @app.route('/raw/<path:file_path>')
+# def raw_file(file_path):
+#     full_path = os.path.join(BASE_DIR, file_path)
+#     return send_file(full_path)
+
+@app.route('/raw/<path:file_path>')
+def raw_file(file_path):
+    full_path = normalize_path(os.path.join(BASE_DIR, file_path))
+    if os.path.exists(full_path):
+        return send_file(full_path)
+    else:
+        abort(404)
+
+
 def render_csv(file_path):
     with open(file_path, mode='r', encoding='utf-8') as file:
         reader = csv.DictReader(file)
@@ -795,6 +831,42 @@ def render_csv2(file_path):
         table_html += '</table>'
         
         return table_html
+
+@app.route('/copy-images-to-clipboard', methods=['POST'])
+def copy_images_to_clipboard():
+    data = request.json
+    image_paths = data.get('paths', [])
+    
+    if not image_paths:
+        return jsonify({'success': False, 'error': '画像が選択されていません。'})
+    
+    try:
+        for encoded_path in image_paths:
+            full_path = os.path.join(BASE_DIR, urllib.parse.unquote(encoded_path))
+            file_name = os.path.basename(full_path)
+            
+            # 画像をクリップボードにコピー
+            if platform.system() == 'Darwin':  # macOS
+                subprocess.run(['osascript', '-e', f'set the clipboard to (read (POSIX file "{full_path}") as JPEG picture)'])
+            elif platform.system() == 'Windows':
+                image = Image.open(full_path)
+                output = io.BytesIO()
+                image.convert("RGB").save(output, "BMP")
+                data = output.getvalue()[14:]
+                output.close()
+                pyperclip.copy(data)
+            else:
+                return jsonify({'success': False, 'error': 'サポートされていないOSです。'})
+            
+            # ポップアップ表示
+            if platform.system() == 'Darwin':  # macOS
+                subprocess.run(['osascript', '-e', f'display dialog "{file_name} をクリップボードにコピーしました。" buttons {{"OK"}} default button "OK"'])
+            elif platform.system() == 'Windows':
+                subprocess.run(['powershell', '-Command', f'[System.Windows.Forms.MessageBox]::Show("{file_name} をクリップボードにコピーしました。", "通知", [System.Windows.Forms.MessageBoxButtons]::OK)'])
+        
+        return jsonify({'success': True})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
 
 if __name__ == '__main__':
     app.secret_key = 'your_secret_key_here'  # セッション用の秘密鍵

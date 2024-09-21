@@ -126,6 +126,7 @@
         <button class="filter-btn" data-filter="ipynb">IPYNB</button>
         <button class="filter-btn" data-filter="py">PY</button>
         <button class="filter-btn" data-filter="docx+xlsx+pptx">MS Office</button>
+        <button class="filter-btn" data-filter="jpg+jpeg+png+gif+bmp+tiff">image</button>
         <button class="filter-btn" data-filter="all">全て</button>
         <button id="toggle-folders" class="filter-btn">フォルダを非表示</button>
         <form id="depth-form" style="display: inline-block; margin-left: 15px;">
@@ -135,6 +136,9 @@
         </form>
     </div>
 </div>
+
+<!-- 画像ツールボタンを追加 -->
+<button id="image-tools-btn" style="position: fixed; right: 20px; top: 50%; display: none;">画像ツール</button>
 
 <h3>フォルダ:</h3>
 <ul class="folder-list">
@@ -229,7 +233,12 @@ document.addEventListener('DOMContentLoaded', function() {
                     } else if (item.classList.contains('file')) {
                         var fileName = item.querySelector('a').textContent.toLowerCase();
                         var shouldShow = (selectedFilter === 'all' ||
-                            (selectedFilter.split('+').some(ext => fileName.endsWith('.' + ext))));
+                            (selectedFilter.split('+').some(ext => {
+                                if (ext === 'image') {
+                                    return /\.(jpg|jpeg|png|gif|bmp|tiff)$/.test(fileName);
+                                }
+                                return fileName.endsWith('.' + ext);
+                            })));
                         item.style.display = shouldShow ? '' : 'none';
                     } else {
                         item.style.display = '';
@@ -254,7 +263,7 @@ document.addEventListener('DOMContentLoaded', function() {
         applyFilter(currentFilter);
     });
 
-    // フ���ルターボタンのイベントリスナーを更新
+    // フルターボタンのイベントリスナーを更新
     document.querySelectorAll('.filter-btn').forEach(function(btn) {
         btn.addEventListener('click', function() {
             if (this.id !== 'toggle-folders') {
@@ -577,7 +586,12 @@ document.addEventListener('DOMContentLoaded', function() {
                 return true;
             }
             const fileName = item.querySelector('a').textContent.toLowerCase();
-            return currentFilter.split('+').some(ext => fileName.endsWith('.' + ext));
+            return currentFilter.split('+').some(ext => {
+                if (ext === 'image') {
+                    return /\.(jpg|jpeg|png|gif|bmp|tiff)$/.test(fileName);
+                }
+                return fileName.endsWith('.' + ext);
+            });
         });
     }
 
@@ -601,6 +615,57 @@ document.addEventListener('DOMContentLoaded', function() {
             item.style.display = '';
         });
     }
+
+    // 画像ツールボタンの表示/非表示を制御
+    function toggleImageToolsButton() {
+        const imageFilterBtn = document.querySelector('.filter-btn[data-filter="jpg+jpeg+png+gif+bmp+tiff"]');
+        const imageToolsBtn = document.getElementById('image-tools-btn');
+        if (imageFilterBtn.classList.contains('active')) {
+            imageToolsBtn.style.display = 'block';
+        } else {
+            imageToolsBtn.style.display = 'none';
+        }
+    }
+
+    // フィルターボタンのクリックイベントに追加
+    document.querySelectorAll('.filter-btn').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            toggleImageToolsButton();
+        });
+    });
+
+    // 画像ツールボタンのクリックイベント
+    document.getElementById('image-tools-btn').addEventListener('click', function() {
+        const currentFilter = document.querySelector('.filter-btn.active[data-filter="jpg+jpeg+png+gif+bmp+tiff"]');
+        if (currentFilter) {
+            const imagePaths = Array.from(document.querySelectorAll('.file-list li:not([style*="display: none"]) a'))
+                .filter(a => /\.(jpg|jpeg|png|gif|bmp|tiff)$/i.test(a.textContent))
+                .map(a => a.getAttribute('href').replace('/view/', ''));
+
+            fetch('/image-tools', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ paths: imagePaths }),
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    window.location.href = data.redirect;
+                } else {
+                    alert('エラーが発生しました: ' + data.error);
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('エラーが発生しました。');
+            });
+        }
+    });
+
+    // 初期表示時にボタンの表示/非表示を設定
+    toggleImageToolsButton();
 });
 </script>
 {% endblock %}
