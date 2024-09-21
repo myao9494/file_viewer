@@ -77,7 +77,7 @@
     .button-container {
         display: flex;
         align-items: center;
-        margin-right: 5px; /* ボタンの右側に余追加 */
+        margin-right: 5px; /* ボタンの右側に余白を追加 */
         margin-left: 40px; /* ボタンの右側に余白を追加 */
     }
     .button-container button {
@@ -131,6 +131,7 @@
         <form id="depth-form" style="display: inline-block; margin-left: 15px;">
             <label for="depth">階層数:</label>
             <input type="number" id="depth" name="depth" value="{{ depth }}" min="0" style="width: 50px;">
+            <button type="button" id="reset-depth">デフォルトに戻す</button>
         </form>
     </div>
 </div>
@@ -159,24 +160,101 @@
 document.addEventListener('DOMContentLoaded', function() {
     console.log('DOMContentLoaded event fired');
 
-    // 検索機能
-    document.getElementById('search-form').addEventListener('submit', function(e) {
-        e.preventDefault();
-        console.log('Search form submitted');
-        var searchText = document.getElementById('search-input').value.toLowerCase();
-        var items = document.querySelectorAll('.folder-list li, .file-list li');
-        items.forEach(function(item) {
-            if (item.classList.contains('folder') || item.textContent.toLowerCase().includes(searchText)) {
-                item.style.display = '';
-            } else {
-                item.style.display = 'none';
+    // URLからフィルタ状態を取得する関数
+    function getFilterFromURL() {
+        const urlParams = new URLSearchParams(window.location.search);
+        return urlParams.get('filter') || 'md+svg+csv+pdf+ipynb+py+docx+xlsx+pptx';
+    }
+
+    // URLにフィルタ状態を設定する関数
+    function setFilterInURL(filter) {
+        const url = new URL(window.location);
+        url.searchParams.set('filter', filter);
+        window.history.replaceState({}, '', url);
+    }
+
+    // URLからフォルダ非表示状態を取得する関数
+    function getHideFoldersFromURL() {
+        const urlParams = new URLSearchParams(window.location.search);
+        return urlParams.get('hideFolders') === 'true';
+    }
+
+    // URLにフォルダ非表示状態を設定する関数
+    function setHideFoldersInURL(hideFolders) {
+        const url = new URL(window.location);
+        url.searchParams.set('hideFolders', hideFolders);
+        window.history.replaceState({}, '', url);
+    }
+
+    let hideFolders = getHideFoldersFromURL();
+
+    // フィルター適用関数を更新
+    async function applyFilter(selectedFilter) {
+        console.log('applyFilter function called with filter:', selectedFilter);
+        
+        setFilterInURL(selectedFilter);
+
+        // フィルターボタンの状態を更新
+        document.querySelectorAll('.filter-btn').forEach(btn => {
+            if (btn.id !== 'toggle-folders') {
+                btn.classList.toggle('active', btn.dataset.filter === selectedFilter);
             }
         });
+
+        var items = document.querySelectorAll('.folder-list li, .file-list li');
+        var batchSize = 100; // 一度に処理するアイテムの数
+        var delay = 0; // ミリ秒単位の遅延
+
+        for (let i = 0; i < items.length; i += batchSize) {
+            let batch = Array.from(items).slice(i, i + batchSize);
+            await processBatch(batch, selectedFilter);
+            await new Promise(resolve => setTimeout(resolve, delay));
+        }
+
+        console.log('All items processed');
+    }
+
+    async function processBatch(batch, selectedFilter) {
+        let promises = batch.map(async (item) => {
+            var itemPath = item.querySelector('a').getAttribute('href').split('/view/')[1];
+            
+            if (hideFolders && item.classList.contains('folder')) {
+                item.style.display = 'none';
+            } else {
+                try {
+                    let response = await fetch('/check_ignore?path=' + encodeURIComponent(itemPath));
+                    let data = await response.json();
+                    if (data.ignored) {
+                        item.style.display = 'none';
+                    } else if (item.classList.contains('file')) {
+                        var fileName = item.querySelector('a').textContent.toLowerCase();
+                        var shouldShow = (selectedFilter === 'all' ||
+                            (selectedFilter.split('+').some(ext => fileName.endsWith('.' + ext))));
+                        item.style.display = shouldShow ? '' : 'none';
+                    } else {
+                        item.style.display = '';
+                    }
+                } catch (error) {
+                    console.error('Error processing item:', error);
+                }
+            }
+        });
+
+        await Promise.all(promises);
+    }
+
+    // フォルダ表示切り替えボタンのイベントリスナーを更新
+    document.getElementById('toggle-folders').addEventListener('click', function() {
+        hideFolders = !hideFolders;
+        updateToggleFoldersButton();
+        setHideFoldersInURL(hideFolders);
+        
+        // 現在のフィルター状態を維持したまま、フォルダの表示/非表示を更新
+        const currentFilter = document.querySelector('.filter-btn.active:not(#toggle-folders)').dataset.filter;
+        applyFilter(currentFilter);
     });
 
-    let hideFolders = false;
-
-    // フィルターボタンのイベントリスナーを設定
+    // フ���ルターボタンのイベントリスナーを更新
     document.querySelectorAll('.filter-btn').forEach(function(btn) {
         btn.addEventListener('click', function() {
             if (this.id !== 'toggle-folders') {
@@ -184,72 +262,108 @@ document.addEventListener('DOMContentLoaded', function() {
                     if (b.id !== 'toggle-folders') b.classList.remove('active');
                 });
                 this.classList.add('active');
+                setFilterInURL(this.dataset.filter);
                 applyFilter(this.dataset.filter);
             }
         });
     });
 
-    // フォルダ表示切り替えボタンのイベントリスナーを設定
-    document.getElementById('toggle-folders').addEventListener('click', function() {
-        hideFolders = !hideFolders;
-        this.classList.toggle('active');
-        this.textContent = hideFolders ? 'フォルダを表示' : 'フォルダを非表示';
-        applyFilter(document.querySelector('.filter-btn.active').dataset.filter);
-    });
-
-    // フィルター適用関数を更新
-    function applyFilter(selectedFilter) {
-        console.log('applyFilter function called with filter:', selectedFilter);
-        
-        var items = document.querySelectorAll('.folder-list li, .file-list li');
-        var promises = [];
-
-        items.forEach(function(item) {
-            var itemPath = item.querySelector('a').getAttribute('href').split('/view/')[1];
-            
-            if (hideFolders && item.classList.contains('folder')) {
-                item.style.display = 'none';
-            } else {
-                promises.push(
-                    fetch('/check_ignore?path=' + encodeURIComponent(itemPath))
-                        .then(response => response.json())
-                        .then(data => {
-                            if (data.ignored) {
-                                item.style.display = 'none';
-                            } else if (item.classList.contains('file')) {
-                                var fileName = item.querySelector('a').textContent.toLowerCase();
-                                var shouldShow = (selectedFilter === 'all' ||
-                                    (selectedFilter.split('+').some(ext => fileName.endsWith('.' + ext))));
-                                item.style.display = shouldShow ? '' : 'none';
-                            } else {
-                                item.style.display = '';
-                            }
-                        })
-                );
-            }
-        });
-
-        Promise.all(promises).then(() => {
-            console.log('All items processed');
-        });
+    // フォルダ表示切り替えボタンの状態を更新する関数
+    function updateToggleFoldersButton() {
+        const toggleFoldersBtn = document.getElementById('toggle-folders');
+        toggleFoldersBtn.classList.toggle('active', hideFolders);
+        toggleFoldersBtn.textContent = hideFolders ? 'フォルダを表示' : 'フォルダを非表示';
     }
 
-    // 初期表示時にフィルターを適用
-    console.log('Applying initial filter');
-    applyFilter('md+svg+csv+pdf+ipynb+py+docx+xlsx+pptx');
+    // デフォルトの階層数
+    const DEFAULT_DEPTH = 0;
+    // デフォルトのフォルダ表示状態
+    const DEFAULT_HIDE_FOLDERS = false;
 
-    // 階層数の入力フィールドのイベントリスナーを設定
+    // 「デフォルトに戻す」ボタンのイベントリスナーを更新
+    document.getElementById('reset-depth').addEventListener('click', function() {
+        // デフォルト値の設定
+        document.getElementById('depth').value = DEFAULT_DEPTH;
+        hideFolders = DEFAULT_HIDE_FOLDERS;
+        const defaultFilter = 'md+svg+csv+pdf+ipynb+py+docx+xlsx+pptx';
+        
+        // フィルターボタンの状態を更新
+        document.querySelectorAll('.filter-btn').forEach(btn => {
+            btn.classList.remove('active');
+            if (btn.dataset.filter === defaultFilter) {
+                btn.classList.add('active');
+            }
+        });
+        
+        // URLを更新
+        const url = new URL(window.location);
+        url.searchParams.set('depth', DEFAULT_DEPTH);
+        url.searchParams.set('filter', defaultFilter);
+        url.searchParams.set('hideFolders', DEFAULT_HIDE_FOLDERS);
+        window.history.replaceState({}, '', url);
+        
+        // フォルダ表示/非表示ボタンの状態を更新
+        updateToggleFoldersButton();
+
+        // 検索フィールドをクリア
+        document.getElementById('search-input').value = '';
+
+        // ページの内容を更新
+        fetchAndUpdateContent(url.toString());
+    });
+
+    // ページの内容を更新する関数
+    async function fetchAndUpdateContent(url) {
+        try {
+            const response = await fetch(url);
+            if (!response.ok) {
+                throw new Error('Network response was not ok');
+            }
+            const html = await response.text();
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(html, 'text/html');
+            
+            // フォルダリストと文書リストを更新
+            document.querySelector('.folder-list').innerHTML = doc.querySelector('.folder-list').innerHTML;
+            document.querySelector('.file-list').innerHTML = doc.querySelector('.file-list').innerHTML;
+            
+            // 必要に応じて他の要素も更新
+            
+            console.log('Page content updated successfully');
+        } catch (error) {
+            console.error('Error updating page content:', error);
+        }
+    }
+
+    // 階層数の変更を適用する関数
+    function applyDepthChange(depth) {
+        var currentUrl = new URL(window.location.href);
+        currentUrl.searchParams.set('depth', depth);
+        // フィルタ状態フォルダ非表示状態を維持
+        const currentFilter = getFilterFromURL();
+        currentUrl.searchParams.set('filter', currentFilter);
+        currentUrl.searchParams.set('hideFolders', hideFolders);
+        window.location.href = currentUrl.toString();
+    }
+
+    // 階層数の入力フィールドのイベントリスナーを更新
     document.getElementById('depth').addEventListener('change', function() {
         console.log('Depth changed:', this.value);
-        var currentUrl = new URL(window.location.href);
-        currentUrl.searchParams.set('depth', this.value);
-        window.location.href = currentUrl.toString();
+        applyDepthChange(this.value);
     });
 
-    // depth-formのsubmitイベントを無効化
-    document.getElementById('depth-form').addEventListener('submit', function(e) {
-        e.preventDefault();
-    });
+    // 初期表示時にフィルターとフォルダ非表示状態を適用
+    console.log('Applying initial filter and folder visibility');
+    const initialFilter = getFilterFromURL();
+    const filterBtn = document.querySelector(`.filter-btn[data-filter="${initialFilter}"]`);
+    if (filterBtn) {
+        filterBtn.classList.add('active');
+    } else {
+        // デフォルトのフィルターボタンをアクティブにする
+        document.querySelector('.filter-btn[data-filter="md+svg+csv+pdf+ipynb+py+docx+xlsx+pptx"]').classList.add('active');
+    }
+    updateToggleFoldersButton();
+    applyFilter(initialFilter);
 
     // クリップボードにコピーする機能
     window.copyToClipboard = function(elementId) {
@@ -263,7 +377,7 @@ document.addEventListener('DOMContentLoaded', function() {
             }, 500);
         }, function(err) {
             console.error('Could not copy text: ', err);
-            alert('コピーに失敗しました。');
+            alert('ピーに失敗しました。');
         });
     }
 
@@ -427,6 +541,64 @@ document.addEventListener('DOMContentLoaded', function() {
         .catch((error) => {
             console.error('Error:', error);
             alert('エラーが発生しました。');
+        });
+    }
+
+    // depth-formのsubmitイベントを無効化
+    document.getElementById('depth-form').addEventListener('submit', function(e) {
+        e.preventDefault();
+    });
+
+    // 検索機能の実装
+    const searchForm = document.getElementById('search-form');
+    const searchInput = document.getElementById('search-input');
+
+    searchForm.addEventListener('submit', function(e) {
+        e.preventDefault();
+        performSearch();
+    });
+
+    searchInput.addEventListener('input', function() {
+        if (this.value.trim() === '') {
+            resetSearch();
+        } else {
+            performSearch();
+        }
+    });
+
+    function getCurrentItems() {
+        const currentFilter = document.querySelector('.filter-btn.active:not(#toggle-folders)').dataset.filter;
+        const items = document.querySelectorAll('.folder-list li, .file-list li');
+        return Array.from(items).filter(item => {
+            if (hideFolders && item.classList.contains('folder')) {
+                return false;
+            }
+            if (currentFilter === 'all') {
+                return true;
+            }
+            const fileName = item.querySelector('a').textContent.toLowerCase();
+            return currentFilter.split('+').some(ext => fileName.endsWith('.' + ext));
+        });
+    }
+
+    function performSearch() {
+        const searchTerm = searchInput.value.toLowerCase().trim();
+        const currentItems = getCurrentItems();
+
+        currentItems.forEach(item => {
+            const text = item.textContent.toLowerCase();
+            if (text.includes(searchTerm)) {
+                item.style.display = '';
+            } else {
+                item.style.display = 'none';
+            }
+        });
+    }
+
+    function resetSearch() {
+        const currentItems = getCurrentItems();
+        currentItems.forEach(item => {
+            item.style.display = '';
         });
     }
 });
