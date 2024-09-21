@@ -78,11 +78,14 @@
                 <i class="fas fa-level-up-alt"></i>
             </a>
             <button id="openFromClipboardBtn" title="クリップボードから開く" onclick="openFromClipboard()">
-                <i class="fas fa-clipboard"></i>
+                <i class="fas fa-sign-in-alt"></i>
             </button>
             <a id="downloadBtn" title="ダウンロード" href="#" onclick="downloadItem(event)">
                 <i class="fas fa-download"></i>
             </a>
+            <button id="openInVSCodeBtn" title="VSCodeで開く" onclick="openInVSCode()">
+                <i class="fas fa-code"></i>
+            </button>
         </div>
         {% block folder_path %}{% endblock %}
     </div>
@@ -199,6 +202,31 @@
                 window.location.href = currentPath.replace('/view/', '/download-zip/');
             }
         }
+    }
+
+    function openInVSCode() {
+        var currentPath = window.location.pathname;
+        var filePath = currentPath.startsWith('/view/') ? currentPath.substring(6) : '';
+        
+        fetch('/open-in-code2', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ path: filePath })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                console.log('VSCodeで開きました');
+            } else {
+                alert('エラーが発生しました: ' + data.error);
+            }
+        })
+        .catch(error => {
+            console.error('エラー:', error);
+            alert('エラーが発生しました。');
+        });
     }
     </script>
 </body>

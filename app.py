@@ -13,7 +13,7 @@ import mimetypes
 import subprocess
 from markdown import markdown
 # import json
-# import html
+import html
 # import os.path
 import webbrowser
 import pathlib
@@ -150,9 +150,9 @@ def view_file(file_path):
 
     # CSVファイルの場合
     # CSVファイルの場合
-    if file_extension == '.csv':
-        content = render_csv(full_path)
-        return render_template('data_table_view_tabulator.html', content=content, file_path=file_path, full_path=full_path, BASE_DIR=BASE_DIR, current_item=current_item)
+    # if file_extension == '.csv':
+    #     content = render_csv(full_path)
+    #     return render_template('data_table_view_tabulator.html', content=content, file_path=file_path, full_path=full_path, BASE_DIR=BASE_DIR, current_item=current_item)
     # if file_extension == '.csv':
     #     content = render_csv(full_path)
     #     return render_template('data_table_view.html', content=content, file_path=file_path, full_path=full_path, BASE_DIR=BASE_DIR, current_item=current_item)
@@ -160,9 +160,9 @@ def view_file(file_path):
     # if file_extension == '.csv':
     #     content = render_csv(full_path)
     #     return render_template('ag_grid_view.html', content=content, file_path=file_path, full_path=full_path, BASE_DIR=BASE_DIR, current_item=current_item)
-    # if file_extension == '.csv':
-    #     content = render_csv(full_path)
-    #     return render_template('csv_view.html', content=content, file_path=file_path, full_path=full_path, BASE_DIR=BASE_DIR, current_item=current_item)
+    if file_extension == '.csv':
+        content = render_csv2(full_path)
+        return render_template('csv_view.html', content=content, file_path=file_path, full_path=full_path, BASE_DIR=BASE_DIR, current_item=current_item)
 
     # ipynbファイルの場合
     if file_extension == '.ipynb':
@@ -256,6 +256,65 @@ def open_in_code():
         if os.path.exists(vscode_path):
             normalized_path = normalize_path(file_path)
             target_path = os.path.dirname(normalized_path) if os.path.isfile(normalized_path) else normalized_path
+            
+            if IS_WINDOWS:
+                # Windowsの場合
+                subprocess.Popen([vscode_path, target_path])
+                # PowerShellを使用してウィンドウをアクティブにする
+                # powershell_command = f'(New-Object -ComObject WScript.Shell).AppActivate("Visual Studio Code")'
+                # subprocess.Popen(["powershell", "-Command", powershell_command])
+            else:
+                # macOSの場合
+                subprocess.Popen([vscode_path, target_path])
+                # AppleScriptを使用してウィンドウをアクティブにしてフルスクリーンにする
+                apple_script = '''
+                tell application "Cursor"
+                    activate
+                end tell
+                
+                tell application "System Events"
+                    tell process "Cursor"
+                        set frontmost to true
+                        delay 1
+                        keystroke "f" using {command down, control down}
+                    end tell
+                end tell
+                '''
+                subprocess.run(["osascript", "-e", apple_script])
+            
+            return jsonify({'success': True})
+        else:
+            return jsonify({'success': False, 'error': 'Visual Studio Code/Cursorが見つかりません。'})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
+
+
+@app.route('/open-in-code2', methods=['POST'])
+def open_in_code2():
+    data = request.json
+    file_path = data.get('path')
+    app.logger.info(f"受信したfile_path: {repr(file_path)}")
+    
+    if not file_path:
+        return jsonify({'success': False, 'error': 'ファイルパスが指定されていません。'})
+    
+    try:
+        if platform.system() == 'Darwin':  # macOS
+            vscode_path = '/Applications/Visual Studio Code.app/Contents/Resources/app/bin/code'
+        elif platform.system() == 'Windows':
+            vscode_path = r'C:\Users\kabu_server\AppData\Local\Programs\Microsoft VS Code\Code.exe'
+        else:
+            return jsonify({'success': False, 'error': 'サポートされていないOSです。'})
+
+
+        if os.path.exists(vscode_path):
+            normalized_path = normalize_path(file_path)
+            cleaned_path = normalized_path.replace('/viewer/', '/').replace('/viewer-main/', '/').replace('/file_viewer/', '/',1).replace('file_view_main/', '')
+            
+            target_path = os.path.join(BASE_DIR, cleaned_path)
+            target_path = os.path.dirname(target_path) if os.path.isfile(target_path) else target_path
+            
+            app.logger.info(f"開こうとしているtarget_path: {repr(target_path)}")
             
             if IS_WINDOWS:
                 # Windowsの場合
@@ -708,6 +767,34 @@ def render_csv(file_path):
     with open(file_path, mode='r', encoding='utf-8') as file:
         reader = csv.DictReader(file)
         return [row for row in reader]
+
+
+def render_csv2(file_path):
+    with open(file_path, mode='r', encoding='utf-8') as file:
+        reader = csv.reader(file)
+        headers = next(reader, None)  # ヘッダー行を読み込む
+        
+        table_html = '<table class="csv-table">\n'
+        
+        # ヘッダー行を追加
+        if headers:
+            table_html += '<thead><tr>\n'
+            for header in headers:
+                table_html += f'<th>{html.escape(header)}</th>\n'
+            table_html += '</tr></thead>\n'
+        
+        # データ行を追加
+        table_html += '<tbody>\n'
+        for row in reader:
+            table_html += '<tr>\n'
+            for cell in row:
+                table_html += f'<td>{html.escape(cell)}</td>\n'
+            table_html += '</tr>\n'
+        table_html += '</tbody>\n'
+        
+        table_html += '</table>'
+        
+        return table_html
 
 if __name__ == '__main__':
     app.secret_key = 'your_secret_key_here'  # セッション用の秘密鍵
