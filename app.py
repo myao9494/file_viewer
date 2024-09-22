@@ -24,6 +24,8 @@ import shutil
 from itertools import zip_longest  # この行を追加
 import pyperclip
 from PIL import Image
+from datetime import datetime
+
 
 app = Flask(__name__, static_folder='static')
 
@@ -802,11 +804,23 @@ def view_image_tools():
     if not image_paths:
         return redirect(url_for('index'))
     
-    full_paths = [os.path.join(BASE_DIR, path) for path in image_paths]
-    encoded_paths = [urllib.parse.quote(path.replace(BASE_DIR, '').lstrip('/')) for path in full_paths]
+    full_paths = [normalize_path(os.path.join(BASE_DIR, path)) for path in image_paths]
+    encoded_paths = [urllib.parse.quote(normalize_path(path.replace(BASE_DIR, '').lstrip('/'))) for path in full_paths]
+    
+    # 作成日時を取得（エラーハンドリングを追加）
+    file_dates = []
+    for path in full_paths:
+        try:
+            file_date = datetime.fromtimestamp(os.path.getctime(path)).isoformat()
+        except FileNotFoundError:
+            file_date = "N/A"  # ファイルが見つからない場合は "N/A" を使用
+        except Exception as e:
+            app.logger.error(f"Error getting file date for {path}: {str(e)}")
+            file_date = "Error"
+        file_dates.append(file_date)
     
     # zipオブジェクトを作成して渡す
-    zipped_paths = list(zip(full_paths, encoded_paths))
+    zipped_paths = list(zip(full_paths, encoded_paths, file_dates))
     
     return render_template('image_tools.html', zipped_paths=zipped_paths, BASE_DIR=BASE_DIR)
 
@@ -913,6 +927,19 @@ def copy_images_to_clipboard():
     except Exception as e:
         app.logger.exception("エラーが発生しました")
         return jsonify({'success': False, 'error': str(e)})
+
+
+@app.template_filter('get_file_date')
+def get_file_date(file_path):
+    normalized_path = normalize_path(file_path)
+    try:
+        return datetime.fromtimestamp(os.path.getmtime(normalized_path)).isoformat()
+    except FileNotFoundError:
+        return "N/A"  # ファイルが見つからない場合は "N/A" を返す
+
+@app.template_filter('get_folder_path')
+def get_folder_path(file_path):
+    return normalize_path(os.path.dirname(file_path))
 
 if __name__ == '__main__':
     app.secret_key = 'your_secret_key_here'  # セッション用の秘密鍵

@@ -53,6 +53,7 @@
         padding: 10px;
         background-color: #fff;
         transition: border-color 0.3s;
+        position: relative;
     }
     .unwanted-images .image-item {
         max-width: 150px;
@@ -141,6 +142,16 @@
     #copyToClipboard:hover {
         background-color: #0056b3;
     }
+    .image-date {
+        position: absolute;
+        top: 5px;
+        right: 5px;
+        background-color: rgba(0, 0, 0, 0.6);
+        color: white;
+        padding: 2px 5px;
+        border-radius: 3px;
+        font-size: 0.8em;
+    }
 </style>
 {% endblock %}
 
@@ -151,16 +162,18 @@
     <button class="btn size-btn active" data-size="medium">中</button>
     <button class="btn size-btn" data-size="large">大</button>
     <button class="btn" id="togglePath">ファイル名切替</button>
+    <button class="btn" id="sortByDate">日付でソート</button>
 </div>
 <button id="copyToClipboard" class="btn">選択画像をクリップボードにコピー</button>
 <div class="container">
     <div class="image-grid-container">
         <div class="image-grid medium" id="image-grid">
-            {% for path, encoded_path in zipped_paths %}
-            <div class="image-item" data-full-path="{{ path }}" data-file-name="{{ path.split('/')[-1] }}" data-encoded-path="{{ encoded_path }}">
+            {% for path, encoded_path, file_date in zipped_paths %}
+            <div class="image-item" data-full-path="{{ path }}" data-file-name="{{ path.split('/')[-1] }}" data-encoded-path="{{ encoded_path }}" data-file-date="{{ file_date }}">
                 <div class="select-overlay" style="display: none;">選択済</div>
                 <img src="{{ url_for('raw_file', file_path=encoded_path) }}" alt="画像">
                 <div class="image-path">{{ path }}</div>
+                <div class="image-date">{{ file_date.split('T')[0] }}</div>
             </div>
             {% endfor %}
         </div>
@@ -179,8 +192,10 @@ document.addEventListener('DOMContentLoaded', function() {
     const imageGrid = document.querySelector('.image-grid');
     const unwantedGrid = document.getElementById('unwanted-grid');
     const togglePathBtn = document.getElementById('togglePath');
+    const sortByDateBtn = document.getElementById('sortByDate');
     let showFullPath = true;
     let selectedImages = new Set();
+    let sortAscending = true;
 
     // サイズ変更機能
     sizeButtons.forEach(button => {
@@ -291,6 +306,23 @@ document.addEventListener('DOMContentLoaded', function() {
             alert('エラーが発生しました: ' + error);
         });
     });
+
+    // 日付でソート機能
+    sortByDateBtn.addEventListener('click', function() {
+        const imageGrid = document.getElementById('image-grid');
+        const imageItems = Array.from(imageGrid.children);
+
+        imageItems.sort((a, b) => {
+            const dateA = new Date(a.dataset.fileDate);
+            const dateB = new Date(b.dataset.fileDate);
+            return sortAscending ? dateA - dateB : dateB - dateA;
+        });
+
+        imageItems.forEach(item => imageGrid.appendChild(item));
+        sortAscending = !sortAscending;
+        this.textContent = sortAscending ? '日付昇順' : '日付降順';
+    });
+
 });
 </script>
 {% endblock %}
