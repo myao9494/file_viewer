@@ -152,6 +152,9 @@
         border-radius: 3px;
         font-size: 0.8em;
     }
+    #sortOptions {
+        margin-left: 10px;
+    }
 </style>
 {% endblock %}
 
@@ -162,14 +165,19 @@
     <button class="btn size-btn active" data-size="medium">中</button>
     <button class="btn size-btn" data-size="large">大</button>
     <button class="btn" id="togglePath">ファイル名切替</button>
-    <button class="btn" id="sortByDate">日付でソート</button>
+    <select id="sortOptions">
+        <option value="date">日付でソート</option>
+        <option value="folder">フォルダ名でソート</option>
+        <option value="file">ファイル名でソート</option>
+    </select>
+    <button class="btn" id="sortButton">昇順</button>
 </div>
 <button id="copyToClipboard" class="btn">選択画像をクリップボードにコピー</button>
 <div class="container">
     <div class="image-grid-container">
         <div class="image-grid medium" id="image-grid">
             {% for path, encoded_path, file_date in zipped_paths %}
-            <div class="image-item" data-full-path="{{ path }}" data-file-name="{{ path.split('/')[-1] }}" data-encoded-path="{{ encoded_path }}" data-file-date="{{ file_date }}">
+            <div class="image-item" data-full-path="{{ path }}" data-file-name="{{ path.split('/')[-1] }}" data-folder-name="{{ '/'.join(path.split('/')[:-1]) }}" data-encoded-path="{{ encoded_path }}" data-file-date="{{ file_date }}">
                 <div class="select-overlay" style="display: none;">選択済</div>
                 <img src="{{ url_for('raw_file', file_path=encoded_path) }}" alt="画像">
                 <div class="image-path">{{ path }}</div>
@@ -192,7 +200,8 @@ document.addEventListener('DOMContentLoaded', function() {
     const imageGrid = document.querySelector('.image-grid');
     const unwantedGrid = document.getElementById('unwanted-grid');
     const togglePathBtn = document.getElementById('togglePath');
-    const sortByDateBtn = document.getElementById('sortByDate');
+    const sortOptions = document.getElementById('sortOptions');
+    const sortButton = document.getElementById('sortButton');
     let showFullPath = true;
     let selectedImages = new Set();
     let sortAscending = true;
@@ -307,21 +316,45 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
 
-    // 日付でソート機能
-    sortByDateBtn.addEventListener('click', function() {
+    function sortImages() {
         const imageGrid = document.getElementById('image-grid');
         const imageItems = Array.from(imageGrid.children);
+        const sortType = sortOptions.value;
 
         imageItems.sort((a, b) => {
-            const dateA = new Date(a.dataset.fileDate);
-            const dateB = new Date(b.dataset.fileDate);
-            return sortAscending ? dateA - dateB : dateB - dateA;
+            let valueA, valueB;
+            switch (sortType) {
+                case 'date':
+                    valueA = new Date(a.dataset.fileDate);
+                    valueB = new Date(b.dataset.fileDate);
+                    break;
+                case 'folder':
+                    valueA = a.dataset.folderName;
+                    valueB = b.dataset.folderName;
+                    break;
+                case 'file':
+                    valueA = a.dataset.fileName;
+                    valueB = b.dataset.fileName;
+                    break;
+            }
+            if (valueA < valueB) return sortAscending ? -1 : 1;
+            if (valueA > valueB) return sortAscending ? 1 : -1;
+            return 0;
         });
 
         imageItems.forEach(item => imageGrid.appendChild(item));
+    }
+
+    sortButton.addEventListener('click', function() {
         sortAscending = !sortAscending;
-        this.textContent = sortAscending ? '日付昇順' : '日付降順';
+        this.textContent = sortAscending ? '昇順' : '降順';
+        sortImages();
     });
+
+    sortOptions.addEventListener('change', sortImages);
+
+    // 初期ソート
+    sortImages();
 
 });
 </script>
