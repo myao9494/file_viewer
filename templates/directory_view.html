@@ -94,6 +94,22 @@
         background-color: #007bff;
         color: white;
     }
+    #image-tools-btn {
+        position: fixed;
+        right: 20px;
+        top: 20px;
+        display: none;
+        background-color: #2a9e37;
+        color: white;
+        border: none;
+        padding: 10px 15px;
+        border-radius: 5px;
+        cursor: pointer;
+        z-index: 1000;
+    }
+    #image-tools-btn:hover {
+        background-color: #00b357;
+    }
 </style>
 
 <div class="folder-path">
@@ -138,7 +154,7 @@
 </div>
 
 <!-- 画像ツールボタンを追加 -->
-<button id="image-tools-btn" style="position: fixed; right: 20px; top: 50%; display: none;">画像ツール</button>
+<button id="image-tools-btn" style="position: fixed; right: 20px; top: 20px; display: none;">画像ツール</button>
 
 <h3>フォルダ:</h3>
 <ul class="folder-list">
@@ -597,16 +613,49 @@ document.addEventListener('DOMContentLoaded', function() {
 
     function performSearch() {
         const searchTerm = searchInput.value.toLowerCase().trim();
-        const currentItems = getCurrentItems();
+        const allItems = document.querySelectorAll('.folder-list li, .file-list li');
 
-        currentItems.forEach(item => {
-            const text = item.textContent.toLowerCase();
+        allItems.forEach(item => {
+            const text = item.querySelector('a').textContent.toLowerCase();
+            const isFolder = item.classList.contains('folder');
+            const isFile = item.classList.contains('file');
+
             if (text.includes(searchTerm)) {
                 item.style.display = '';
+                if (isFolder) {
+                    showAllItemsInFolder(item.querySelector('a').getAttribute('href'));
+                }
             } else {
-                item.style.display = 'none';
+                if (isFolder) {
+                    const hasMatchingItems = checkFolderContents(item.querySelector('a').getAttribute('href'), searchTerm);
+                    item.style.display = hasMatchingItems ? '' : 'none';
+                } else {
+                    item.style.display = 'none';
+                }
             }
         });
+    }
+
+    function showAllItemsInFolder(folderPath) {
+        const items = document.querySelectorAll('.folder-list li, .file-list li');
+        items.forEach(item => {
+            const itemPath = item.querySelector('a').getAttribute('href');
+            if (itemPath.startsWith(folderPath)) {
+                item.style.display = '';
+            }
+        });
+    }
+
+    function checkFolderContents(folderPath, searchTerm) {
+        const items = document.querySelectorAll('.folder-list li, .file-list li');
+        for (let item of items) {
+            const itemPath = item.querySelector('a').getAttribute('href');
+            const itemText = item.querySelector('a').textContent.toLowerCase();
+            if (itemPath.startsWith(folderPath) && itemText.includes(searchTerm)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     function resetSearch() {

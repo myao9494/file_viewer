@@ -125,6 +125,22 @@
     body > div.container > main > div.container {
         padding-top: 0;
     }
+
+    #copyToClipboard {
+        position: fixed;
+        right: 20px;
+        top: 20px;
+        background-color: #007bff;
+        color: white;
+        border: none;
+        padding: 10px 15px;
+        border-radius: 5px;
+        cursor: pointer;
+        z-index: 1000;
+    }
+    #copyToClipboard:hover {
+        background-color: #0056b3;
+    }
 </style>
 {% endblock %}
 
@@ -135,8 +151,8 @@
     <button class="btn size-btn active" data-size="medium">中</button>
     <button class="btn size-btn" data-size="large">大</button>
     <button class="btn" id="togglePath">ファイル名切替</button>
-    <button id="copyToClipboard" class="btn">選択画像をクリップボードにコピー</button>
 </div>
+<button id="copyToClipboard" class="btn">選択画像をクリップボードにコピー</button>
 <div class="container">
     <div class="image-grid-container">
         <div class="image-grid medium" id="image-grid">

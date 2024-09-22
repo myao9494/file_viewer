@@ -172,9 +172,10 @@ def view_file(file_path):
         relative_path = os.path.relpath(full_path, BASE_DIR)
         # JupyterのURLを構築
         jupyter_url = f"{JUPYTER_BASE_URL}/{relative_path}"
-        
+        cleaned_path = jupyter_url.replace('/viewer/', '/').replace('/viewer-main/', '/').replace('/file_viewer/', '/',1).replace('file_view_main/', '')
+        print(cleaned_path)
         # ブラウザでJupyterのURLを開く
-        webbrowser.open(jupyter_url)
+        webbrowser.open(cleaned_path)
         
         # ユーザーに通知を返す
         flash('Jupyter Notebookを開きました。', 'info')
@@ -324,9 +325,11 @@ def open_in_code2():
                 subprocess.Popen([vscode_path, target_path])
                 # AppleScriptを使用してウィンドウをアクティブにしてフルスクリーンにする
                 apple_script = '''
-                tell application "Code"
+                tell application "Visual Studio Code"
                     activate
                 end tell
+
+                delay 1
                 
                 tell application "System Events"
                     tell process "Code"
@@ -607,8 +610,10 @@ def open_jupyter():
         relative_path = os.path.relpath(file_path, BASE_DIR)
         app.logger.debug(f"Relative path: {relative_path}")
 
+        jupyter_url = f"{JUPYTER_BASE_URL}/{relative_path}"
+
         # 'file_viewer'を含まない相対パスを作成
-        cleaned_path = relative_path.replace('/viewer/', '/').replace('/viewer-main/', '/').replace('/file_viewer/', '/',1).replace('file_view_main/', '')
+        cleaned_path = jupyter_url.replace('/viewer/', '/').replace('/viewer-main/', '/').replace('/file_viewer/', '/',1).replace('file_view_main/', '')
         app.logger.debug(f"Cleaned path: {cleaned_path}")
         
         if cleaned_path.endswith('.ipynb'):
@@ -620,11 +625,11 @@ def open_jupyter():
             app.logger.debug(f"Opening folder: {cleaned_path}")
         
         # JupyterのURLを構築
-        jupyter_url = f"{JUPYTER_BASE_URL}/{cleaned_path}"
-        app.logger.info(f"Opening Jupyter URL: {jupyter_url}")
+        # jupyter_url = f"{JUPYTER_BASE_URL}/{cleaned_path}"
+        app.logger.info(f"Opening Jupyter URL: {cleaned_path}")
         
         # ブラウザでJupyterのURLを開く
-        webbrowser.open(jupyter_url)
+        webbrowser.open(cleaned_path)
         
         return jsonify({'success': True})
     except Exception as e:
@@ -755,9 +760,26 @@ def create_folder():
         
         shutil.copytree(TEMPLATE_FOLDER, new_folder_path)
         
-        return jsonify({'success': True, 'message': 'フォルダが作成されました。'})
+        # フォルダ作成後のアクション
+        perform_post_creation_actions(new_folder_path)
+        
+        return jsonify({'success': True, 'message': 'フォルダが作成されました。', 'path': new_folder_path})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)})
+
+def perform_post_creation_actions(folder_path):
+    # ここに作成後のアクションを記述
+    # 例: ログを記録する
+    app.logger.info(f"新しいフォルダが作成されました: {folder_path}")
+    
+    # 例: 特定のファイルを作成する
+    with open(os.path.join(folder_path, 'README.md'), 'w') as f:
+        f.write(f"# {os.path.basename(folder_path)}\n\nこのフォルダは自動生成されました。")
+    
+    # 例: 権限を設定する
+    # os.chmod(folder_path, 0o755)
+    
+    # その他必要なアクション...
 
 
 @app.route('/image-tools', methods=['POST'])
