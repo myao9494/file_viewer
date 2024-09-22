@@ -280,15 +280,15 @@ document.addEventListener('DOMContentLoaded', function() {
         })
         .then(response => response.json())
         .then(data => {
-            if (data.success) {
-                alert('全ての画像がクリップボードにコピーされました。');
-            } else {
-                alert('ラーが発生しました: ' + data.error);
-            }
+        if (data.success) {
+            alert(data.message);  // サーバーからのメッセージを表示
+        } else {
+            alert('エラーが発生しました: ' + (data.error || '不明なエラー'));
+        }
         })
         .catch(error => {
             console.error('Error:', error);
-            alert('エラーが発生しました。');
+            alert('エラーが発生しました: ' + error);
         });
     });
 });

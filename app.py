@@ -865,8 +865,14 @@ def copy_images_to_clipboard():
     if not image_paths:
         return jsonify({'success': False, 'error': '画像が選択されていません。'})
     
+    cancelled = False
+    processed_images = 0
+
     try:
         for encoded_path in image_paths:
+            if cancelled:
+                break
+
             full_path = os.path.join(BASE_DIR, urllib.parse.unquote(encoded_path))
             file_name = os.path.basename(full_path)
             
@@ -885,12 +891,27 @@ def copy_images_to_clipboard():
             
             # ポップアップ表示
             if platform.system() == 'Darwin':  # macOS
-                subprocess.run(['osascript', '-e', f'display dialog "{file_name} をクリップボードにコピーしました。" buttons {{"OK"}} default button "OK"'])
+                result = subprocess.run(['osascript', '-e', f'display dialog "{file_name} をクリップボードにコピーしました。続けますか？" buttons {{"キャンセル", "OK"}} default button "OK"'], capture_output=True, text=True)
+                app.logger.debug(f"macOS result.stdout: {result.stdout}")
+                app.logger.debug(f"macOS result.stderr: {result.stderr}")
+                if 'ユーザによってキャンセルされました' in result.stderr:
+                    cancelled = True
             elif platform.system() == 'Windows':
-                subprocess.run(['powershell', '-Command', f'[System.Windows.Forms.MessageBox]::Show("{file_name} をクリップボードにコピーしました。", "通知", [System.Windows.Forms.MessageBoxButtons]::OK)'])
-        
-        return jsonify({'success': True})
+                result = subprocess.run(['powershell', '-Command', f'$result = [System.Windows.Forms.MessageBox]::Show("{file_name} をクリップボードにコピーしました。続けますか？", "確認", [System.Windows.Forms.MessageBoxButtons]::OKCancel); $result.ToString()'], capture_output=True, text=True)
+                app.logger.debug(f"Windows result.stdout: {result.stdout}")
+                app.logger.debug(f"Windows result.stderr: {result.stderr}")
+                if 'Cancel' in result.stdout:
+                    cancelled = True
+
+            processed_images += 1
+
+        app.logger.debug(cancelled)
+        if cancelled:
+            return jsonify({'success': True, 'message': f'{processed_images}個の画像をコピーした後、処理を中断しました。'})
+        else:
+            return jsonify({'success': True, 'message': f'すべての画像（{processed_images}個）をクリップボードにコピーしました。'})
     except Exception as e:
+        app.logger.exception("エラーが発生しました")
         return jsonify({'success': False, 'error': str(e)})
 
 if __name__ == '__main__':
