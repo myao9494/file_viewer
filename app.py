@@ -25,6 +25,9 @@ from itertools import zip_longest  # この行を追加
 import pyperclip
 from PIL import Image
 from datetime import datetime
+if platform.system() == "Windows":
+    import win32clipboard
+    import PySimpleGUI as sg
 
 
 app = Flask(__name__, static_folder='static')
@@ -48,6 +51,7 @@ global BASE_DIR
 
 mac_BASE_DIR = r"/Users/sudoupousei/000_work"  # Windowsの場合
 win_BASE_DIR = r"C:\Users\kabu_server\000_work"
+net_work_drive = "network"
 BASE_DIR = normalize_path(mac_BASE_DIR if not IS_WINDOWS else win_BASE_DIR)
 
 # テンプレートフォルダの設定
@@ -103,6 +107,10 @@ def view_file(file_path):
     else:
         file_path = file_path.lstrip('/')
         full_path = normalize_path(os.path.join(BASE_DIR, file_path))
+        if full_path.find(net_work_drive) != -1:
+            full_path = full_path.split(net_work_drive)[1]
+            full_path = f"\\\\{net_work_drive}" + full_path
+            full_path = full_path.replace('/', '\\')
         file_name = os.path.basename(file_path)
         folder_name = os.path.basename(os.path.dirname(file_path))
         current_item = f"{file_name} - {folder_name}" if folder_name else file_name
@@ -171,10 +179,12 @@ def view_file(file_path):
     # ipynbファイルの場合
     if file_extension == '.ipynb':
         # ファイルパスをベースディレクトリからの相対パスに変換
-        relative_path = os.path.relpath(full_path, BASE_DIR)
+        relative_path = urllib.parse.unquote(os.path.relpath(full_path, BASE_DIR))
         # JupyterのURLを構築
         jupyter_url = f"{JUPYTER_BASE_URL}/{relative_path}"
+        cleaned_path = urllib.parse.unquote(jupyter_url)
         cleaned_path = jupyter_url.replace('/viewer/', '/').replace('/viewer-main/', '/').replace('/file_viewer/', '/',1).replace('file_view_main/', '')
+        app.logger.info(f"{jupyter_url},{cleaned_path}")
         print(cleaned_path)
         # ブラウザでJupyterのURLを開く
         webbrowser.open(cleaned_path)
@@ -613,9 +623,11 @@ def open_jupyter():
         app.logger.debug(f"Relative path: {relative_path}")
 
         jupyter_url = f"{JUPYTER_BASE_URL}/{relative_path}"
+        jupyter_url = urllib.parse.unquote(jupyter_url)
+        jupyter_url = jupyter_url.replace("\\","/")
 
         # 'file_viewer'を含まない相対パスを作成
-        cleaned_path = jupyter_url.replace('/viewer/', '/').replace('/viewer-main/', '/').replace('/file_viewer/', '/',1).replace('file_view_main/', '')
+        cleaned_path = jupyter_url.replace('/viewer/', '/').replace('/viewer-main/', '/').replace('/file_viewer/', '/',1).replace('file_viewer_main/', '')
         app.logger.debug(f"Cleaned path: {cleaned_path}")
         
         if cleaned_path.endswith('.ipynb'):
@@ -805,7 +817,8 @@ def view_image_tools():
         return redirect(url_for('index'))
     
     full_paths = [normalize_path(os.path.join(BASE_DIR, path)) for path in image_paths]
-    encoded_paths = [urllib.parse.quote(normalize_path(path.replace(BASE_DIR, '').lstrip('/'))) for path in full_paths]
+    encoded_paths = [urllib.parse.unquote(normalize_path(path.replace(BASE_DIR, '').lstrip('/'))) for path in full_paths]
+    app.logger.debug(encoded_paths)
     
     # 作成日時を取得（エラーハンドリングを追加）
     file_dates = []
@@ -894,12 +907,20 @@ def copy_images_to_clipboard():
             if platform.system() == 'Darwin':  # macOS
                 subprocess.run(['osascript', '-e', f'set the clipboard to (read (POSIX file "{full_path}") as JPEG picture)'])
             elif platform.system() == 'Windows':
-                image = Image.open(full_path)
+                app.logger.info(full_path)
+                original_image = Image.open(full_path)
                 output = io.BytesIO()
-                image.convert("RGB").save(output, "BMP")
+                original_image.convert("RGB").save(output, "BMP")
                 data = output.getvalue()[14:]
                 output.close()
-                pyperclip.copy(data)
+                # クリップボードを開く
+                win32clipboard.OpenClipboard()
+                # クリップボードに画像データを設定
+                win32clipboard.EmptyClipboard()
+                win32clipboard.SetClipboardData(win32clipboard.CF_DIB, data)
+                # クリップボードを閉じる
+                win32clipboard.CloseClipboard()
+
             else:
                 return jsonify({'success': False, 'error': 'サポートされていないOSです。'})
             
@@ -911,10 +932,8 @@ def copy_images_to_clipboard():
                 if 'ユーザによってキャンセルされました' in result.stderr:
                     cancelled = True
             elif platform.system() == 'Windows':
-                result = subprocess.run(['powershell', '-Command', f'$result = [System.Windows.Forms.MessageBox]::Show("{file_name} をクリップボードにコピーしました。続けますか？", "確認", [System.Windows.Forms.MessageBoxButtons]::OKCancel); $result.ToString()'], capture_output=True, text=True)
-                app.logger.debug(f"Windows result.stdout: {result.stdout}")
-                app.logger.debug(f"Windows result.stderr: {result.stderr}")
-                if 'Cancel' in result.stdout:
+                result = sg.popup_yes_no("{file_name} をクリップボードにコピーしました。続けますか？" ,location=(None,None),keep_on_top =True)
+                if result == "No":
                     cancelled = True
 
             processed_images += 1

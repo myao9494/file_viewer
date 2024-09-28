@@ -25,10 +25,11 @@
     }
     .image-grid.small { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
     .image-grid.medium { grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); }
-    .image-grid.large { grid-template-columns: repeat(auto-fill, minmax(350px, 1fr)); }
+    .image-grid.large { grid-template-columns: repeat(auto-fill, minmax(750px, 1fr)); }
     .unwanted-images {
         flex: 1;
-        min-width: 200px;
+        max-width: 200px;
+        min-width: 100px;
         border-left: 1px solid #ccc;
         padding: 20px;
         display: flex;
@@ -180,7 +181,7 @@
             <div class="image-item" data-full-path="{{ path }}" data-file-name="{{ path.split('/')[-1] }}" data-folder-name="{{ '/'.join(path.split('/')[:-1]) }}" data-encoded-path="{{ encoded_path }}" data-file-date="{{ file_date }}">
                 <div class="select-overlay" style="display: none;">選択済</div>
                 <img src="{{ url_for('raw_file', file_path=encoded_path) }}" alt="画像">
-                <div class="image-path">{{ path }}</div>
+                <div class="image-path">{{ encoded_path }}</div>
                 <div class="image-date">{{ file_date.split('T')[0] }}</div>
             </div>
             {% endfor %}
