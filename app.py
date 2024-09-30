@@ -643,7 +643,12 @@ def open_jupyter():
         app.logger.info(f"Opening Jupyter URL: {cleaned_path}")
         
         # ブラウザでJupyterのURLを開く
-        webbrowser.open(cleaned_path)
+        # URLをエンコード
+        encoded_url = urllib.parse.quote(cleaned_path, safe=':/')  # safeに':'と'/'を指定して、これらの文字はエンコードしない
+
+        # エンコードしたURLを開く
+        webbrowser.open(encoded_url)
+        # webbrowser.open(cleaned_path)
         
         return jsonify({'success': True})
     except Exception as e:
