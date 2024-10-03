@@ -449,6 +449,50 @@
 
         // ウィンドウのリサイズ時にMarkdownサイズを再計算
         window.addEventListener('resize', updateMarkdownContentSize);
+
+        function adjustImageSizes() {
+            const markdownBody = document.querySelector('.markdown-body');
+            const baseFontSize = parseFloat(window.getComputedStyle(markdownBody).fontSize);
+            const images = markdownBody.querySelectorAll('img');
+
+            images.forEach(img => {
+                img.onload = function() {
+                    const maxWidth = markdownBody.clientWidth * 0.8; // 80% of the container width
+                    const maxHeight = window.innerHeight * 0.6; // 60% of the viewport height
+                    const aspectRatio = img.naturalWidth / img.naturalHeight;
+
+                    let newWidth = Math.min(img.naturalWidth, maxWidth);
+                    let newHeight = newWidth / aspectRatio;
+
+                    if (newHeight > maxHeight) {
+                        newHeight = maxHeight;
+                        newWidth = newHeight * aspectRatio;
+                    }
+
+                    // Adjust size based on font size
+                    const scaleFactor = baseFontSize / 20; // Assuming 16px is the default font size
+                    newWidth *= scaleFactor;
+                    newHeight *= scaleFactor;
+
+                    img.style.width = `${newWidth}px`;
+                    img.style.height = `${newHeight}px`;
+                };
+
+                // Trigger onload for cached images
+                if (img.complete) {
+                    img.onload();
+                }
+            });
+        }
+
+        // Call adjustImageSizes on page load and window resize
+        window.addEventListener('load', adjustImageSizes);
+        window.addEventListener('resize', adjustImageSizes);
+
+        // Adjust image sizes when font size changes
+        document.getElementById('size-input').addEventListener('change', function() {
+            setTimeout(adjustImageSizes, 300); // Wait for font size change to take effect
+        });
     });
     </script>
 </body>

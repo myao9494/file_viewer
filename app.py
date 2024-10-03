@@ -22,7 +22,7 @@ import zipfile
 import io
 import shutil
 from itertools import zip_longest  # この行を追加
-import pyperclip
+# import pyperclip
 from PIL import Image
 from datetime import datetime
 if platform.system() == "Windows":
@@ -183,7 +183,7 @@ def view_file(file_path):
         # JupyterのURLを構築
         jupyter_url = f"{JUPYTER_BASE_URL}/{relative_path}"
         cleaned_path = urllib.parse.unquote(jupyter_url)
-        cleaned_path = jupyter_url.replace('/viewer/', '/').replace('/viewer-main/', '/').replace('/file_viewer/', '/',1).replace('file_view_main/', '')
+        cleaned_path = jupyter_url.replace('/viewer/', '/').replace('/viewer-main/', '/').replace('/file_viewer/', '/',1).replace('file_view-main/', '')
         app.logger.info(f"{jupyter_url},{cleaned_path}")
         print(cleaned_path)
         # ブラウザでJupyterのURLを開く
@@ -319,7 +319,7 @@ def open_in_code2():
             # URLデコードを行う
             decoded_path = urllib.parse.unquote(file_path)
             normalized_path = normalize_path(decoded_path)
-            cleaned_path = normalized_path.replace('/viewer/', '/').replace('/viewer-main/', '/').replace('/file_viewer/', '/',1).replace('file_view_main/', '')
+            cleaned_path = normalized_path.replace('/viewer/', '/').replace('/viewer-main/', '/').replace('/file_viewer/', '/',1).replace('file_view-main/', '')
             
             target_path = os.path.join(BASE_DIR, cleaned_path)
             target_path = os.path.dirname(target_path) if os.path.isfile(target_path) else target_path
@@ -627,7 +627,7 @@ def open_jupyter():
         jupyter_url = jupyter_url.replace("\\","/")
 
         # 'file_viewer'を含まない相対パスを作成
-        cleaned_path = jupyter_url.replace('/viewer/', '/').replace('/viewer-main/', '/').replace('/file_viewer/', '/',1).replace('file_viewer_main/', '')
+        cleaned_path = jupyter_url.replace('/viewer/', '/').replace('/viewer-main/', '/').replace('/file_viewer/', '/',1).replace('file_viewer-main/', '')
         app.logger.debug(f"Cleaned path: {cleaned_path}")
         
         if cleaned_path.endswith('.ipynb'):
@@ -723,6 +723,8 @@ def normalize_path_endpoint():
         return jsonify({'success': False, 'error': 'パスが指定されていません。'})
     
     try:
+        # パスの前後の引用符を削除
+        path = path.strip('"')
         normalized_path = normalize_path(path)
         return jsonify({'success': True, 'normalized_path': normalized_path})
     except Exception as e:

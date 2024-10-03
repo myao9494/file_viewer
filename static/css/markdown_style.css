@@ -263,6 +263,22 @@ mjx-container[jax="CHTML"][display="true"] mjx-math {
 .markdown-body img {
     max-width: 100%;
     height: auto;
+    display: block;
+    margin: 1em 0; /* 上下のマージンを追加 */
+    padding-left: 15px; /* 左側にパディングを追加 */
+    transition: all 0.3s ease;
+}
+
+.markdown-body figure {
+    text-align: left; /* 左揃えに変更 */
+    margin: 1em 0;
+}
+
+.markdown-body figcaption {
+    font-size: 0.85em;
+    color: #666;
+    margin-top: 0.5em;
+    padding-left: 15px; /* キャプションも左側にパディングを追加 */
 }
 
 /* 数式のスタイル */

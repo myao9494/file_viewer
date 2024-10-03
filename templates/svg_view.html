@@ -195,6 +195,9 @@ function fixSvgPaths() {
 function processElement(element) {
     let href = element.getAttribute('xlink:href') || element.getAttribute('href');
     if (href && !href.startsWith('data:')) {  // data: URLの場合は処理をスキップ
+        // 引用符を取り除く
+        href = href.replace(/^["']|["']$/g, '');
+
         const baseDirPath = '{{ BASE_DIR }}'.replace(/\\/g, '/');  // バックスラッシュをスラッシュに変換
         const currentFilePath = '{{ full_path }}'.replace(/\\/g, '/');
         const currentDir = currentFilePath.substring(0, currentFilePath.lastIndexOf('/'));
