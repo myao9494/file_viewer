@@ -86,6 +86,16 @@
             <button id="openInVSCodeBtn" title="VSCodeで開く" onclick="openInVSCode()">
                 <i class="fas fa-code"></i>
             </button>
+            <!-- 新しく追加したボタン -->
+            <button id="openInCodeBtn" title="Codeで開く" onclick="openInCode()">
+                <i class="fas fa-edit"></i>
+            </button>
+            <button id="openFolderBtn" title="フォルダを開く" onclick="openFolder()">
+                <i class="fas fa-folder-open"></i>
+            </button>
+            <button id="openJupyterBtn" title="Jupyterで開く" onclick="openJupyter()">
+                <i class="fas fa-book"></i>
+            </button>
         </div>
         {% block folder_path %}{% endblock %}
     </div>
@@ -225,6 +235,72 @@
         })
         .catch(error => {
             console.error('エラー:', error);
+            alert('エラーが発生しました。');
+        });
+    }
+
+    function openInCode() {
+        fetch('/open-in-code', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ path: '{{ full_path | trim }}' }),
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                console.log('ファイルがCodeで開かれました。');
+            } else {
+                alert('エラーが発生しました: ' + data.error);
+            }
+        })
+        .catch((error) => {
+            console.error('Error:', error);
+            alert('エラーが発生しました。');
+        });
+    }
+
+    function openFolder() {
+        fetch('/open-folder', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ path: '{{ full_path | trim }}' }),
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                console.log('フォルダが開かれました。');
+            } else {
+                alert('エラーが発生しました: ' + data.error);
+            }
+        })
+        .catch((error) => {
+            console.error('Error:', error);
+            alert('エラーが発生しました。');
+        });
+    }
+
+    function openJupyter() {
+        fetch('/open-jupyter', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ path: '{{ full_path | trim }}' }),
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                console.log('Jupyterが新しいタブで開かれました。');
+            } else {
+                alert('エラーが発生しました: ' + data.error);
+            }
+        })
+        .catch((error) => {
+            console.error('Error:', error);
             alert('エラーが発生しました。');
         });
     }

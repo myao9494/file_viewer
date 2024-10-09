@@ -1,4 +1,4 @@
-import os
+import os,re
 # import fnmatch
 import platform
 from flask import Flask, render_template, request, send_file, abort, url_for, Response, send_from_directory, jsonify, redirect, flash, session
@@ -183,7 +183,7 @@ def view_file(file_path):
         # JupyterのURLを構築
         jupyter_url = f"{JUPYTER_BASE_URL}/{relative_path}"
         cleaned_path = urllib.parse.unquote(jupyter_url)
-        cleaned_path = jupyter_url.replace('/viewer/', '/').replace('/viewer-main/', '/').replace('/file_viewer/', '/',1).replace('file_view-main/', '')
+        cleaned_path = jupyter_url.replace('/viewer/', '/').replace('/viewer-main/', '/').replace('/file-viewer/', '/',1).replace('file_viewer-main/', '')
         app.logger.info(f"{jupyter_url},{cleaned_path}")
         print(cleaned_path)
         # ブラウザでJupyterのURLを開く
@@ -319,7 +319,7 @@ def open_in_code2():
             # URLデコードを行う
             decoded_path = urllib.parse.unquote(file_path)
             normalized_path = normalize_path(decoded_path)
-            cleaned_path = normalized_path.replace('/viewer/', '/').replace('/viewer-main/', '/').replace('/file_viewer/', '/',1).replace('file_view-main/', '')
+            cleaned_path = normalized_path.replace('/viewer/', '/').replace('/viewer-main/', '/').replace('/file-viewer/', '/',1).replace('file_view-main/', '')
             
             target_path = os.path.join(BASE_DIR, cleaned_path)
             target_path = os.path.dirname(target_path) if os.path.isfile(target_path) else target_path
@@ -626,17 +626,28 @@ def open_jupyter():
         jupyter_url = urllib.parse.unquote(jupyter_url)
         jupyter_url = jupyter_url.replace("\\","/")
 
-        # 'file_viewer'を含まない相対パスを作成
-        cleaned_path = jupyter_url.replace('/viewer/', '/').replace('/viewer-main/', '/').replace('/file_viewer/', '/',1).replace('file_viewer-main/', '')
+        # 'file-viewer'を含まない相対パスを作成
+        cleaned_path = jupyter_url.replace('/viewer/', '/').replace('/viewer-main/', '/').replace('/file-viewer/', '/',1).replace('file_viewer-main/', '')
         app.logger.debug(f"Cleaned path: {cleaned_path}")
         
         if cleaned_path.endswith('.ipynb'):
             app.logger.debug(f"Opening .ipynb file: {cleaned_path}")
-        elif os.path.isfile(os.path.join(BASE_DIR, cleaned_path)):
-            cleaned_path = os.path.dirname(cleaned_path)
-            app.logger.debug(f"Opening folder for non-.ipynb file: {cleaned_path}")
-        else:
-            app.logger.debug(f"Opening folder: {cleaned_path}")
+        elif cleaned_path.startswith('http://') or cleaned_path.startswith('https://'):
+            # URLの場合、拡張子があるかチェック
+            parsed_url = urllib.parse.urlparse(cleaned_path)
+            path = parsed_url.path
+            if os.path.splitext(path)[1]:  # 拡張子がある場合
+                # ファイル名を除いたディレクトリパスを取得
+                cleaned_path = os.path.dirname(cleaned_path)
+                app.logger.debug(f"Opening folder for URL with file: {cleaned_path}")
+            else:
+                # 拡張子がない場合はそのまま開く
+                app.logger.debug(f"Opening URL directly: {cleaned_path}")
+        # elif os.path.isfile(os.path.join(BASE_DIR, cleaned_path)):
+        #     cleaned_path = os.path.dirname(cleaned_path)
+        #     app.logger.debug(f"Opening folder for non-.ipynb file: {cleaned_path}")
+        # else:
+        #     app.logger.debug(f"Opening folder: {cleaned_path}")
         
         # JupyterのURLを構築
         # jupyter_url = f"{JUPYTER_BASE_URL}/{cleaned_path}"
@@ -645,7 +656,6 @@ def open_jupyter():
         # ブラウザでJupyterのURLを開く
         # URLをエンコード
         encoded_url = urllib.parse.quote(cleaned_path, safe=':/')  # safeに':'と'/'を指定して、これらの文字はエンコードしない
-
         # エンコードしたURLを開く
         webbrowser.open(encoded_url)
         # webbrowser.open(cleaned_path)

@@ -159,9 +159,9 @@
     <!-- ファイル情報バーをコンテナで囲む -->
     <div class="file-info-container">
         <div class="file-info">
-            <button onclick="openInCode()" title="Codeで開く"><i class="fas fa-edit"></i></button>
+            <!-- <button onclick="openInCode()" title="Codeで開く"><i class="fas fa-edit"></i></button>
             <button onclick="openFolder()" title="フォルダを開く"><i class="fas fa-folder-open"></i></button>
-            <button onclick="openJupyter()" title="Jupyterで開く"><i class="fas fa-book"></i></button>
+            <button onclick="openJupyter()" title="Jupyterで開く"><i class="fas fa-book"></i></button> -->
             <button onclick="showMindMap()" title="マインドマップを表示"><i class="fas fa-project-diagram"></i></button>
             <div class="size-input-container">
                 <label for="size-input">サイズ調整 (%): </label>
@@ -209,79 +209,79 @@
         }, 500);
     }
 
-    function openInCode() {
-        fetch('/open-in-code', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ path: '{{ full_path | trim }}' }),
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                // alert('ファイルがCodeで開かれました。');
-            } else {
-                alert('エラーが発生しました: ' + data.error);
-            }
-        })
-        .catch((error) => {
-            console.error('Error:', error);
-            alert('エラー発生しました。');
-        });
-    }
+    // function openInCode() {
+    //     fetch('/open-in-code', {
+    //         method: 'POST',
+    //         headers: {
+    //             'Content-Type': 'application/json',
+    //         },
+    //         body: JSON.stringify({ path: '{{ full_path | trim }}' }),
+    //     })
+    //     .then(response => response.json())
+    //     .then(data => {
+    //         if (data.success) {
+    //             // alert('ファイルがCodeで開かれました。');
+    //         } else {
+    //             alert('エラーが発生しました: ' + data.error);
+    //         }
+    //     })
+    //     .catch((error) => {
+    //         console.error('Error:', error);
+    //         alert('エラー発生しました。');
+    //     });
+    // }
 
-    function openFolder() {
-        var filePath = '{{ full_path | safe }}';  // サーバーから渡されたフルパスを使用
-        filePath = filePath.replace(/\\/g, '/');  // バックスラッシュをスラッシュに変換
+    // function openFolder() {
+    //     var filePath = '{{ full_path | safe }}';  // サーバーから渡されたフルパスを使用
+    //     filePath = filePath.replace(/\\/g, '/');  // バックスラッシュをスラッシュに変換
         
-        console.log("Sending file path:", filePath);  // デバッグ用
+    //     console.log("Sending file path:", filePath);  // デバッグ用
 
-        fetch('/open-folder', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ path: filePath }),
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                console.log('フォルダが開かれました。');
-            } else {
-                console.error('エラーが発生しました:', data.error);
-                alert('エラーが発生しました: ' + data.error);
-            }
-        })
-        .catch((error) => {
-            console.error('Error:', error);
-            alert('エラーが発生しました。');
-        });
-    }
+    //     fetch('/open-folder', {
+    //         method: 'POST',
+    //         headers: {
+    //             'Content-Type': 'application/json',
+    //         },
+    //         body: JSON.stringify({ path: filePath }),
+    //     })
+    //     .then(response => response.json())
+    //     .then(data => {
+    //         if (data.success) {
+    //             console.log('フォルダが開かれました。');
+    //         } else {
+    //             console.error('エラーが発生しました:', data.error);
+    //             alert('エラーが発生しました: ' + data.error);
+    //         }
+    //     })
+    //     .catch((error) => {
+    //         console.error('Error:', error);
+    //         alert('エラーが発生しました。');
+    //     });
+    // }
 
-    function openJupyter() {
-        const basePath = '{{ BASE_DIR }}' || '/Users/sudoupousei/000_work';  // BASE_DIRが空の場合のフォールバック
-        const filePath = '{{ full_path | trim }}';
-        console.log('BASE_DIR:', basePath);
-        console.log('Full path:', filePath);
+    // function openJupyter() {
+    //     const basePath = '{{ BASE_DIR }}' || '/Users/sudoupousei/000_work';  // BASE_DIRが空の場合のフォールバック
+    //     const filePath = '{{ full_path | trim }}';
+    //     console.log('BASE_DIR:', basePath);
+    //     console.log('Full path:', filePath);
         
-        // BASE_DIRの最後のディレクトリ名を取得
-        const baseDir = basePath.split('/').pop();
-        console.log('Base directory:', baseDir);
+    //     // BASE_DIRの最後のディレクトリ名を取得
+    //     const baseDir = basePath.split('/').pop();
+    //     console.log('Base directory:', baseDir);
         
-        let relativePath = '';
-        if (filePath.includes(baseDir)) {
-            relativePath = filePath.split(baseDir)[1].replace(/^\//, '');
-        } else {
-            relativePath = filePath.replace(basePath, '').replace(/^\//, '');
-        }
-        console.log('Relative path:', relativePath);
+    //     let relativePath = '';
+    //     if (filePath.includes(baseDir)) {
+    //         relativePath = filePath.split(baseDir)[1].replace(/^\//, '');
+    //     } else {
+    //         relativePath = filePath.replace(basePath, '').replace(/^\//, '');
+    //     }
+    //     console.log('Relative path:', relativePath);
         
-        const jupyterURL = 'http://localhost:8888/lab/tree/' + encodeURIComponent(relativePath);
-        console.log('Jupyter URL:', jupyterURL);
+    //     const jupyterURL = 'http://localhost:8888/lab/tree/' + encodeURIComponent(relativePath);
+    //     console.log('Jupyter URL:', jupyterURL);
         
-        window.open(jupyterURL, '_blank');
-    }
+    //     window.open(jupyterURL, '_blank');
+    // }
 
     // function showMindMap() {
     //     const filePath = '{{ full_path | trim }}';
