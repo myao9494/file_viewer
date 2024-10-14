@@ -183,7 +183,7 @@ def view_file(file_path):
         # JupyterのURLを構築
         jupyter_url = f"{JUPYTER_BASE_URL}/{relative_path}"
         cleaned_path = urllib.parse.unquote(jupyter_url)
-        cleaned_path = jupyter_url.replace('/viewer/', '/').replace('/viewer-main/', '/').replace('/file-viewer/', '/',1).replace('file_viewer-main/', '')
+        cleaned_path = jupyter_url.replace('/viewer/', '/').replace('/viewer-main/', '/').replace('/file_viewer/', '/',1).replace('file_viewer-main/', '')
         app.logger.info(f"{jupyter_url},{cleaned_path}")
         print(cleaned_path)
         # ブラウザでJupyterのURLを開く
@@ -319,7 +319,7 @@ def open_in_code2():
             # URLデコードを行う
             decoded_path = urllib.parse.unquote(file_path)
             normalized_path = normalize_path(decoded_path)
-            cleaned_path = normalized_path.replace('/viewer/', '/').replace('/viewer-main/', '/').replace('/file-viewer/', '/',1).replace('file_view-main/', '')
+            cleaned_path = normalized_path.replace('/viewer/', '/').replace('/viewer-main/', '/').replace('/file_viewer/', '/',1).replace('file_view-main/', '')
             
             target_path = os.path.join(BASE_DIR, cleaned_path)
             target_path = os.path.dirname(target_path) if os.path.isfile(target_path) else target_path
@@ -626,8 +626,8 @@ def open_jupyter():
         jupyter_url = urllib.parse.unquote(jupyter_url)
         jupyter_url = jupyter_url.replace("\\","/")
 
-        # 'file-viewer'を含まない相対パスを作成
-        cleaned_path = jupyter_url.replace('/viewer/', '/').replace('/viewer-main/', '/').replace('/file-viewer/', '/',1).replace('file_viewer-main/', '')
+        # 'file_viewer'を含まない相対パスを作成
+        cleaned_path = jupyter_url.replace('/viewer/', '/').replace('/viewer-main/', '/').replace('/file_viewer/', '/',1).replace('file_viewer-main/', '')
         app.logger.debug(f"Cleaned path: {cleaned_path}")
         
         if cleaned_path.endswith('.ipynb'):

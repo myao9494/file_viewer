@@ -194,7 +194,7 @@ function fixSvgPaths() {
 
 function processElement(element) {
     let href = element.getAttribute('xlink:href') || element.getAttribute('href');
-    if (href && !href.startsWith('data:')) {  // data: URLの場合は処理をスキップ
+    if (href && !href.startsWith('data:')) {
         // 引用符を取り除く
         href = href.replace(/^["']|["']$/g, '');
 
@@ -229,39 +229,40 @@ function processElement(element) {
             };
             element.removeAttribute('xlink:href');
             element.removeAttribute('href');
-            element.classList.add('clickable-element');
-        } else if (href.startsWith('/') || /^[A-Za-z]:/.test(href)) {
-            // 絶対パスの場合（Windowsのドライブレターを含む）
-            if (href.toLowerCase().startsWith(baseDirPath.toLowerCase())) {
-                // BASE_DIR内のパスの場合、view_fileエンドポイントを使用
-                const relativePath = href.slice(baseDirPath.length);
-                const encodedPath = relativePath.replace(/^\/+/, '').split('/').map(encodeURIComponent).join('/');
-                const newHref = `/view/${encodedPath}`;
-                setHref(element, newHref);
-            } else {
-                // BASE_DIR外の絶対パスの場合、open-local-fileエンドポイントを使用
-                const encodedPath = href.split('/').map(encodeURIComponent).join('/');
-                const newHref = `/open-local-file?path=${encodedPath}`;
+        } else {
+            // その他のパスの場合
+            if (href.startsWith('/') || /^[A-Za-z]:/.test(href) || !href.startsWith('http')) {
+                // 絶対パス、相対パス、ローカルパスの処理
+                const newHref = processPath(href, baseDirPath, currentDir);
                 setHref(element, newHref);
             }
-            element.classList.add('clickable-element');
-        } else if (!href.startsWith('http')) {
-            // 相対パスの場合
-            const fullPath = `${currentDir}/${href}`;
-            if (fullPath.toLowerCase().startsWith(baseDirPath.toLowerCase())) {
-                // BASE_DIR内のパスの場合、view_fileエンドポイントを使用
-                const relativePath = fullPath.slice(baseDirPath.length);
-                const encodedPath = relativePath.replace(/^\/+/, '').split('/').map(encodeURIComponent).join('/');
-                const newHref = `/view/${encodedPath}`;
-                setHref(element, newHref);
-            } else {
-                // BASE_DIR外のパスの場合、open-local-fileエンドポイントを使用
-                const encodedPath = fullPath.split('/').map(encodeURIComponent).join('/');
-                const newHref = `/open-local-file?path=${encodedPath}`;
-                setHref(element, newHref);
-            }
-            element.classList.add('clickable-element');
+            
+            // クリックイベントを追加
+            element.onclick = function(e) {
+                e.preventDefault();
+                window.open(element.getAttribute('xlink:href') || element.getAttribute('href'), '_blank');
+            };
         }
+        
+        element.classList.add('clickable-element');
+    }
+}
+
+function processPath(href, baseDirPath, currentDir) {
+    let fullPath = href;
+    if (!href.startsWith('/') && !/^[A-Za-z]:/.test(href)) {
+        fullPath = `${currentDir}/${href}`;
+    }
+    
+    if (fullPath.toLowerCase().startsWith(baseDirPath.toLowerCase())) {
+        // BASE_DIR内のパスの場合、view_fileエンドポイントを使用
+        const relativePath = fullPath.slice(baseDirPath.length);
+        const encodedPath = relativePath.replace(/^\/+/, '').split('/').map(encodeURIComponent).join('/');
+        return `/view/${encodedPath}`;
+    } else {
+        // BASE_DIR外のパスの場合、open-local-fileエンドポイントを使用
+        const encodedPath = fullPath.split('/').map(encodeURIComponent).join('/');
+        return `/open-local-file?path=${encodedPath}`;
     }
 }
 
