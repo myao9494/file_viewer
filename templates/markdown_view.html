@@ -12,21 +12,20 @@
     <!-- Markdown用のCSSファイルを読み込み -->
     <link rel="stylesheet" href="{{ url_for('static', filename='css/markdown_style.css') }}">
     <script>
-    // MathJax設定
-    MathJax = {
-        tex: {
-            // インライン数式の定義
-            inlineMath: [['$', '$'], ['\\(', '\\)']],
-            // ディスプレイ数式の定義
-            displayMath: [['$$', '$$'], ['\\[', '\\]']],
-            processEscapes: true,
-            processEnvironments: true
-        },
-        options: {
-            // MathJaxが無視するHTMLタグ
-            skipHtmlTags: ['script', 'noscript', 'style', 'textarea', 'pre']
+    document.addEventListener("DOMContentLoaded", function() {
+        if (typeof renderMathInElement === 'function') {
+            renderMathInElement(document.body, {
+                delimiters: [
+                    {left: "$$", right: "$$", display: true},
+                    {left: "$", right: "$", display: false},
+                    {left: "\\(", right: "\\)", display: false},
+                    {left: "\\[", right: "\\]", display: true}
+                ],
+                throwOnError: false,
+                strict: false
+            });
         }
-    };
+    });
     </script>
     <!-- MathJaxスクリプトの読み込み (ローカル版) -->
     <script id="MathJax-script" async src="{{ url_for('static', filename='js/tex-mml-chtml.js') }}"></script>
