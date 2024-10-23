@@ -153,6 +153,66 @@
         #markdown-content {
             transform-origin: 0 0;
         }
+
+        /* スクロール可能なコンテナのスタイルを更新 */
+        .scrollable-container {
+            width: 100%;
+            height: calc(100vh - 100px);
+            overflow: auto;
+            padding-right: 20px; /* 270pxから20pxに変更 */
+            position: relative;
+        }
+
+        /* マークダウンコンテナのスタイルを更新 */
+        #markdown-container {
+            position: relative;
+            width: 100%;
+            min-height: 100%;
+            overflow: visible; /* hiddenからvisibleに変更 */
+        }
+
+        #markdown-content {
+            transform-origin: 0 0;
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            min-height: 100%;
+        }
+
+        /* TOCの位置とスタイルを修正 */
+        #toc {
+            position: fixed;
+            right: 0;
+            top: 100px;
+            width: 250px;
+            height: calc(100vh - 120px);
+            overflow-y: auto;
+            background-color: white;
+            padding: 10px;
+            border-left: 1px solid #ddd;
+            z-index: 1000;
+            box-shadow: -2px 0 5px rgba(0, 0, 0, 0.1); /* 影を追加してTOCを目立たせる */
+        }
+        #toc ul {
+            list-style-type: none;
+            padding-left: 15px;
+        }
+        #toc li {
+            margin-bottom: 5px;
+        }
+        #toc a {
+            text-decoration: none;
+            color: #333;
+        }
+        #toc a:hover {
+            color: #007bff;
+        }
+        
+        /* メインコンテンツのマージン調整 */
+        #markdown-container {
+            margin-right: 270px; /* TOCの幅 + 余白 */
+        }
     </style>
 </head>
 <body>
@@ -172,10 +232,18 @@
         </div>
     </div>
     
-    <!-- 元のマークダウンコンテンツ表示部分 -->
-    <div id="markdown-container">
-        <div id="markdown-content" class="markdown-body">
-            {{ content|safe }}
+    <!-- Table of Contents -->
+    <div id="toc">
+        <h3>目次</h3>
+        <!-- ここにJavaScriptで目次を生成します -->
+    </div>
+
+    <!-- スクロール可能なコンテナを追加 -->
+    <div class="scrollable-container">
+        <div id="markdown-container">
+            <div id="markdown-content" class="markdown-body">
+                {{ content|safe }}
+            </div>
         </div>
     </div>
 
@@ -372,7 +440,7 @@
         sizeInput.value = 90;
         updateSize();
 
-        // コードブロックとインラインコードにコピーボタンを追加
+        // コードブロックとインラインコーにコピーボタンを追加
         var codeElements = document.querySelectorAll('.markdown-body pre, .markdown-body code');
         codeElements.forEach(function(element) {
             if (element.tagName === 'CODE' && element.parentElement.tagName === 'PRE') {
@@ -415,31 +483,54 @@
         let scale = 0.9; // 初期スケールを90%に設定
         const markdownContent = document.getElementById('markdown-content');
         const markdownContainer = document.getElementById('markdown-container');
+        const scrollableContainer = document.querySelector('.scrollable-container');
 
         function updateMarkdownContentSize() {
-            markdownContainer.style.width = `${window.innerWidth}px`;
-            markdownContainer.style.height = `${window.innerHeight}px`;
-            applyTransform();
+            const containerWidth = scrollableContainer.clientWidth - 270; // TOCの幅を考慮
+            const containerHeight = scrollableContainer.clientHeight;
+            
+            // コンテンツの実際の高さを取得（スケール考慮）
+            const contentHeight = markdownContent.scrollHeight / scale;
+            
+            // スケールに応じてコンテナのサイズを調整
+            markdownContainer.style.width = `${containerWidth}px`;
+            markdownContainer.style.height = `${Math.max(containerHeight, contentHeight * scale)}px`;
+            
+            // コンテンツのサイズを設定
+            markdownContent.style.width = `${containerWidth / scale}px`;
+            markdownContent.style.minHeight = `${contentHeight}px`;
         }
 
         function applyTransform() {
             markdownContent.style.transform = `scale(${scale})`;
             document.getElementById('size-input').value = Math.round(scale * 100);
+            
+            // スケーリング後にサイズを再計算
+            updateMarkdownContentSize();
         }
 
-        markdownContainer.addEventListener('wheel', function(e) {
+        // スクロールイベントハンドラを更新
+        scrollableContainer.addEventListener('wheel', function(e) {
             if (e.ctrlKey) {
                 e.preventDefault();
-                const zoomSensitivity = 0.03; // SVGと同じ感度に変更
+                const zoomSensitivity = 0.03;
                 const delta = e.deltaY > 0 ? -zoomSensitivity : zoomSensitivity;
-                scale = Math.min(Math.max(0.1, scale * (1 + delta)), 5); // 最大値を5に変更
+                const oldScale = scale;
+                scale = Math.min(Math.max(0.1, scale * (1 + delta)), 5);
+                
+                // マウス位置を基準にズーム
+                const rect = scrollableContainer.getBoundingClientRect();
+                const x = (e.clientX - rect.left) / oldScale;
+                const y = (e.clientY - rect.top) / oldScale;
+                
                 applyTransform();
+                
+                // スクロール位置を調整
+                const newX = x * scale;
+                const newY = y * scale;
+                scrollableContainer.scrollLeft += newX - (e.clientX - rect.left);
+                scrollableContainer.scrollTop += newY - (e.clientY - rect.top);
             }
-        });
-
-        document.getElementById('size-input').addEventListener('change', function(e) {
-            scale = e.target.value / 100;
-            applyTransform();
         });
 
         // 初期化時にMarkdownサイズを設定
@@ -493,8 +584,52 @@
         document.getElementById('size-input').addEventListener('change', function() {
             setTimeout(adjustImageSizes, 300); // Wait for font size change to take effect
         });
+
+        // Table of Contents 生成
+        function generateTOC() {
+            const toc = document.getElementById('toc');
+            const headings = document.querySelectorAll('.markdown-body h1, .markdown-body h2, .markdown-body h3');
+            const tocList = document.createElement('ul');
+
+            headings.forEach((heading, index) => {
+                const listItem = document.createElement('li');
+                const link = document.createElement('a');
+                const headingId = `heading-${index}`;
+
+                // 既存のIDがある場合はそれを使用
+                if (!heading.id) {
+                    heading.id = headingId;
+                }
+
+                link.textContent = heading.textContent;
+                link.href = `#${heading.id}`;
+                
+                // クリックイベントを追加
+                link.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    heading.scrollIntoView({ behavior: 'smooth' });
+                });
+                
+                listItem.appendChild(link);
+                tocList.appendChild(listItem);
+
+                // インデントの調整
+                if (heading.tagName === 'H2') {
+                    listItem.style.marginLeft = '10px';
+                } else if (heading.tagName === 'H3') {
+                    listItem.style.marginLeft = '20px';
+                }
+            });
+
+            // 既存の目次をクリアして新しい目次を追加
+            toc.innerHTML = '<h3>目次</h3>';
+            toc.appendChild(tocList);
+        }
+
+        generateTOC();
     });
     </script>
 </body>
 </html>
 {% endblock %}
+
