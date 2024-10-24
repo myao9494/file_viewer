@@ -28,6 +28,7 @@ from datetime import datetime
 if platform.system() == "Windows":
     import win32clipboard
     import PySimpleGUI as sg
+    import win32com.client
 
 
 app = Flask(__name__, static_folder='static')
@@ -370,7 +371,18 @@ def open_folder():
     
     try:
         # file_pathがファイルの場合は親ディレクトリを、ディレクトリの場合はそのまま使用
-        folder_path = os.path.dirname(file_path) if os.path.isfile(file_path) else file_path
+        if os.path.isfile(file_path):
+            # .lnkファイルの場合、リンク先を取得
+            if file_path.lower().endswith('.lnk') and platform.system() == "Windows":
+                shell = win32com.client.Dispatch("WScript.Shell")
+                shortcut = shell.CreateShortCut(file_path)
+                target_path = shortcut.Targetpath
+                folder_path = os.path.dirname(target_path) if os.path.isfile(target_path) else target_path
+            else:
+                folder_path = os.path.dirname(file_path)
+        else:
+            folder_path = file_path
+
         app.logger.info(f"開こうとしているfolder_path: {repr(folder_path)}")
         
         if os.path.exists(folder_path):
@@ -388,32 +400,6 @@ def open_folder():
     except Exception as e:
         app.logger.error(f"エラーが発生しました: {str(e)}")
         return jsonify({'success': False, 'error': str(e)})
-# @app.route('/open-folder', methods=['POST'])
-# def open_folder():
-#     data = request.json
-#     file_path = data.get('path')
-#     app.logger.info(f"受信したfile_path: {repr(file_path)}")
-    
-#     if not file_path:
-#         return jsonify({'success': False, 'error': 'ファイルパスが指定されていません。'})
-    
-#     try:
-#         folder_path = os.path.dirname(file_path)
-#         app.logger.info(f"開こうとしているfolder_path: {repr(folder_path)}")
-        
-#         if os.path.exists(folder_path):
-#             if IS_WINDOWS:
-#                 # Windowsの場合、バックスラッシュを使用
-#                 folder_path = folder_path.replace('/', '\\')
-#                 subprocess.Popen(['explorer', folder_path])
-#             else:
-#                 subprocess.Popen(['open', folder_path])
-#             return jsonify({'success': True})
-#         else:
-#             return jsonify({'success': False, 'error': f'フォルダが見つかりません: {folder_path}'})
-#     except Exception as e:
-#         app.logger.error(f"エラーが発生しました: {str(e)}")
-#         return jsonify({'success': False, 'error': str(e)})
 
 @app.route('/mindmap/<path:file_path>')
 def view_mindmap(file_path):
