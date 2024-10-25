@@ -978,6 +978,40 @@ def get_file_date(file_path):
 def get_folder_path(file_path):
     return normalize_path(os.path.dirname(file_path))
 
+@app.route('/html-to-markdown', methods=['POST'])
+def html_to_markdown():
+    html_content = request.json.get('html', '')
+    h = html2text.HTML2Text()
+    h.body_width = 0  # 行の折り返しを無効化
+    markdown_content = h.handle(html_content)
+    return markdown_content
+
+@app.route('/save-markdown', methods=['POST'])
+def save_markdown():
+    try:
+        content = request.json.get('content')
+        file_path = request.json.get('path')
+        
+        with open(file_path, 'w', encoding='utf-8') as f:
+            f.write(content)
+            
+        return jsonify({'success': True})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
+
+@app.route('/get-markdown-content', methods=['POST'])
+def get_markdown_content():
+    try:
+        file_path = request.json.get('path')
+        
+        # ファイルの内容を読み込む
+        with open(file_path, 'r', encoding='utf-8') as f:
+            content = f.read()
+            
+        return content
+    except Exception as e:
+        return str(e), 500
+
 if __name__ == '__main__':
     app.secret_key = 'your_secret_key_here'  # セッション用の秘密鍵
     # デバッグモードでアプリケーションを実行
