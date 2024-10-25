@@ -391,6 +391,14 @@ document.addEventListener('DOMContentLoaded', function() {
     if (filterBtn) {
         filterBtn.classList.add('active');
         applyFilter(initialFilter);  // フィルターを即時適用
+    } else {
+        // フィルターボタンが見つからない場合はデフォルトフィルターを適用
+        const defaultFilterBtn = document.querySelector(`.filter-btn[data-filter="${defaultFilter}"]`);
+        if (defaultFilterBtn) {
+            defaultFilterBtn.classList.add('active');
+            applyFilter(defaultFilter);
+            setFilterInURL(defaultFilter);
+        }
     }
     updateToggleFoldersButton();
 
