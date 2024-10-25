@@ -134,7 +134,7 @@
         <button type="submit">検索</button>
     </form>
     <div id="filter-options">
-        <button class="filter-btn active" data-filter="md+svg+csv+pdf+ipynb+py+docx+xlsx+pptx+lnk">よく使うもの</button>
+        <button class="filter-btn" data-filter="md+svg+csv+pdf+ipynb+py+docx+xlsx+pptx+lnk">よく使うもの</button>
         <button class="filter-btn" data-filter="md">MD</button>
         <button class="filter-btn" data-filter="svg">SVG</button>
         <button class="filter-btn" data-filter="csv">CSV</button>
@@ -180,17 +180,24 @@
 document.addEventListener('DOMContentLoaded', function() {
     console.log('DOMContentLoaded event fired');
 
-    // URLからフィルタ状態を取得する関数
+    // 初期フィルターの設定（HTMLのdata-filter属性から取得）
+    const defaultFilter = document.querySelector('.filter-btn').dataset.filter;
+    
+    // URLからフィルタ状態を取得する関数を修正
     function getFilterFromURL() {
         const urlParams = new URLSearchParams(window.location.search);
-        return urlParams.get('filter') || 'md+svg+csv+pdf+ipynb+py+docx+xlsx+pptx';
+        const urlFilter = urlParams.get('filter');
+        return urlFilter ? urlFilter.replace(/,/g, '+') : defaultFilter;
     }
 
-    // URLにフィルタ状態を設定する関数
+    // URLにフィルタ状態を設定する関数を修正
     function setFilterInURL(filter) {
         const url = new URL(window.location);
-        url.searchParams.set('filter', filter);
-        window.history.replaceState({}, '', url);
+        const newFilter = filter.replace(/\+/g, ',');
+        url.searchParams.set('filter', newFilter);
+        // URLSearchParamsによる自動エンコーディングを避けるため、直接文字列置換を行う
+        const newUrl = url.toString().replace(encodeURIComponent(newFilter), newFilter);
+        window.history.replaceState({}, '', newUrl);
     }
 
     // URLからフォルダ非表示状態を取得する関数
@@ -377,18 +384,15 @@ document.addEventListener('DOMContentLoaded', function() {
         applyDepthChange(this.value);
     });
 
-    // 初期表示時にフィルターとフォルダ非表示状態を適用
+    // 初期表示時にフィルターとフォルダ非表示状態を適用する部分を修正
     console.log('Applying initial filter and folder visibility');
     const initialFilter = getFilterFromURL();
     const filterBtn = document.querySelector(`.filter-btn[data-filter="${initialFilter}"]`);
     if (filterBtn) {
         filterBtn.classList.add('active');
-    } else {
-        // デフォルトのフィルターボタンをアクティブにする
-        document.querySelector('.filter-btn[data-filter="md+svg+csv+pdf+ipynb+py+docx+xlsx+pptx"]').classList.add('active');
+        applyFilter(initialFilter);  // フィルターを即時適用
     }
     updateToggleFoldersButton();
-    applyFilter(initialFilter);
 
     // クリップボードにコピーする機能
     window.copyToClipboard = function(elementId) {
@@ -718,3 +722,4 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 </script>
 {% endblock %}
+

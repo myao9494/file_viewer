@@ -123,30 +123,19 @@
 
         function updateHref() {
             if (currentPath.startsWith('/view/')) {
-                var filePath = currentPath.substring(6); // '/view/'の長さは6
-                if (filePath.includes('.')) {
-                    // ファイルを表示している場合、現在のディレクトリを表示
-                    var directoryPath = filePath.split('/').slice(0, -1).join('/');
-                    showDirectoryBtn.href = '/view/' + directoryPath;
+                var filePath = currentPath.substring(6);
+                if (filePath) {
+                    var parentPath = filePath.split('/').slice(0, -1).join('/');
+                    showDirectoryBtn.href = '/view/' + parentPath;
                 } else {
-                    // ディレクトリを表示している場合、現在のパスを維持
-                    showDirectoryBtn.href = currentPath;
+                    showDirectoryBtn.href = '/view';
                 }
             } else {
-                // '/view'以外のページの場合、ルートディレクトリに移動
                 showDirectoryBtn.href = '/view';
             }
         }
 
         updateHref();
-
-        showDirectoryBtn.addEventListener('click', function(event) {
-            if (currentPath.startsWith('/view/') && !currentPath.substring(6).includes('.')) {
-                event.preventDefault();
-                var customEvent = new Event('showDirectoryBtnClicked');
-                document.dispatchEvent(customEvent);
-            }
-        });
     });
 
     function openFromClipboard() {
@@ -294,7 +283,7 @@
         .then(response => response.json())
         .then(data => {
             if (data.success) {
-                console.log('Jupyterが新しいタブで開かれました。');
+                console.log('Jupyterが新しいタブで���かれました。');
             } else {
                 alert('エラーが発生しました: ' + data.error);
             }
