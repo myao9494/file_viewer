@@ -122,6 +122,28 @@ def view_file(file_path):
         app.logger.error(f"ファイルが存在しません: {full_path}")
         abort(404)
 
+    # .lnkファイルの場合
+    if full_path.lower().endswith('.lnk') and platform.system() == "Windows":
+        try:
+            shell = win32com.client.Dispatch("WScript.Shell")
+            shortcut = shell.CreateShortCut(full_path)
+            target_path = shortcut.Targetpath
+            
+            # リンク先が存在するか確認
+            if os.path.exists(target_path):
+                if os.path.isdir(target_path):
+                    # ディレクトリの場合はそのまま開く
+                    subprocess.Popen(['explorer', target_path])
+                else:
+                    # ファイルの場合はデフォルトアプリで開く
+                    os.startfile(target_path)
+                return jsonify({'success': True, 'message': 'ショートカットのリンク先を開きました'})
+            else:
+                return jsonify({'success': False, 'error': 'リンク先が見つかりません'})
+        except Exception as e:
+            app.logger.error(f"ショートカットを開く際にエラーが発生しました: {str(e)}")
+            return jsonify({'success': False, 'error': str(e)})
+
     # ディレクトリの場合
     if os.path.isdir(full_path):
         app.logger.info(f"ディレクトリを表示します: {full_path}")
@@ -372,14 +394,7 @@ def open_folder():
     try:
         # file_pathがファイルの場合は親ディレクトリを、ディレクトリの場合はそのまま使用
         if os.path.isfile(file_path):
-            # .lnkファイルの場合、リンク先を取得
-            if file_path.lower().endswith('.lnk') and platform.system() == "Windows":
-                shell = win32com.client.Dispatch("WScript.Shell")
-                shortcut = shell.CreateShortCut(file_path)
-                target_path = shortcut.Targetpath
-                folder_path = os.path.dirname(target_path) if os.path.isfile(target_path) else target_path
-            else:
-                folder_path = os.path.dirname(file_path)
+            folder_path = os.path.dirname(file_path)
         else:
             folder_path = file_path
 
