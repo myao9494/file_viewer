@@ -153,6 +153,13 @@ def view_file(file_path):
 
     # ファイルの場合
     file_extension = os.path.splitext(full_path)[1].lower()
+    base_name = os.path.basename(full_path).lower()
+    
+    # Excalidrawファイルの場合
+    if (file_extension == '.excalidraw' or 
+        base_name.endswith('.excalidraw.svg') or 
+        base_name.endswith('.excalidraw.png')):
+        return excalidraw(file_path)
     
     # MIMEタイプを取得
     mime_type, _ = mimetypes.guess_type(full_path)
@@ -1011,6 +1018,70 @@ def get_markdown_content():
         return content
     except Exception as e:
         return str(e), 500
+
+@app.route('/excalidraw/<path:file_path>')
+def excalidraw(file_path):
+    """
+    Excalidrawで図を作成/編集するためのページを表示する
+
+    Args:
+        file_path (str): 処理するファイルのパス
+
+    Returns:
+        str: レンダリングされたHTMLテンプレート
+    """
+    full_path = normalize_path(os.path.join(BASE_DIR, file_path))
+    if not os.path.exists(os.path.dirname(full_path)):
+        abort(404)
+        
+    current_item = f"Excalidraw - {os.path.basename(file_path)}"
+    return render_template('excalidraw.html', 
+                         file_path=file_path, 
+                         full_path=full_path, 
+                         current_item=current_item)
+
+@app.route('/create-excalidraw', methods=['POST'])
+def create_excalidraw():
+    """
+    Excalidrawファイルを作成するエンドポイント
+    """
+    try:
+        data = request.json
+        directory = data.get('directory', '')
+        filename = data.get('filename', '')
+        
+        # ディレクトリパスを構築
+        dir_path = os.path.join(BASE_DIR, directory)
+        file_path = os.path.join(dir_path, filename)
+        
+        # ディレクトリが存在しない場合は作成
+        os.makedirs(dir_path, exist_ok=True)
+        
+        # ファイルが存在しない場合のみ作成
+        if not os.path.exists(file_path):
+            # 空のSVGファイルを作成
+            with open(file_path, 'w', encoding='utf-8') as f:
+                f.write('')
+        
+        # 相対パスを返す
+        relative_path = os.path.relpath(file_path, BASE_DIR)
+        normalized_path = normalize_path(relative_path)
+        
+        return jsonify({
+            'success': True,
+            'file_path': normalized_path,
+            'full_path': normalize_path(file_path)
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        })
+
+@app.route('/excalidraw-memo')
+def excalidraw_memo():
+    return render_template('excalidraw_memo.html')
 
 if __name__ == '__main__':
     app.secret_key = 'your_secret_key_here'  # セッション用の秘密鍵

@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+
+{% block head %}
+<script src="https://unpkg.com/react@18.2.0/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/react-dom@18.2.0/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@excalidraw/excalidraw@0.17.3/dist/excalidraw.production.min.js"></script>
+<style>
+    .excalidraw-wrapper {
+        height: calc(100vh - 50px);
+        margin-top: 10px;
+    }
+    #excalidraw-container {
+        height: 100%;
+    }
+</style>
+{% endblock %}
+
+{% block folder_path %}
+<div class="folder-path">
+    <span title="{{ full_path }}">{{ full_path }}</span>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="excalidraw-wrapper">
+    <div id="excalidraw-container"></div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', async () => {
+        // フォーカスを設定してからクリップボードにコピー
+        window.focus();
+        setTimeout(async () => {
+            try {
+                await navigator.clipboard.writeText('{{ full_path }}');
+                console.log('パスをクリップボードにコピーしました');
+            } catch (err) {
+                console.error('クリップボードへのコピーに失敗しました:', err);
+            }
+        }, 500);
+
+        // Excalidrawの初期化
+        const App = () => {
+            const excalidrawRef = React.useRef(null);
+            
+            return React.createElement(window.ExcalidrawLib.Excalidraw, {
+                ref: excalidrawRef,
+                onChange: (elements, state) => {
+                    console.log("Elements:", elements, "State:", state);
+                },
+                initialData: {
+                    elements: [],
+                    appState: {
+                        viewBackgroundColor: '#ffffff'
+                    }
+                }
+            });
+        };
+
+        const excalidrawContainer = document.getElementById('excalidraw-container');
+        const waitForExcalidraw = () => {
+            if (window.ExcalidrawLib) {
+                ReactDOM.render(React.createElement(App), excalidrawContainer);
+
+                // ファイル選択ダイアログを自動的に表示
+                setTimeout(() => {
+                    const openFileButton = excalidrawContainer.querySelector('button[aria-label="Open"]');
+                    if (openFileButton) {
+                        openFileButton.click();
+                    }
+                }, 2000);
+            } else {
+                setTimeout(waitForExcalidraw, 100);
+            }
+        };
+
+        waitForExcalidraw();
+    });
+</script>
+{% endblock %}

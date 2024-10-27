@@ -96,6 +96,13 @@
             <button id="openJupyterBtn" title="Jupyterで開く" onclick="openJupyter()">
                 <i class="fas fa-book"></i>
             </button>
+            <button id="openExcalidrawBtn" title="Excalidrawで開く" onclick="openExcalidraw()">
+                <i class="fas fa-draw-polygon"></i>
+            </button>
+            <!-- 新しく追加するメモ用ボタン -->
+            <a href="/excalidraw-memo" title="Excalidraw Memo" class="top-button">
+                <i class="fas fa-sticky-note"></i>
+            </a>
         </div>
         {% block folder_path %}{% endblock %}
     </div>
@@ -196,7 +203,7 @@
             // ファイルの場合は直接ダウンロード
             window.location.href = currentPath.replace('/view/', '/download/');
         } else {
-            // フォルダの場合はアラートを表示
+            // フォルダ場合はアラートを表示
             if (confirm('これはフォルダです。ZIPファイルとしてダウンロードしますか？')) {
                 window.location.href = currentPath.replace('/view/', '/download-zip/');
             }
@@ -283,7 +290,7 @@
         .then(response => response.json())
         .then(data => {
             if (data.success) {
-                console.log('Jupyterが新しいタブで���かれました。');
+                console.log('Jupyterが新しいタブでかれました。');
             } else {
                 alert('エラーが発生しました: ' + data.error);
             }
@@ -292,6 +299,46 @@
             console.error('Error:', error);
             alert('エラーが発生しました。');
         });
+    }
+
+    function openExcalidraw() {
+        const currentPath = window.location.pathname;
+        const currentDir = currentPath.startsWith('/view/') ? 
+            currentPath.substring(6) : '';
+
+        // ファイル名を入力するダイアログを表示
+        const fileName = prompt('新しい図の名前を入力してください（.excalidraw.svg は自動的に追加されます）:');
+        
+        if (fileName) {
+            // 拡張子を追加
+            const fullFileName = fileName.endsWith('.excalidraw.svg') ? 
+                fileName : `${fileName}.excalidraw.svg`;
+                
+            // サーバーにファイル作成をリクエスト
+            fetch('/create-excalidraw', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    directory: currentDir,
+                    filename: fullFileName
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // 作成されたファイルのExcalidrawページに移動
+                    window.location.href = `/excalidraw/${data.file_path}`;
+                } else {
+                    alert('エラーが発生しました: ' + data.error);
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('エラーが発生しました。');
+            });
+        }
     }
     </script>
     {% block scripts %}{% endblock %}

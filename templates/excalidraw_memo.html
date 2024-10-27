@@ -1,0 +1,291 @@
+{% extends "base.html" %}
+
+{% block title %}WIP Board{% endblock %}
+
+{% block head %}
+<!-- <script src="https://unpkg.com/react@16.14.0/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/react-dom@16.14.0/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@excalidraw/excalidraw@0.12.0/dist/excalidraw.production.min.js"></script> -->
+<!-- CDNのスクリプトを以下のローカルファイルに置き換え -->
+<script src="{{ url_for('static', filename='js/react.production.min.js') }}"></script>
+<script src="{{ url_for('static', filename='js/react-dom.production.min.js') }}"></script>
+<script src="{{ url_for('static', filename='js/excalidraw.production.min.js') }}"></script>
+
+<!-- フォントのプリロード追加 -->
+<link rel="preload" href="{{ url_for('static', filename='fonts/Virgil.woff2') }}" as="font" type="font/woff2" crossorigin="anonymous">
+<link rel="preload" href="{{ url_for('static', filename='fonts/Cascadia.woff2') }}" as="font" type="font/woff2" crossorigin="anonymous">
+
+<style>
+    .excalidraw-wrapper {
+        height: calc(100vh - 50px);
+        margin-top: 10px;
+    }
+    #excalidraw-container {
+        height: 100%;
+    }
+    .shortcuts-help {
+        position: fixed;
+        bottom: 10px;
+        right: 10px;
+        background: rgba(255, 255, 255, 0.9);
+        padding: 10px;
+        border-radius: 5px;
+        font-size: 12px;
+        z-index: 1000;
+    }
+
+    /* フォント定義を追加 */
+    @font-face {
+        font-family: "Virgil";
+        src: url("{{ url_for('static', filename='fonts/Virgil.woff2') }}") format("woff2");
+        font-display: swap;
+    }
+    
+    @font-face {
+        font-family: "Cascadia";
+        src: url("{{ url_for('static', filename='fonts/Cascadia.woff2') }}") format("woff2");
+        font-display: swap;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="excalidraw-wrapper">
+    <div id="excalidraw-container"></div>
+</div>
+<div class="shortcuts-help">
+    ショートカット:<br>
+    N: 新規付箋<br>
+    T: テキスト<br>
+    R: 四角形<br>
+    L: ライン<br>
+    W: リンク追加
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', async () => {
+        const excalidrawContainer = document.getElementById('excalidraw-container');
+
+        const App = () => {
+            const excalidrawRef = React.useRef(null);
+            const [elements, setElements] = React.useState(() => {
+                const saved = localStorage.getItem('wip-board');
+                if (saved) {
+                    try {
+                        const parsed = JSON.parse(saved);
+                        return parsed.elements || [];
+                    } catch (e) {
+                        console.error('Failed to parse saved data:', e);
+                        return [];
+                    }
+                }
+                return [];
+            });
+
+            const createStickyNote = () => {
+                const centerX = window.innerWidth / 3;
+                const centerY = window.innerHeight / 3;
+                
+                const groupId = Math.random().toString(36).substr(2, 9);
+                const textId = Math.random().toString(36).substr(2, 9);
+                
+                // 付箋（四角形）の作成
+                const stickyNote = {
+                    id: Math.random().toString(36).substr(2, 9),
+                    type: "rectangle",
+                    x: centerX,
+                    y: centerY,
+                    width: 200,
+                    height: 150,
+                    angle: 0,
+                    strokeColor: "#1e1e1e",
+                    backgroundColor: "#fff3b0",
+                    fillStyle: "solid",
+                    strokeWidth: 2,
+                    strokeStyle: "solid",
+                    roughness: 0,
+                    opacity: 100,
+                    groupIds: [groupId],
+                    frameId: null,
+                    roundness: null,
+                    seed: Math.floor(Math.random() * 2000),
+                    version: 1,
+                    versionNonce: Math.floor(Math.random() * 1000000),
+                    isDeleted: false,
+                    boundElements: null,
+                    updated: Date.now(),
+                    link: null,
+                    locked: false,
+                    customData: {},
+                    points: [],
+                    baseline: 0,
+                    containerId: null,
+                    originalText: "",
+                    scale: [1, 1],
+                    boundElements: [{ type: "text", id: textId }]
+                };
+
+                // テキストの作成
+                const text = {
+                    id: textId,
+                    type: "text",
+                    x: centerX + 20,
+                    y: centerY + 20,
+                    width: 160,  // 付箋より少し小さめに設定
+                    height: 60,  // 付箋より少し小さめに設定
+                    angle: 0,
+                    strokeColor: "#1e1e1e",
+                    backgroundColor: "transparent",
+                    fillStyle: "solid",
+                    strokeWidth: 1,
+                    strokeStyle: "solid",
+                    roughness: 0,
+                    opacity: 100,
+                    groupIds: [groupId],
+                    frameId: null,
+                    roundness: null,
+                    seed: Math.floor(Math.random() * 2000),
+                    version: 1,
+                    versionNonce: Math.floor(Math.random() * 1000000),
+                    isDeleted: false,
+                    boundElements: null,
+                    updated: Date.now(),
+                    link: null,
+                    locked: false,
+                    text: "",  // 空のテキストから開始
+                    fontSize: 16,     // フォントサイズを小さくする
+                    fontFamily: 1,
+                    textAlign: "left",
+                    verticalAlign: "top",
+                    baseline: 22,
+                    containerId: stickyNote.id,  // 付箋に紐付ける
+                    scale: [1, 1],
+                    groupIds: [groupId],
+                    text: "",  // 空のテキストから開始
+                    originalText: "",
+                    wrapped: true,    // テキストの自動改行を有効にする
+                };
+
+                return [stickyNote, text];
+            };
+
+            React.useEffect(() => {
+                const handleKeyDown = async (event) => {
+                    if (!excalidrawRef.current) return;
+
+                    const isTextEditing = excalidrawRef.current.getAppState().editingElement !== null;
+                    const selectedElements = excalidrawRef.current.getSceneElements().filter(
+                        element => excalidrawRef.current.getAppState().selectedElementIds[element.id]
+                    );
+                    
+                    if ((event.key === 'n' || event.key === 'N') && !isTextEditing) {
+                        event.preventDefault();
+                        
+                        const newElements = createStickyNote();
+                        const updatedElements = [...elements, ...newElements];
+                        
+                        setElements(updatedElements);
+                        
+                        // テキスト要素を選択状態にする
+                        excalidrawRef.current.updateScene({
+                            elements: updatedElements,
+                            appState: {
+                                ...excalidrawRef.current.getAppState(),
+                                selectedElementIds: {
+                                    [newElements[1].id]: true  // テキスト要素のIDを選択
+                                },
+                                currentTool: "text"  // キストツールを選択
+                            }
+                        });
+
+                        // テキスト編集モードをアクティブにする
+                        setTimeout(() => {
+                            excalidrawRef.current.setActiveTool({ type: "text" });
+                            excalidrawRef.current.startTextEditing({
+                                elementId: newElements[1].id,
+                                selectedElementIds: { [newElements[1].id]: true }
+                            });
+                        }, 100);
+                    }
+                    
+                    // リンク追加機能のキーを 'w' に変更
+                    if ((event.key === 'w' || event.key === 'W') && !isTextEditing && selectedElements.length > 0) {
+                        event.preventDefault();
+                        
+                        const url = prompt('URLを入力してください:');
+                        if (url) {
+                            const updatedElements = excalidrawRef.current.getSceneElements().map(element => {
+                                if (selectedElements.find(selected => selected.id === element.id)) {
+                                    return {
+                                        ...element,
+                                        link: url
+                                    };
+                                }
+                                return element;
+                            });
+                            
+                            setElements(updatedElements);
+                            excalidrawRef.current.updateScene({
+                                elements: updatedElements
+                            });
+                        }
+                    }
+                };
+
+                window.addEventListener('keydown', handleKeyDown);
+                return () => window.removeEventListener('keydown', handleKeyDown);
+            }, [elements]);
+
+            const onSave = (els, state) => {
+                setElements(els);
+                localStorage.setItem('wip-board', JSON.stringify({
+                    elements: els,
+                    appState: state
+                }));
+            };
+
+            return React.createElement(ExcalidrawLib.Excalidraw, {
+                ref: excalidrawRef,
+                initialData: {
+                    elements: elements,
+                    appState: {
+                        viewBackgroundColor: '#ffffff',
+                        currentItemFontFamily: 1,
+                        gridSize: 20,
+                        theme: 'light',
+                        defaultFontSize: 20,
+                        defaultTextAlign: "left",
+                        currentTool: "text",
+                        showLinkIcon: false  // リンクアイコンを非表示にする設定を追加
+                    }
+                },
+                onChange: onSave,
+                onCollabButtonClick: () => {},
+                viewModeEnabled: false,
+                zenModeEnabled: false,
+                gridModeEnabled: true,
+                theme: 'light'
+            });
+        };
+
+        const waitForExcalidraw = () => {
+            if (window.ExcalidrawLib) {
+                ReactDOM.render(React.createElement(App), excalidrawContainer);
+            } else {
+                setTimeout(waitForExcalidraw, 100);
+            }
+        };
+
+        waitForExcalidraw();
+    });
+</script>
+
+<script>
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('/static/js/sw.js');
+    });
+  }
+</script>
+
+{% endblock %}
