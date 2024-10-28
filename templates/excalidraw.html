@@ -1,9 +1,12 @@
 {% extends "base.html" %}
 
 {% block head %}
-<script src="https://unpkg.com/react@18.2.0/umd/react.production.min.js"></script>
+<!-- <script src="https://unpkg.com/react@18.2.0/umd/react.production.min.js"></script>
 <script src="https://unpkg.com/react-dom@18.2.0/umd/react-dom.production.min.js"></script>
-<script src="https://unpkg.com/@excalidraw/excalidraw@0.17.3/dist/excalidraw.production.min.js"></script>
+<script src="https://unpkg.com/@excalidraw/excalidraw@0.17.3/dist/excalidraw.production.min.js"></script> -->
+<script src="{{ url_for('static', filename='js/react.production.min.js') }}"></script>
+<script src="{{ url_for('static', filename='js/react-dom.production.min.js') }}"></script>
+<script src="{{ url_for('static', filename='js/excalidraw.production.min.js') }}"></script>
 <style>
     .excalidraw-wrapper {
         height: calc(100vh - 50px);
@@ -11,6 +14,18 @@
     }
     #excalidraw-container {
         height: 100%;
+    }
+    @font-face {
+        font-family: "Virgil";
+        src: url("{{ url_for('static', filename='fonts/Virgil.woff2') }}");
+    }
+    @font-face {
+        font-family: "Cascadia";
+        src: url("{{ url_for('static', filename='fonts/Cascadia.woff2') }}");
+    }
+    @font-face {
+        font-family: "Assistant";
+        src: url("{{ url_for('static', filename='fonts/Assistant-Regular.woff2') }}");
     }
 </style>
 {% endblock %}

@@ -12,7 +12,7 @@ from utils.csv_renderer import render_csv
 import mimetypes
 import subprocess
 from markdown import markdown
-# import json
+import json
 import html
 # import os.path
 import webbrowser
@@ -32,6 +32,9 @@ if platform.system() == "Windows":
 
 
 app = Flask(__name__, static_folder='static')
+
+# 以下を追加
+app.config['STATIC_URL_PATH'] = '/static'
 
 # OSの種類を判別
 IS_WINDOWS = platform.system() == 'Windows'
@@ -1059,10 +1062,33 @@ def create_excalidraw():
         
         # ファイルが存在しない場合のみ作成
         if not os.path.exists(file_path):
-            # 空のSVGファイルを作成
+            # 空の辞書を定義
+            empty_data = """
+            <svg version="1.1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" width="20" height="20">
+            <!-- svg-source:excalidraw -->
+            <!-- payload-type:application/vnd.excalidraw+json --><!-- payload-version:2 --><!-- payload-start -->eyJ2ZXJzaW9uIjoiMSIsImVuY29kaW5nIjoiYnN0cmluZyIsImNvbXByZXNzZWQiOnRydWUsImVuY29kZWQiOiJ4nEWOMVx1MDAwYsIwXHUwMDEwhff+ilx1MDAxMldtwbEggu4uXHUwMDFkxeFIznqYNCG5tGrpfzeJgzdcdTAwMWO871x1MDAxZe/dUtW14LdD0dVcdTAwMDJfXHUwMDEyNClcdTAwMGaz2GY+oVx1MDAwZmTHdNpcdTAwMTdcdTAwMWRs9LI4XHUwMDFmzC50bWvAP5GdXHUwMDA2ic1EIYJcdTAwMGVcdTAwMWNcdTAwMTXZRlrTXHUwMDEyo1x0x7wvYPDgrFHsm3/JXHUwMDBlXHUwMDE1sfW/LtRocOSQ0q+3QsC5noFz35J0XCKDJ9XTJ5Mxar390YlwPoF8XHUwMDBl3sZRna1OkenFzb2MSKa15N1JY45f1mr9XHUwMDAy4lxcTtsifQ==<!-- payload-end -->
+            <defs>
+                <style class="style-fonts">
+                @font-face {
+                    font-family: "Virgil";
+                    src: url("https://file%2B.vscode-resource.vscode-cdn.net/Users/sudoupousei/.vscode/extensions/pomdtr.excalidraw-editor-3.7.4/public//dist/excalidraw-assets/Virgil.woff2");
+                }
+                @font-face {
+                    font-family: "Cascadia";
+                    src: url("https://file%2B.vscode-resource.vscode-cdn.net/Users/sudoupousei/.vscode/extensions/pomdtr.excalidraw-editor-3.7.4/public//dist/excalidraw-assets/Cascadia.woff2");
+                }
+                @font-face {
+                    font-family: "Assistant";
+                    src: url("https://file%2B.vscode-resource.vscode-cdn.net/Users/sudoupousei/.vscode/extensions/pomdtr.excalidraw-editor-3.7.4/public//dist/excalidraw-assets/Assistant-Regular.woff2");
+                }
+                </style>
+                
+            </defs>
+            <rect x="0" y="0" width="20" height="20" fill="#ffffff"></rect></svg>
+            """
             with open(file_path, 'w', encoding='utf-8') as f:
-                f.write('')
-        
+                json.dump(empty_data, f)
+                
         # 相対パスを返す
         relative_path = os.path.relpath(file_path, BASE_DIR)
         normalized_path = normalize_path(relative_path)
