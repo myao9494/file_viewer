@@ -4,9 +4,21 @@
 <!-- <script src="https://unpkg.com/react@18.2.0/umd/react.production.min.js"></script>
 <script src="https://unpkg.com/react-dom@18.2.0/umd/react-dom.production.min.js"></script>
 <script src="https://unpkg.com/@excalidraw/excalidraw@0.17.3/dist/excalidraw.production.min.js"></script> -->
+<!-- <script src="{{ url_for('static', filename='js/react.production.min.js') }}"></script>
+<script src="{{ url_for('static', filename='js/react-dom.production.min.js') }}"></script>
+<script src="{{ url_for('static', filename='js/excalidraw.production.min.js') }}"></script> -->
+<!-- アセットファイルのパスをローカルに変更 -->
 <script src="{{ url_for('static', filename='js/react.production.min.js') }}"></script>
 <script src="{{ url_for('static', filename='js/react-dom.production.min.js') }}"></script>
 <script src="{{ url_for('static', filename='js/excalidraw.production.min.js') }}"></script>
+<script src="{{ url_for('static', filename='js/excalidraw-assets/vendor-677e88ca78c86bddf13d.js') }}"></script>
+<!-- 他の必要なアセットファイルも同様に -->
+
+<!-- フォントの読み込みを確実にする -->
+<link rel="preload" href="{{ url_for('static', filename='fonts/Assistant-Regular.woff2') }}" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="{{ url_for('static', filename='fonts/Assistant-Medium.woff2') }}" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="{{ url_for('static', filename='fonts/Assistant-Bold.woff2') }}" as="font" type="font/woff2" crossorigin>
+
 <style>
     .excalidraw-wrapper {
         height: calc(100vh - 50px);
