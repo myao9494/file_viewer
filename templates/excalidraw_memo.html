@@ -20,15 +20,18 @@
 
 <style>
     .excalidraw-wrapper {
-        height: calc(100vh - 50px);
-        margin-top: 10px;
+        height: 98vh;
+        margin-top: 0;
+    }
+    .container {
+        padding-top: 0 !important;
     }
     #excalidraw-container {
         height: 100%;
     }
     .shortcuts-help {
         position: fixed;
-        bottom: 10px;
+        bottom: 23px;
         right: 10px;
         background: rgba(255, 255, 255, 0.9);
         padding: 10px;
@@ -78,6 +81,16 @@
             clearTimeout(timeout);
             timeout = setTimeout(later, wait);
         };
+    }
+
+    // マウス位置を追跡する変数を追加
+    let mouseX = window.innerWidth / 3;
+    let mouseY = window.innerHeight / 3;
+
+    // マウス位置を更新する関数を追加
+    function updateMousePosition(e) {
+        mouseX = e.clientX;
+        mouseY = e.clientY;
     }
 
     document.addEventListener('DOMContentLoaded', async () => {
@@ -167,18 +180,32 @@
             }, []);
 
             const createStickyNote = () => {
-                const centerX = window.innerWidth / 3;
-                const centerY = window.innerHeight / 3;
-                
                 const groupId = Math.random().toString(36).substr(2, 9);
                 const textId = Math.random().toString(36).substr(2, 9);
                 
-                // 付箋（四角形）の作成
+                // ビューポート座標の計算を修正
+                let x, y;
+                if (excalidrawRef.current) {
+                    const appState = excalidrawRef.current.getAppState();
+                    const zoom = appState.zoom?.value || 1;
+                    
+                    // スクロール位置とズームを考慮した座標計算
+                    x = (mouseX + appState.scrollX) / zoom;
+                    y = (mouseY + appState.scrollY) / zoom;
+                    
+                    // 付箋のサイズの半分をオフセット
+                    x -= 100;
+                    y -= 75;
+                } else {
+                    x = mouseX - 100;
+                    y = mouseY - 75;
+                }
+
                 const stickyNote = {
                     id: Math.random().toString(36).substr(2, 9),
                     type: "rectangle",
-                    x: centerX,
-                    y: centerY,
+                    x: x,
+                    y: y,
                     width: 200,
                     height: 150,
                     angle: 0,
@@ -213,10 +240,10 @@
                 const text = {
                     id: textId,
                     type: "text",
-                    x: centerX + 20,
-                    y: centerY + 20,
-                    width: 160,  // 付箋より少し小さめに設定
-                    height: 60,  // 付箋より少し小さめに設定
+                    x: x + 10, // マージンを10pxに調整
+                    y: y + 10, // マージンを10pxに調整
+                    width: 180,  // 付箋の幅に合わせて調整
+                    height: 130, // 付箋の高さに合わせて調整
                     angle: 0,
                     strokeColor: "#1e1e1e",
                     backgroundColor: "transparent",
@@ -254,7 +281,27 @@
             };
 
             React.useEffect(() => {
-                const handleKeyDown = async (event) => {
+                const handleKeyDown = (event) => {
+                    // 入力中は無視
+                    if (event.target.tagName.toLowerCase() === 'input' || 
+                        event.target.tagName.toLowerCase() === 'textarea') {
+                        return;
+                    }
+
+                    // G でグリッドの表示/非表示を切り替え
+                    if (event.key.toLowerCase() === 'g') {
+                        event.preventDefault();
+                        if (excalidrawRef.current) {
+                            const appState = excalidrawRef.current.getAppState();
+                            excalidrawRef.current.updateScene({
+                                appState: {
+                                    ...appState,
+                                    gridSize: appState.gridSize ? null : 20,
+                                }
+                            });
+                        }
+                    }
+
                     if (!excalidrawRef.current) return;
 
                     const isTextEditing = excalidrawRef.current.getAppState().editingElement !== null;
@@ -324,7 +371,7 @@
                 ref: excalidrawRef,
                 initialData: {
                     elements: elements,
-                    files: files, // ファイルデータを初期データとして渡す
+                    files: files,
                     appState: {
                         viewBackgroundColor: '#ffffff',
                         currentItemFontFamily: 1,
@@ -333,14 +380,14 @@
                         defaultFontSize: 20,
                         defaultTextAlign: "left",
                         currentTool: "text",
-                        showLinkIcon: false  // リンクアイコンを非表示にする設定を追加
+                        showLinkIcon: false
                     }
                 },
                 onChange: onChange,
                 onCollabButtonClick: () => {},
                 viewModeEnabled: false,
                 zenModeEnabled: false,
-                gridModeEnabled: true,
+                gridModeEnabled: false,
                 theme: 'light'
             });
         };
@@ -354,6 +401,9 @@
         };
 
         waitForExcalidraw();
+
+        // マウス移動イベントリスナーを追加
+        document.addEventListener('mousemove', updateMousePosition);
     });
 </script>
 
