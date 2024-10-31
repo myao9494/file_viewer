@@ -5,11 +5,10 @@
 {% block head %}
 <!-- <script src="https://unpkg.com/react@16.14.0/umd/react.production.min.js"></script>
 <script src="https://unpkg.com/react-dom@16.14.0/umd/react-dom.production.min.js"></script>
-<script src="https://unpkg.com/@excalidraw/excalidraw@0.12.0/dist/excalidraw.production.min.js"></script> -->
-<!-- CDNのスクリプトを以下のローカルファイルに置き換え -->
-<script src="{{ url_for('static', filename='js/react.production.min.js') }}"></script>
-<script src="{{ url_for('static', filename='js/react-dom.production.min.js') }}"></script>
-<script src="{{ url_for('static', filename='js/excalidraw.production.min.js') }}"></script>
+<script src="https://unpkg.com/@excalidraw/excalidraw@0.12.0/dist/excalidraw.production.min.js"></script> --> -->
+<script src="{{ url_for('static', filename='js/react.production.min-16.14.0.js') }}"></script>
+<script src="{{ url_for('static', filename='js/react-dom.production.min-16.14.0.js') }}"></script>
+<script src="{{ url_for('static', filename='js/excalidraw.production.min-0.12.0.js') }}"></script>
 
 <!-- フォントのプリロード追加 -->
 <link rel="preload" href="{{ url_for('static', filename='fonts/Virgil.woff2') }}" as="font" type="font/woff2" crossorigin="anonymous">

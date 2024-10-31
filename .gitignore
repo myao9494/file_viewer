@@ -5,3 +5,5 @@ static/js/mathjax/
 markmap_sample/
 dldraw_build/
 .DS_Store
+*.excalidraw.svg
+*.excalidraw

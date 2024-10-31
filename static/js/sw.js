@@ -1,9 +1,9 @@
-const CACHE_NAME = 'excalidraw-offline-v1';
+const CACHE_NAME = 'excalidraw-memo-v1';
 const urlsToCache = [
   '/',
-  '/static/js/react.production.min.js',
-  '/static/js/react-dom.production.min.js',
-  '/static/js/excalidraw.production.min.js',
+  '/static/js/react.production.min-16.14.0.js',
+  '/static/js/react-dom.production.min-16.14.0.js',
+  '/static/js/excalidraw.production.min-0.12.0.js',
   '/static/fonts/Virgil.woff2',
   '/static/fonts/Cascadia.woff2'
 ];

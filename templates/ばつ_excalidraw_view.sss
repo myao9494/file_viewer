@@ -1,0 +1,164 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="excalidraw-container">
+    <div id="error-message" style="display: none; color: red; padding: 10px;"></div>
+    <div id="debug-info" style="display: none; color: blue; padding: 10px;"></div>
+    <div id="excalidraw-wrapper"></div>
+</div>
+
+<!-- React と ReactDOM を追加 -->
+<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+
+<!-- Excalidraw -->
+<script src="https://unpkg.com/@excalidraw/excalidraw@0.15.2/dist/excalidraw.production.min.js"></script>
+
+<!-- browser-fs-access -->
+<script src="https://unpkg.com/browser-fs-access@0.31.0/dist/index.js"></script>
+
+<script>
+const App = () => {
+    const excalidrawRef = React.useRef(null);
+    const [errorMessage, setErrorMessage] = React.useState('');
+    const [debugInfo, setDebugInfo] = React.useState('');
+
+    React.useEffect(() => {
+        const loadFile = async () => {
+            try {
+                const filePath = '{{ file_path }}';
+                setDebugInfo(`Loading file from: ${filePath}`);
+                
+                const response = await fetch(`/raw/${filePath}`);
+                const content = await response.text();
+                const sceneData = JSON.parse(content);
+                
+                console.log('Original scene data:', sceneData);
+
+                // 要素を適切な形式に変換
+                const processedElements = sceneData.elements.map(element => ({
+                    ...element, // 元のプロパティをすべて保持
+                    id: element.id || Math.random().toString(36).substr(2, 9),
+                    type: element.type || 'rectangle',
+                    // 基本プロパティ
+                    x: element.x || 0,
+                    y: element.y || 0,
+                    width: element.width || 0,
+                    height: element.height || 0,
+                    angle: element.angle || 0,
+                    // スタイル関連
+                    strokeColor: element.strokeColor || '#000000',
+                    backgroundColor: element.backgroundColor || 'transparent',
+                    fillStyle: element.fillStyle || 'hachure',
+                    strokeWidth: element.strokeWidth || 1,
+                    strokeStyle: element.strokeStyle || 'solid',
+                    roughness: element.roughness || 1,
+                    opacity: element.opacity || 100,
+                    // テキスト関連
+                    text: element.text || '',
+                    fontSize: element.fontSize || 20,
+                    fontFamily: element.fontFamily || 1,
+                    textAlign: element.textAlign || 'left',
+                    verticalAlign: element.verticalAlign || 'top',
+                    // その他
+                    groupIds: element.groupIds || [],
+                    seed: element.seed || Math.floor(Math.random() * 2000),
+                    version: element.version || 1,
+                    versionNonce: element.versionNonce || 0,
+                    isDeleted: element.isDeleted || false,
+                    boundElements: element.boundElements || null,
+                    updated: element.updated || Date.now(),
+                    link: element.link || null,
+                    locked: element.locked || false,
+                }));
+
+                console.log('Processed elements:', processedElements);
+
+                // シーンを更新
+                if (excalidrawRef.current) {
+                    excalidrawRef.current.updateScene({
+                        elements: processedElements,
+                        appState: {
+                            viewBackgroundColor: '#ffffff',
+                            theme: 'light',
+                            currentItemFontFamily: 1,
+                            gridSize: null,
+                            name: sceneData.name || ''
+                        }
+                    });
+                    setDebugInfo(prev => `${prev}\nScene updated with ${processedElements.length} elements`);
+                }
+
+            } catch (error) {
+                setErrorMessage(`Error: ${error.message}`);
+                console.error('Error details:', error);
+            }
+        };
+
+        loadFile();
+    }, []);
+
+    return React.createElement(
+        'div',
+        null,
+        errorMessage && React.createElement('div', { 
+            style: { color: 'red', padding: '10px', backgroundColor: '#fff3f3', border: '1px solid #ffcdd2' } 
+        }, errorMessage),
+        debugInfo && React.createElement('div', { 
+            style: { color: 'blue', padding: '10px', backgroundColor: '#e3f2fd', border: '1px solid #90caf9' } 
+        }, debugInfo),
+        React.createElement(window.ExcalidrawLib.Excalidraw, {
+            ref: excalidrawRef,
+            initialData: {
+                elements: [],
+                appState: { 
+                    viewBackgroundColor: '#ffffff',
+                    theme: 'light',
+                    currentItemFontFamily: 1,
+                    gridSize: null
+                }
+            },
+            onChange: (els, state) => {
+                console.log('Scene updated');
+            }
+        })
+    );
+};
+
+document.addEventListener('DOMContentLoaded', () => {
+    const container = document.getElementById('excalidraw-wrapper');
+    const root = ReactDOM.createRoot(container);
+    root.render(React.createElement(App));
+});
+</script>
+
+<style>
+.excalidraw-container {
+    width: 100%;
+    height: 100vh;
+    padding: 10px;
+}
+
+#excalidraw-wrapper {
+    width: 100%;
+    height: 100%;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+}
+
+#error-message {
+    background-color: #fff3f3;
+    border: 1px solid #ffcdd2;
+    border-radius: 4px;
+    margin-bottom: 10px;
+}
+
+#debug-info {
+    background-color: #e3f2fd;
+    border: 1px solid #90caf9;
+    border-radius: 4px;
+    margin-bottom: 10px;
+    white-space: pre-wrap;
+}
+</style>
+{% endblock %}
