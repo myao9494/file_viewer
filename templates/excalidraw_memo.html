@@ -3,6 +3,10 @@
 {% block title %}WIP Board{% endblock %}
 
 {% block head %}
+{{ super() }}
+<link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='images/white_board.svg') }}">
+<!-- <link rel="icon" type="image/webp" href="{{ url_for('static', filename='images/image.webp') }}"> -->
+
 <!-- <script src="https://unpkg.com/react@16.14.0/umd/react.production.min.js"></script>
 <script src="https://unpkg.com/react-dom@16.14.0/umd/react-dom.production.min.js"></script>
 <script src="https://unpkg.com/@excalidraw/excalidraw@0.12.0/dist/excalidraw.production.min.js"></script> --> -->
@@ -46,6 +50,7 @@
         font-display: swap;
     }
 </style>
+
 {% endblock %}
 
 {% block content %}
@@ -62,11 +67,26 @@
 </div>
 
 <script>
+    // debounce関数の実装を追加
+    function debounce(func, wait) {
+        let timeout;
+        return function executedFunction(...args) {
+            const later = () => {
+                clearTimeout(timeout);
+                func(...args);
+            };
+            clearTimeout(timeout);
+            timeout = setTimeout(later, wait);
+        };
+    }
+
     document.addEventListener('DOMContentLoaded', async () => {
         const excalidrawContainer = document.getElementById('excalidraw-container');
 
         const App = () => {
             const excalidrawRef = React.useRef(null);
+            
+            // ローカルストレージからの読み込みを改善
             const [elements, setElements] = React.useState(() => {
                 const saved = localStorage.getItem('wip-board');
                 if (saved) {
@@ -74,12 +94,77 @@
                         const parsed = JSON.parse(saved);
                         return parsed.elements || [];
                     } catch (e) {
-                        console.error('Failed to parse saved data:', e);
+                        console.error('保存データの解析に失敗:', e);
                         return [];
                     }
                 }
                 return [];
             });
+
+            // ファイルの状態を管理
+            const [files, setFiles] = React.useState(() => {
+                const saved = localStorage.getItem('wip-board-files');
+                if (saved) {
+                    try {
+                        return JSON.parse(saved);
+                    } catch (e) {
+                        console.error('ファイルデータの解析に失敗:', e);
+                        return {};
+                    }
+                }
+                return {};
+            });
+
+            // 自動保存の実装を改善
+            const saveToLocalStorage = debounce((els, state, fileData) => {
+                try {
+                    localStorage.setItem('wip-board', JSON.stringify({
+                        elements: els,
+                        appState: state,
+                        lastSaved: Date.now()
+                    }));
+                    
+                    // ファイルデータを別途保存
+                    if (fileData && Object.keys(fileData).length > 0) {
+                        localStorage.setItem('wip-board-files', JSON.stringify(fileData));
+                    }
+                } catch (e) {
+                    console.error('データの保存に失敗:', e);
+                }
+            }, 1000);
+
+            // 変更検知時の処理を改善
+            const onChange = (els, state, files) => {
+                setElements(els);
+                setFiles(files);
+                saveToLocalStorage(els, state, files);
+            };
+
+            // ページ離脱時の保存処理を追加
+            React.useEffect(() => {
+                const handleBeforeUnload = () => {
+                    if (excalidrawRef.current) {
+                        const currentState = excalidrawRef.current.getSceneElements();
+                        const appState = excalidrawRef.current.getAppState();
+                        const currentFiles = excalidrawRef.current.getFiles();
+                        
+                        localStorage.setItem('wip-board', JSON.stringify({
+                            elements: currentState,
+                            appState: appState,
+                            lastSaved: Date.now()
+                        }));
+                        
+                        if (currentFiles && Object.keys(currentFiles).length > 0) {
+                            localStorage.setItem('wip-board-files', JSON.stringify(currentFiles));
+                        }
+                    }
+                };
+
+                window.addEventListener('beforeunload', handleBeforeUnload);
+                return () => {
+                    window.removeEventListener('beforeunload', handleBeforeUnload);
+                };
+            }, []);
 
             const createStickyNote = () => {
                 const centerX = window.innerWidth / 3;
@@ -235,18 +320,11 @@
                 return () => window.removeEventListener('keydown', handleKeyDown);
             }, [elements]);
 
-            const onSave = (els, state) => {
-                setElements(els);
-                localStorage.setItem('wip-board', JSON.stringify({
-                    elements: els,
-                    appState: state
-                }));
-            };
-
             return React.createElement(ExcalidrawLib.Excalidraw, {
                 ref: excalidrawRef,
                 initialData: {
                     elements: elements,
+                    files: files, // ファイルデータを初期データとして渡す
                     appState: {
                         viewBackgroundColor: '#ffffff',
                         currentItemFontFamily: 1,
@@ -258,7 +336,7 @@
                         showLinkIcon: false  // リンクアイコンを非表示にする設定を追加
                     }
                 },
-                onChange: onSave,
+                onChange: onChange,
                 onCollabButtonClick: () => {},
                 viewModeEnabled: false,
                 zenModeEnabled: false,
@@ -281,8 +359,13 @@
 
 <script>
   if ('serviceWorker' in navigator) {
-    window.addEventListener('load', () => {
-      navigator.serviceWorker.register('/static/js/sw.js');
+    window.addEventListener('load', async () => {
+      try {
+        const registration = await navigator.serviceWorker.register('/static/js/sw.js');
+        console.log('Service Worker 登録成功:', registration.scope);
+      } catch (error) {
+        console.error('Service Worker 登録失敗:', error);
+      }
     });
   }
 </script>
