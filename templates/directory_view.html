@@ -547,7 +547,15 @@ document.addEventListener('DOMContentLoaded', function() {
         link.addEventListener('click', function(e) {
             e.preventDefault();
             var path = this.getAttribute('href').replace('/view/', '');
-            openFile(path);
+            var fileName = this.textContent.toLowerCase();
+            
+            if (fileName.endsWith('.excalidraw.svg')) {
+                window.location.href = '/view/' + path;  // 通常のSVGビューアーで表示
+            } else if (path.toLowerCase().endsWith('.ipynb')) {
+                openJupyter(path);
+            } else {
+                window.location.href = '/view/' + path;
+            }
         });
     });
 

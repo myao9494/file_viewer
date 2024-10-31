@@ -159,10 +159,10 @@ def view_file(file_path):
     base_name = os.path.basename(full_path).lower()
     
     # Excalidrawファイルの場合
-    if (file_extension == '.excalidraw' or 
-        base_name.endswith('.excalidraw.svg') or 
-        base_name.endswith('.excalidraw.png')):
-        return excalidraw(file_path)
+    # if (file_extension == '.excalidraw' or 
+    #     base_name.endswith('.excalidraw.svg') or 
+    #     base_name.endswith('.excalidraw.png')):
+    #     return excalidraw(file_path)
     
     # MIMEタイプを取得
     mime_type, _ = mimetypes.guess_type(full_path)
@@ -176,7 +176,15 @@ def view_file(file_path):
         with open(full_path, 'r', encoding='utf-8') as f:
             svg_content = f.read()
         svg_content = svg_content.replace('<svg', '<svg id="svg-content"', 1)
-        return render_template('svg_view.html', svg_content=svg_content, file_path=file_path, full_path=full_path, BASE_DIR=BASE_DIR, current_item=current_item)
+        # Excalidraw SVGかどうかを判定
+        is_excalidraw = base_name.endswith('.excalidraw.svg')
+        return render_template('svg_view.html', 
+                             svg_content=svg_content, 
+                             file_path=file_path, 
+                             full_path=full_path, 
+                             BASE_DIR=BASE_DIR, 
+                             current_item=current_item,
+                             is_excalidraw=is_excalidraw)
 
     # 画像ファイルの場合
     if mime_type and mime_type.startswith('image/'):
@@ -1108,6 +1116,58 @@ def create_excalidraw():
 @app.route('/excalidraw-memo')
 def excalidraw_memo():
     return render_template('excalidraw_memo.html')
+
+@app.route('/create-markdown', methods=['POST'])
+def create_markdown():
+    """
+    Markdownファイルを作成するエンドポイント
+    """
+    try:
+        data = request.json
+        directory = data.get('directory', '')
+        filename = data.get('filename', '')
+        
+        # ディレクトリパスを構築
+        dir_path = os.path.join(BASE_DIR, directory)
+        file_path = os.path.join(dir_path, filename)
+        
+        # ディレクトリが存在しない場合は作成
+        os.makedirs(dir_path, exist_ok=True)
+        
+        # ファイルが存在しない場合のみ作成
+        if not os.path.exists(file_path):
+            # 初期内容を設定
+            initial_content = f"""# {os.path.splitext(filename)[0]}
+
+                Created: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+
+                ## 概要
+
+                ここに概要を書きます。
+
+                ## 内容
+
+                ここに内容を書きます。
+                """
+            # ファイルを作成して初期内容を書き込む
+            with open(file_path, 'w', encoding='utf-8') as f:
+                f.write(initial_content)
+                
+        # 相対パスを返す
+        relative_path = os.path.relpath(file_path, BASE_DIR)
+        normalized_path = normalize_path(relative_path)
+        
+        return jsonify({
+            'success': True,
+            'file_path': normalized_path,
+            'full_path': normalize_path(file_path)
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        })
 
 if __name__ == '__main__':
     app.secret_key = 'your_secret_key_here'  # セッション用の秘密鍵

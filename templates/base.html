@@ -99,6 +99,10 @@
             <button id="openExcalidrawBtn" title="Excalidrawで開く" onclick="openExcalidraw()">
                 <i class="fas fa-draw-polygon"></i>
             </button>
+            <!-- 新しく追加するMarkdownボタン -->
+            <button id="createMarkdownBtn" title="Markdownファイルを作成" onclick="createMarkdown()">
+                <i class="fas fa-file-alt"></i>
+            </button>
             <!-- 新しく追加するメモ用ボタン -->
             <a href="/excalidraw-memo" title="Excalidraw Memo" class="top-button">
                 <i class="fas fa-sticky-note"></i>
@@ -303,8 +307,22 @@
 
     function openExcalidraw() {
         const currentPath = window.location.pathname;
-        const currentDir = currentPath.startsWith('/view/') ? 
-            currentPath.substring(6) : '';
+        let currentDir = '';
+
+        // /view/からのパスを取得
+        if (currentPath.startsWith('/view/')) {
+            const filePath = currentPath.substring(6);
+            
+            // ファイルかフォルダかを判断
+            const isFile = filePath.split('/').pop().includes('.');
+            if (isFile) {
+                // ファイルの場合は、親ディレクトリを取得
+                currentDir = filePath.split('/').slice(0, -1).join('/');
+            } else {
+                // フォルダの場合は、そのままのパスを使用
+                currentDir = filePath;
+            }
+        }
 
         // ファイル名を入力するダイアログを表示
         const fileName = prompt('新しい図の名前を入力してください（.excalidraw.svg は自動的に追加されます）:');
@@ -330,6 +348,59 @@
                 if (data.success) {
                     // 作成されたファイルのExcalidrawページに移動
                     window.location.href = `/excalidraw/${data.file_path}`;
+                } else {
+                    alert('エラーが発生しました: ' + data.error);
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('エラーが発生しました。');
+            });
+        }
+    }
+
+    function createMarkdown() {
+        const currentPath = window.location.pathname;
+        let currentDir = '';
+
+        // /view/からのパスを取得
+        if (currentPath.startsWith('/view/')) {
+            const filePath = currentPath.substring(6);
+            
+            // ファイルかフォルダかを判断
+            const isFile = filePath.split('/').pop().includes('.');
+            if (isFile) {
+                // ファイルの場合は、親ディレクトリを取得
+                currentDir = filePath.split('/').slice(0, -1).join('/');
+            } else {
+                // フォルダの場合は、そのままのパスを使用
+                currentDir = filePath;
+            }
+        }
+
+        // ファイル名を入力するダイアログを表示
+        const fileName = prompt('新しいMarkdownファイルの名前を入力してください（.md は自動的に追加されます）:');
+        
+        if (fileName) {
+            // 拡張子を追加
+            const fullFileName = fileName.endsWith('.md') ? fileName : `${fileName}.md`;
+                
+            // サーバーにファイル作成をリクエスト
+            fetch('/create-markdown', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    directory: currentDir,
+                    filename: fullFileName
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // 作成されたファイルを表示
+                    window.location.href = `/view/${data.file_path}`;
                 } else {
                     alert('エラーが発生しました: ' + data.error);
                 }
