@@ -187,11 +187,11 @@
                 let x, y;
                 if (excalidrawRef.current) {
                     const appState = excalidrawRef.current.getAppState();
-                    const zoom = appState.zoom?.value || 1;
+                    const zoom = appState.zoom.value || 1;
                     
-                    // スクロール位置とズームを考慮した座標計算
-                    x = (mouseX + appState.scrollX) / zoom;
-                    y = (mouseY + appState.scrollY) / zoom;
+                    // スクロール位置とズームを考慮した座標計算を修正
+                    x = mouseX / zoom - appState.scrollX;
+                    y = mouseY / zoom - appState.scrollY;
                     
                     // 付箋のサイズの半分をオフセット
                     x -= 100;
@@ -388,7 +388,9 @@
                 viewModeEnabled: false,
                 zenModeEnabled: false,
                 gridModeEnabled: false,
-                theme: 'light'
+                theme: 'light',
+                langCode: 'ja-JP',  // 日本語設定を追加
+                renderTopRightUI: null  // デフォルトの英語メニューを無効化
             });
         };
 
