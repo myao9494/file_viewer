@@ -14,10 +14,9 @@
 <script src="{{ url_for('static', filename='js/excalidraw-assets/vendor-677e88ca78c86bddf13d.js') }}"></script>
 <!-- 他の必要なアセットファイルも同様に -->
 
-<!-- フォントの読み込みを確実にする -->
-<link rel="preload" href="{{ url_for('static', filename='fonts/Assistant-Regular.woff2') }}" as="font" type="font/woff2" crossorigin>
-<link rel="preload" href="{{ url_for('static', filename='fonts/Assistant-Medium.woff2') }}" as="font" type="font/woff2" crossorigin>
-<link rel="preload" href="{{ url_for('static', filename='fonts/Assistant-Bold.woff2') }}" as="font" type="font/woff2" crossorigin>
+<!-- ントの読み込みの残す -->
+<link rel="preload" href="{{ url_for('static', filename='fonts/Virgil.woff2') }}" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="{{ url_for('static', filename='fonts/Cascadia.woff2') }}" as="font" type="font/woff2" crossorigin>
 
 <style>
     .excalidraw-wrapper {
@@ -29,15 +28,13 @@
     }
     @font-face {
         font-family: "Virgil";
-        src: url("{{ url_for('static', filename='fonts/Virgil.woff2') }}");
+        src: url("{{ url_for('static', filename='fonts/Virgil.woff2') }}") format("woff2");
+        font-display: swap;
     }
     @font-face {
         font-family: "Cascadia";
-        src: url("{{ url_for('static', filename='fonts/Cascadia.woff2') }}");
-    }
-    @font-face {
-        font-family: "Assistant";
-        src: url("{{ url_for('static', filename='fonts/Assistant-Regular.woff2') }}");
+        src: url("{{ url_for('static', filename='fonts/Cascadia.woff2') }}") format("woff2");
+        font-display: swap;
     }
 </style>
 {% endblock %}
@@ -50,6 +47,7 @@
 
 {% block content %}
 <div class="excalidraw-wrapper">
+    <button id="add-sticky-note" style="position: fixed; top: 10px; right: 20px; z-index: 1000; padding: 8px;">付箋を追加</button>
     <div id="excalidraw-container"></div>
 </div>
 {% endblock %}
@@ -61,8 +59,17 @@
         window.focus();
         setTimeout(async () => {
             try {
-                await navigator.clipboard.writeText('{{ full_path }}');
-                console.log('パスをクリップボードにコピーしました');
+                const originalPath = '{{ full_path }}';
+                // OSを判定（Windows判定）
+                const isWindows = navigator.platform.toLowerCase().includes('win');
+                
+                // パスの変換
+                const pathToCopy = isWindows 
+                    ? originalPath.replace(/\//g, '\\') // Windowsの場合、スラッシュをバックスラッシュに変換
+                    : originalPath; // その他のOSはそのまま
+                
+                await navigator.clipboard.writeText(pathToCopy);
+                console.log('パスをクリップボードにコピーしました:', pathToCopy);
             } catch (err) {
                 console.error('クリップボードへのコピーに失敗しました:', err);
             }
@@ -70,41 +77,115 @@
 
         // Excalidrawの初期化
         const App = () => {
-            const excalidrawRef = React.useRef(null);
+            const [excalidrawAPI, setExcalidrawAPI] = React.useState(null);
+            const [elements, setElements] = React.useState([]);
             
-            return React.createElement(window.ExcalidrawLib.Excalidraw, {
-                ref: excalidrawRef,
-                onChange: (elements, state) => {
-                    console.log("Elements:", elements, "State:", state);
-                },
-                langCode: 'ja-JP',
+            // 付箋を追加する関数
+            const addStickyNote = React.useCallback(() => {
+                console.log('ボタンがクリックされました');
+                console.log('excalidrawAPI:', excalidrawAPI);
+                
+                if (!excalidrawAPI) {
+                    console.warn('Excalidraw API not ready');
+                    return;
+                }
+                
+                try {
+                    const newElement = {
+                        id: Math.random().toString(36).substr(2, 9),
+                        type: 'rectangle',
+                        x: 100,
+                        y: 100,
+                        width: 200,
+                        height: 100,
+                        angle: 0,
+                        strokeColor: '#000000',
+                        backgroundColor: '#fef3bd',
+                        fillStyle: 'solid',
+                        strokeWidth: 1,
+                        strokeStyle: 'solid',
+                        roughness: 0,
+                        opacity: 100,
+                        groupIds: [],
+                        seed: Math.random(),
+                        version: 1,
+                        versionNonce: 0,
+                        isDeleted: false,
+                        boundElements: null,
+                        updated: Date.now(),
+                        link: null,
+                        locked: false,
+                    };
+                    
+                    excalidrawAPI.updateScene({
+                        elements: [...excalidrawAPI.getSceneElements(), newElement]
+                    });
+                    console.log('付箋を追加しました:', newElement);
+                } catch (error) {
+                    console.error('付箋の追加に失敗しました:', error);
+                }
+            }, [excalidrawAPI]);
+
+            // ボタンのイベントリスナーを設定
+            React.useEffect(() => {
+                if (!excalidrawAPI) return;
+
+                const button = document.getElementById('add-sticky-note');
+                if (button) {
+                    button.addEventListener('click', addStickyNote);
+                    console.log('ボタンのイベントリスナーを設定しました');
+                }
+
+                return () => {
+                    const button = document.getElementById('add-sticky-note');
+                    if (button) {
+                        button.removeEventListener('click', addStickyNote);
+                    }
+                };
+            }, [excalidrawAPI, addStickyNote]);
+
+            // Excalidrawコンポーネントの初期化時に呼ばれるコールバック
+            const onMountCallback = React.useCallback((api) => {
+                console.log('Excalidraw mounted:', api);
+                setExcalidrawAPI(api);
+            }, []);
+
+            console.log('Rendering Excalidraw component');
+
+            // Excalidrawコンポーネントをレンダリング
+            return React.createElement(ExcalidrawLib.Excalidraw, {
                 initialData: {
-                    elements: [],
+                    elements: elements,
                     appState: {
                         viewBackgroundColor: '#ffffff'
                     }
+                },
+                langCode: 'ja-JP',
+                onChange: (elements) => {
+                    // console.log('Scene changed:', elements);
+                    setElements(elements);
+                },
+                onMount: onMountCallback,
+                excalidrawAPI: (api) => {
+                    // console.log('Excalidraw API available:', api);
+                    setExcalidrawAPI(api);
                 }
             });
         };
 
-        const excalidrawContainer = document.getElementById('excalidraw-container');
-        const waitForExcalidraw = () => {
-            if (window.ExcalidrawLib) {
-                ReactDOM.render(React.createElement(App), excalidrawContainer);
-
-                // ファイル選択ダイアログを自動的に表示
-                setTimeout(() => {
-                    const openFileButton = excalidrawContainer.querySelector('button[aria-label="Open"]');
-                    if (openFileButton) {
-                        openFileButton.click();
-                    }
-                }, 2000);
-            } else {
-                setTimeout(waitForExcalidraw, 100);
+        // アプリケーションのマウント
+        try {
+            const excalidrawContainer = document.getElementById('excalidraw-container');
+            if (!excalidrawContainer) {
+                throw new Error('Excalidrawコンテナが見つかりません');
             }
-        };
 
-        waitForExcalidraw();
+            const root = ReactDOM.createRoot(excalidrawContainer);
+            root.render(React.createElement(App));
+            console.log('Excalidraw app rendered');
+        } catch (error) {
+            console.error('Excalidrawの初期化に失敗:', error);
+        }
     });
 </script>
 {% endblock %}
