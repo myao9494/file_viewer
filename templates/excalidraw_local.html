@@ -55,23 +55,29 @@
 {% block scripts %}
 <script>
     document.addEventListener('DOMContentLoaded', async () => {
-        // フォーカスを設定してからクリップボードにコピー
-        window.focus();
+        // クリップボードの処理を修正
         setTimeout(async () => {
             try {
                 const originalPath = '{{ full_path }}';
-                // OSを判定（Windows判定）
                 const isWindows = navigator.platform.toLowerCase().includes('win');
-                
-                // パスの変換
                 const pathToCopy = isWindows 
-                    ? originalPath.replace(/\//g, '\\') // Windowsの場合、スラッシュをバックスラッシュに変換
-                    : originalPath; // その他のOSはそのまま
+                    ? originalPath.replace(/\//g, '\\')
+                    : originalPath;
                 
-                await navigator.clipboard.writeText(pathToCopy);
-                console.log('パスをクリップボードにコピーしました:', pathToCopy);
+                // クリップボード処理を Promise で適切に処理
+                await new Promise((resolve, reject) => {
+                    navigator.clipboard.writeText(pathToCopy)
+                        .then(() => {
+                            console.log('パスをクリップボードにコピーしました:', pathToCopy);
+                            resolve();
+                        })
+                        .catch(err => {
+                            console.error('クリップボードへのコピーに失敗しました:', err);
+                            reject(err);
+                        });
+                });
             } catch (err) {
-                console.error('クリップボードへのコピーに失敗しました:', err);
+                console.error('クリップボード処理中にエラーが発生しました:', err);
             }
         }, 500);
 
@@ -89,20 +95,25 @@
 
             // 付箋を追加する関数
             const addStickyNote = React.useCallback(() => {
-                console.log('ボタンがクリックされました');
-                console.log('excalidrawAPI:', excalidrawAPI);
-                
                 if (!excalidrawAPI) {
                     console.warn('Excalidraw API not ready');
                     return;
                 }
                 
                 try {
+                    // マウスの位置を取得
+                    const viewportPosition = excalidrawAPI.getAppState().scrollX 
+                        ? {
+                            x: excalidrawAPI.getAppState().scrollX + window.innerWidth / 2,
+                            y: excalidrawAPI.getAppState().scrollY + window.innerHeight / 2
+                        }
+                        : { x: window.innerWidth / 2, y: window.innerHeight / 2 };
+
                     const newElement = {
                         id: Math.random().toString(36).substr(2, 9),
                         type: 'rectangle',
-                        x: 100,
-                        y: 100,
+                        x: viewportPosition.x - 100, // 付箋の幅の半分を引いて中央に配置
+                        y: viewportPosition.y - 50,  // 付箋の高さの半分を引いて中央に配置
                         width: 200,
                         height: 100,
                         angle: 0,
@@ -181,13 +192,15 @@
             console.log('Rendering Excalidraw component');
 
             // シーンが変更されたときの処理
-            const onChange = (newElements, _, newFiles) => {
+            const onChange = React.useCallback((newElements, _, newFiles) => {
                 setElements(newElements);
                 setFiles(newFiles);
-                // ローカルストレージにデータを保存
-                localStorage.setItem('excalidraw-elements', JSON.stringify(newElements));
-                localStorage.setItem('excalidraw-files', JSON.stringify(newFiles));
-            };
+                // ローカルストレージへの保存を非同期で実行
+                Promise.all([
+                    localStorage.setItem('excalidraw-elements', JSON.stringify(newElements)),
+                    localStorage.setItem('excalidraw-files', JSON.stringify(newFiles))
+                ]).catch(err => console.error('データの保存に失敗:', err));
+            }, []);
 
             // Excalidrawコンポーネントをレンダリング
             return React.createElement(ExcalidrawLib.Excalidraw, {
