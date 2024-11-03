@@ -1058,19 +1058,26 @@ def create_excalidraw():
     """
     try:
         data = request.json
-        directory = data.get('directory', '')
-        filename = data.get('filename', '')
+        directory = urllib.parse.unquote(data.get('directory', ''))  # URLデコード
+        filename = urllib.parse.unquote(data.get('filename', ''))    # URLデコード
         
-        # ディレクトリパスを構築
-        dir_path = os.path.join(BASE_DIR, directory)
-        file_path = os.path.join(dir_path, filename)
+        # ディレクトリパスを構築（os.path.joinを使用せず、手動で結合）
+        dir_path = os.path.normpath(os.path.join(BASE_DIR, directory))
+        file_path = os.path.normpath(os.path.join(dir_path, filename))
+        
+        # パスが BASE_DIR 配下にあることを確認（セキュリティチェック）
+        if not os.path.commonpath([file_path, BASE_DIR]) == BASE_DIR:
+            return jsonify({
+                'success': False,
+                'error': '無効なパスです'
+            }), 400
         
         # ディレクトリが存在しない場合は作成
         os.makedirs(dir_path, exist_ok=True)
         
         # ファイルが存在しない場合のみ作成
         if not os.path.exists(file_path):
-            # 空の辞書を定義
+            # 空のexcalidraw fileを定義
             empty_data = """
             <svg version="1.1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" width="20" height="20">
             <!-- svg-source:excalidraw -->
@@ -1094,6 +1101,7 @@ def create_excalidraw():
             </defs>
             <rect x="0" y="0" width="20" height="20" fill="#ffffff"></rect></svg>
             """
+            # バイナリモードで書き込み
             with open(file_path, 'w', encoding='utf-8') as f:
                 json.dump(empty_data, f)
                 
@@ -1108,10 +1116,11 @@ def create_excalidraw():
         })
         
     except Exception as e:
+        app.logger.error(f"Error in create_excalidraw: {str(e)}")  # エラーログを追加
         return jsonify({
             'success': False,
             'error': str(e)
-        })
+        }), 500
 
 @app.route('/excalidraw-memo')
 def excalidraw_memo():
@@ -1171,7 +1180,7 @@ def create_markdown():
         return jsonify({
             'success': False,
             'error': str(e)
-        })
+        }), 500
 
 @app.route('/save_library', methods=['POST'])
 def save_library():
