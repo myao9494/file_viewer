@@ -1207,11 +1207,9 @@ def save_excalidraw():
         file_path = data['path']
         drawing_data = data['data']
         
-        # ディレクトリが存在することを確認
-        os.makedirs(os.path.dirname(file_path), exist_ok=True)
-        
-        # .excalidrawファイルとして保存
-        save_path = file_path if file_path.endswith('.excalidraw') else f"{file_path}.excalidraw"
+        # excalidrawフォルダのパスを作成
+        excalidraw_dir = os.path.join(os.path.dirname(file_path), 'excalidraw')
+        os.makedirs(excalidraw_dir, exist_ok=True)
         
         # 保存するデータを準備
         scene_data = {
@@ -1223,11 +1221,25 @@ def save_excalidraw():
             "files": drawing_data.get("files", {})
         }
         
-        # JSONとして保存
-        with open(save_path, 'w', encoding='utf-8') as f:
+        # ベースファイル名を作成
+        base_name = os.path.splitext(os.path.basename(file_path))[0]
+        if base_name.endswith('.excalidraw'):
+            base_name = base_name[:-11]  # .excalidrawを除去
+        
+        # excalidrawファイルとして保存
+        excalidraw_path = os.path.join(excalidraw_dir, f"{base_name}.excalidraw")
+        with open(excalidraw_path, 'w', encoding='utf-8') as f:
             json.dump(scene_data, f, ensure_ascii=False, indent=2)
+        
+        # SVGファイルとして保存
+        svg_dir = os.path.dirname(file_path)
+        if drawing_data.get('svg'):
+            svg_path = os.path.join(svg_dir, f"{base_name}.svg")
+            with open(svg_path, 'w', encoding='utf-8') as f:
+                f.write(drawing_data['svg'])
+            app.logger.info(f"Successfully saved SVG to {svg_path}")
             
-        app.logger.info(f"Successfully saved to {save_path}")
+        app.logger.info(f"Successfully saved to {excalidraw_path}")
         return jsonify({'success': True})
         
     except Exception as e:

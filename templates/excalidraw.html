@@ -174,38 +174,50 @@
             }, [excalidrawAPI]);
 
             // シーンが変更されたときの処理
-            const onChange = React.useCallback((elements, appState, files) => {
-                // 変更が小さすぎる場合はスキ���プ
-                if (elements.length === 0 && Object.keys(files).length === 0) {
-                    return;
-                }
+            const onChange = React.useCallback(async (elements, appState, files) => {
+                if (!elements || elements.length === 0) return;
                 
-                const saveData = {
-                    elements: elements,
-                    appState: appState,
-                    files: files
-                };
-                
-                fetch("{{ url_for('save_excalidraw') }}", {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                        path: '{{ full_path }}',
-                        data: saveData
-                    })
-                })
-                .then(response => response.json())
-                .then(data => {
-                    if (!data.success) {
-                        throw new Error(data.error || '保存に失敗しました');
+                try {
+                    const svgString = await window.ExcalidrawLib.exportToSvg({
+                        elements: elements,
+                        appState: {
+                            ...appState,
+                            exportWithDarkMode: false,
+                            exportBackground: true,
+                            viewBackgroundColor: "#ffffff"
+                        },
+                        files: files
+                    });
+                    
+                    const saveData = {
+                        elements: elements,
+                        appState: appState,
+                        files: files,
+                        svg: svgString.outerHTML
+                    };
+                    
+                    const response = await fetch("{{ url_for('save_excalidraw') }}", {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            path: '{{ full_path }}',
+                            data: saveData
+                        })
+                    });
+
+                    if (!response.ok) {
+                        throw new Error('保存に失敗しました');
                     }
-                    console.log('自動保存完了');
-                })
-                .catch(error => {
-                    console.error('自動保存エラー:', error);
-                });
+
+                    const data = await response.json();
+                    if (data.success) {
+                        console.log('自動保存完了');
+                    }
+                } catch (error) {
+                    console.error('保存エラー:', error);
+                }
             }, []);
 
             // ライブラリの変更を監視
@@ -255,8 +267,11 @@
                 onChange: onChange,
                 onMount: onMountCallback,
                 onLibraryChange: onLibraryChange,
-                excalidrawAPI: (api) => {
-                    setExcalidrawAPI(api);
+                ref: (api) => {
+                    if (api) {
+                        setExcalidrawAPI(api);
+                        console.log('Excalidraw API set:', api);  // APIの確認用ログ
+                    }
                 }
             });
         };
