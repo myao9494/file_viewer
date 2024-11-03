@@ -55,6 +55,20 @@
 {% block scripts %}
 <script>
     document.addEventListener('DOMContentLoaded', async () => {
+        // ライブラリファイルを読み込む関数を追加
+        async function loadExcalidrawLibrary() {
+            try {
+                const response = await fetch("{{ url_for('static', filename='excalidraw_lib/my_lib.excalidrawlib') }}");
+                if (!response.ok) {
+                    throw new Error('ライブラリの読み込みに失敗しました');
+                }
+                return await response.json();
+            } catch (error) {
+                console.error('ライブラリの読み込みエラー:', error);
+                return null;
+            }
+        }
+
         // フォーカスを設定してからクリップボードにコピー
         window.focus();
         setTimeout(async () => {
@@ -79,70 +93,117 @@
         const App = () => {
             const [excalidrawAPI, setExcalidrawAPI] = React.useState(null);
             const [elements, setElements] = React.useState([]);
-            
-            // 付箋を追加する関数
-            const addStickyNote = React.useCallback(() => {
-                console.log('ボタンがクリックされました');
-                console.log('excalidrawAPI:', excalidrawAPI);
-                
-                if (!excalidrawAPI) {
-                    console.warn('Excalidraw API not ready');
-                    return;
-                }
-                
-                try {
-                    const newElement = {
-                        id: Math.random().toString(36).substr(2, 9),
-                        type: 'rectangle',
-                        x: 100,
-                        y: 100,
-                        width: 200,
-                        height: 100,
-                        angle: 0,
-                        strokeColor: '#000000',
-                        backgroundColor: '#fef3bd',
-                        fillStyle: 'solid',
-                        strokeWidth: 1,
-                        strokeStyle: 'solid',
-                        roughness: 0,
-                        opacity: 100,
-                        groupIds: [],
-                        seed: Math.random(),
-                        version: 1,
-                        versionNonce: 0,
-                        isDeleted: false,
-                        boundElements: null,
-                        updated: Date.now(),
-                        link: null,
-                        locked: false,
-                    };
-                    
-                    excalidrawAPI.updateScene({
-                        elements: [...excalidrawAPI.getSceneElements(), newElement]
-                    });
-                    console.log('付箋を追加しました:', newElement);
-                } catch (error) {
-                    console.error('付箋の追加に失敗しました:', error);
-                }
-            }, [excalidrawAPI]);
+            const [files, setFiles] = React.useState({});
 
-            // ボタンのイベントリスナーを設定
+            // ライブラリを読み込むeffectを追加
             React.useEffect(() => {
                 if (!excalidrawAPI) return;
 
-                const button = document.getElementById('add-sticky-note');
-                if (button) {
-                    button.addEventListener('click', addStickyNote);
-                    console.log('ボタンのイベントリスナーを設定しました');
-                }
+                loadExcalidrawLibrary().then(libraryItems => {
+                    if (libraryItems) {
+                        excalidrawAPI.updateLibrary({
+                            libraryItems: libraryItems.libraryItems || []
+                        });
+                        console.log('ライブラリを読み込みました');
+                    }
+                });
+            }, [excalidrawAPI]);
 
-                return () => {
-                    const button = document.getElementById('add-sticky-note');
-                    if (button) {
-                        button.removeEventListener('click', addStickyNote);
+            // キーボードショートカットのイベントハンドラを追加
+            React.useEffect(() => {
+                if (!excalidrawAPI) return;
+
+                let mouseX = 0;
+                let mouseY = 0;
+
+                const handleMouseMove = (event) => {
+                    mouseX = event.clientX;
+                    mouseY = event.clientY;
+                };
+
+                const handleKeyPress = (event) => {
+                    if (event.key.toLowerCase() === 'n' && 
+                        !event.target.matches('input, textarea, [contenteditable]')) {
+                        event.preventDefault();
+                        
+                        const viewportPosition = {
+                            x: mouseX + excalidrawAPI.getAppState().scrollX,
+                            y: mouseY + excalidrawAPI.getAppState().scrollY
+                        };
+
+                        // 付箋の追加処理
+                        const newElement = {
+                            id: Math.random().toString(36).substr(2, 9),
+                            type: 'rectangle',
+                            x: viewportPosition.x - 100,
+                            y: viewportPosition.y - 50,
+                            width: 200,
+                            height: 100,
+                            angle: 0,
+                            strokeColor: '#000000',
+                            backgroundColor: '#fef3bd',
+                            fillStyle: 'solid',
+                            strokeWidth: 1,
+                            strokeStyle: 'solid',
+                            roughness: 0,
+                            opacity: 100,
+                            groupIds: [],
+                            seed: Math.random(),
+                            version: 1,
+                            versionNonce: 0,
+                            isDeleted: false,
+                            boundElements: null,
+                            updated: Date.now(),
+                            link: null,
+                            locked: false,
+                        };
+                        
+                        excalidrawAPI.updateScene({
+                            elements: [...excalidrawAPI.getSceneElements(), newElement]
+                        });
                     }
                 };
-            }, [excalidrawAPI, addStickyNote]);
+
+                document.addEventListener('mousemove', handleMouseMove);
+                document.addEventListener('keydown', handleKeyPress);
+                
+                return () => {
+                    document.removeEventListener('mousemove', handleMouseMove);
+                    document.removeEventListener('keydown', handleKeyPress);
+                };
+            }, [excalidrawAPI]);
+
+            // シーンが変更されたときの処理
+            const onChange = React.useCallback((newElements, _, newFiles) => {
+                setElements(newElements);
+                setFiles(newFiles);
+            }, []);
+
+            // ライブラリの変更を監視
+            const onLibraryChange = React.useCallback(async (libraryItems) => {
+                try {
+                    const libraryData = {
+                        type: "excalidrawlib",
+                        version: 2,
+                        libraryItems
+                    };
+
+                    const response = await fetch("{{ url_for('save_library') }}", {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify(libraryData)
+                    });
+
+                    if (!response.ok) {
+                        throw new Error('ライブラリの保存に失敗しました');
+                    }
+                    console.log('ライブラリを保存しました');
+                } catch (error) {
+                    console.error('ライブラリの保存エラー:', error);
+                }
+            }, []);
 
             // Excalidrawコンポーネントの初期化時に呼ばれるコールバック
             const onMountCallback = React.useCallback((api) => {
@@ -156,18 +217,16 @@
             return React.createElement(ExcalidrawLib.Excalidraw, {
                 initialData: {
                     elements: elements,
+                    files: files,
                     appState: {
                         viewBackgroundColor: '#ffffff'
                     }
                 },
                 langCode: 'ja-JP',
-                onChange: (elements) => {
-                    // console.log('Scene changed:', elements);
-                    setElements(elements);
-                },
+                onChange: onChange,
                 onMount: onMountCallback,
+                onLibraryChange: onLibraryChange,
                 excalidrawAPI: (api) => {
-                    // console.log('Excalidraw API available:', api);
                     setExcalidrawAPI(api);
                 }
             });
