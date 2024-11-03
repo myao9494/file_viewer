@@ -1117,6 +1117,10 @@ def create_excalidraw():
 def excalidraw_memo():
     return render_template('excalidraw_memo.html')
 
+@app.route('/excalidraw-local')
+def excalidraw_local():
+    return render_template('excalidraw_local.html')
+
 @app.route('/create-markdown', methods=['POST'])
 def create_markdown():
     """
@@ -1168,6 +1172,24 @@ def create_markdown():
             'success': False,
             'error': str(e)
         })
+
+@app.route('/save_library', methods=['POST'])
+def save_library():
+    try:
+        library_data = request.get_json()
+        
+        # 保存先のディレクトリが存在することを確認
+        library_dir = os.path.join(app.static_folder, 'excalidraw_lib')
+        os.makedirs(library_dir, exist_ok=True)
+        
+        # ライブラリファイルに保存
+        library_path = os.path.join(library_dir, 'my_lib.excalidrawlib')
+        with open(library_path, 'w', encoding='utf-8') as f:
+            json.dump(library_data, f, ensure_ascii=False, indent=2)
+        
+        return jsonify({'success': True, 'message': 'ライブラリを保存しました'})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 if __name__ == '__main__':
     app.secret_key = 'your_secret_key_here'  # セッション用の秘密鍵

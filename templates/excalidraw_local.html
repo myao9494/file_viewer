@@ -55,6 +55,20 @@
 {% block scripts %}
 <script>
     document.addEventListener('DOMContentLoaded', async () => {
+        // ライブラリファイルを読み込む関数を追加
+        async function loadExcalidrawLibrary() {
+            try {
+                const response = await fetch("{{ url_for('static', filename='excalidraw_lib/my_lib.excalidrawlib') }}");
+                if (!response.ok) {
+                    throw new Error('ライブラリの読み込みに失敗しました');
+                }
+                return await response.json();
+            } catch (error) {
+                console.error('ライブラリの読み込みエラー:', error);
+                return null;
+            }
+        }
+
         // クリップボードの処理を修正
         setTimeout(async () => {
             try {
@@ -92,6 +106,20 @@
                 const savedFiles = localStorage.getItem('excalidraw-files');
                 return savedFiles ? JSON.parse(savedFiles) : {};
             });
+
+            // ライブラリを読み込むeffectを追加
+            React.useEffect(() => {
+                if (!excalidrawAPI) return;
+
+                loadExcalidrawLibrary().then(libraryItems => {
+                    if (libraryItems) {
+                        excalidrawAPI.updateLibrary({
+                            libraryItems: libraryItems.libraryItems || []
+                        });
+                        console.log('ライブラリを読み込みました');
+                    }
+                });
+            }, [excalidrawAPI]);
 
             // 付箋を追加する関数
             const addStickyNote = React.useCallback(() => {
@@ -144,7 +172,7 @@
                 }
             }, [excalidrawAPI]);
 
-            // ボタンのイベントリスナーを設定
+            // ボタンのイベントリスナーを設��
             React.useEffect(() => {
                 if (!excalidrawAPI) return;
 
@@ -271,6 +299,32 @@
                 ]).catch(err => console.error('データの保存に失敗:', err));
             }, []);
 
+            // ライブラリの変更を監視して保存する関数を追加
+            const onLibraryChange = React.useCallback(async (libraryItems) => {
+                try {
+                    const libraryData = {
+                        type: "excalidrawlib",
+                        version: 2,
+                        libraryItems
+                    };
+
+                    const response = await fetch("{{ url_for('save_library') }}", {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify(libraryData)
+                    });
+
+                    if (!response.ok) {
+                        throw new Error('ライブラリの保存に失敗しました');
+                    }
+                    console.log('ライブラリを保存しました');
+                } catch (error) {
+                    console.error('ライブラリの保存エラー:', error);
+                }
+            }, []);
+
             // Excalidrawコンポーネントをレンダリング
             return React.createElement(ExcalidrawLib.Excalidraw, {
                 initialData: {
@@ -283,8 +337,8 @@
                 langCode: 'ja-JP',
                 onChange: onChange,
                 onMount: onMountCallback,
+                onLibraryChange: onLibraryChange,  // ライブラリ変更ハンドラを追加
                 excalidrawAPI: (api) => {
-                    // console.log('Excalidraw API available:', api);
                     setExcalidrawAPI(api);
                 }
             });
