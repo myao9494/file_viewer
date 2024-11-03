@@ -166,22 +166,91 @@
             React.useEffect(() => {
                 if (!excalidrawAPI) return;
 
+                let mouseX = 0;
+                let mouseY = 0;
+
+                // マウスの移動を追跡
+                const handleMouseMove = (event) => {
+                    mouseX = event.clientX;
+                    mouseY = event.clientY;
+                };
+
                 const handleKeyPress = (event) => {
                     // Nキーが押された時（かつ、テキスト入力中でない時）
                     if (event.key.toLowerCase() === 'n' && 
                         !event.target.matches('input, textarea, [contenteditable]')) {
                         event.preventDefault();
-                        addStickyNote();
+                        
+                        // マウスの位置をログ出力
+                        const viewportPosition = {
+                            x: mouseX + excalidrawAPI.getAppState().scrollX,
+                            y: mouseY + excalidrawAPI.getAppState().scrollY
+                        };
+                        console.log('マウスの位置:', {
+                            viewport: viewportPosition,
+                            mouse: { x: mouseX, y: mouseY },
+                            scroll: {
+                                x: excalidrawAPI.getAppState().scrollX,
+                                y: excalidrawAPI.getAppState().scrollY
+                            },
+                            window: {
+                                width: window.innerWidth,
+                                height: window.innerHeight
+                            }
+                        });
+                        
+                        // 付箋の位置をマウス位置に更新
+                        const addStickyNoteAtPosition = () => {
+                            if (!excalidrawAPI) return;
+                            
+                            try {
+                                const newElement = {
+                                    id: Math.random().toString(36).substr(2, 9),
+                                    type: 'rectangle',
+                                    x: viewportPosition.x - 100,
+                                    y: viewportPosition.y - 50,
+                                    width: 200,
+                                    height: 100,
+                                    angle: 0,
+                                    strokeColor: '#000000',
+                                    backgroundColor: '#fef3bd',
+                                    fillStyle: 'solid',
+                                    strokeWidth: 1,
+                                    strokeStyle: 'solid',
+                                    roughness: 0,
+                                    opacity: 100,
+                                    groupIds: [],
+                                    seed: Math.random(),
+                                    version: 1,
+                                    versionNonce: 0,
+                                    isDeleted: false,
+                                    boundElements: null,
+                                    updated: Date.now(),
+                                    link: null,
+                                    locked: false,
+                                };
+                                
+                                excalidrawAPI.updateScene({
+                                    elements: [...excalidrawAPI.getSceneElements(), newElement]
+                                });
+                            } catch (error) {
+                                console.error('付箋の追加に失敗しました:', error);
+                            }
+                        };
+
+                        addStickyNoteAtPosition();
                     }
                 };
 
+                document.addEventListener('mousemove', handleMouseMove);
                 document.addEventListener('keydown', handleKeyPress);
                 
                 // クリーンアップ関数
                 return () => {
+                    document.removeEventListener('mousemove', handleMouseMove);
                     document.removeEventListener('keydown', handleKeyPress);
                 };
-            }, [excalidrawAPI, addStickyNote]);
+            }, [excalidrawAPI]);
 
             // Excalidrawコンポーネントの初期化時に呼ばれるコールバック
             const onMountCallback = React.useCallback((api) => {
