@@ -164,7 +164,7 @@ def view_file(file_path):
     #     base_name.endswith('.excalidraw.png')):
     #     return excalidraw(file_path)
     
-    # MIMEタイプを取得
+    # MIMEタイプを得
     mime_type, _ = mimetypes.guess_type(full_path)
 
     # .xdwファイルの場合
@@ -195,7 +195,7 @@ def view_file(file_path):
     if file_extension == '.pdf':
         return send_file(full_path, mimetype='application/pdf')
 
-    # Markdownファイルの場合
+    # Markdownァイルの場合
     if file_extension == '.md':
         content = render_markdown(full_path)
         folder_path = os.path.dirname(full_path)
@@ -799,7 +799,7 @@ def create_folder():
     
     try:
         if not os.path.exists(TEMPLATE_FOLDER):
-            return jsonify({'success': False, 'error': 'テンプレートフォルダが見つかりません。'})
+            return jsonify({'success': False, 'error': 'テンプレートフォルが見つかりません'})
         
         new_folder_path = os.path.join(target_path, folder_name)
         counter = 1
@@ -1198,6 +1198,40 @@ def save_library():
         
         return jsonify({'success': True, 'message': 'ライブラリを保存しました'})
     except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/save_excalidraw', methods=['POST'])
+def save_excalidraw():
+    try:
+        data = request.json
+        file_path = data['path']
+        drawing_data = data['data']
+        
+        # ディレクトリが存在することを確認
+        os.makedirs(os.path.dirname(file_path), exist_ok=True)
+        
+        # .excalidrawファイルとして保存
+        save_path = file_path if file_path.endswith('.excalidraw') else f"{file_path}.excalidraw"
+        
+        # 保存するデータを準備
+        scene_data = {
+            "type": "excalidraw",
+            "version": 2,
+            "source": "http://localhost:5001",
+            "elements": drawing_data.get("elements", []),
+            "appState": drawing_data.get("appState", {}),
+            "files": drawing_data.get("files", {})
+        }
+        
+        # JSONとして保存
+        with open(save_path, 'w', encoding='utf-8') as f:
+            json.dump(scene_data, f, ensure_ascii=False, indent=2)
+            
+        app.logger.info(f"Successfully saved to {save_path}")
+        return jsonify({'success': True})
+        
+    except Exception as e:
+        app.logger.error(f"Error saving excalidraw: {str(e)}")
         return jsonify({'success': False, 'error': str(e)}), 500
 
 if __name__ == '__main__':

@@ -14,7 +14,7 @@
 <script src="{{ url_for('static', filename='js/excalidraw-assets/vendor-677e88ca78c86bddf13d.js') }}"></script>
 <!-- 他の必要なアセットファイルも同様に -->
 
-<!-- ントの読み込みの残す -->
+<!-- ントの読み込みの残��� -->
 <link rel="preload" href="{{ url_for('static', filename='fonts/Virgil.woff2') }}" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="{{ url_for('static', filename='fonts/Cascadia.woff2') }}" as="font" type="font/woff2" crossorigin>
 
@@ -174,9 +174,38 @@
             }, [excalidrawAPI]);
 
             // シーンが変更されたときの処理
-            const onChange = React.useCallback((newElements, _, newFiles) => {
-                setElements(newElements);
-                setFiles(newFiles);
+            const onChange = React.useCallback((elements, appState, files) => {
+                // 変更が小さすぎる場合はスキ���プ
+                if (elements.length === 0 && Object.keys(files).length === 0) {
+                    return;
+                }
+                
+                const saveData = {
+                    elements: elements,
+                    appState: appState,
+                    files: files
+                };
+                
+                fetch("{{ url_for('save_excalidraw') }}", {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        path: '{{ full_path }}',
+                        data: saveData
+                    })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (!data.success) {
+                        throw new Error(data.error || '保存に失敗しました');
+                    }
+                    console.log('自動保存完了');
+                })
+                .catch(error => {
+                    console.error('自動保存エラー:', error);
+                });
             }, []);
 
             // ライブラリの変更を監視
