@@ -177,7 +177,7 @@ def view_file(file_path):
             svg_content = f.read()
         svg_content = svg_content.replace('<svg', '<svg id="svg-content"', 1)
         # Excalidraw SVGかどうかを判定
-        is_excalidraw = base_name.endswith('.excalidraw.svg')
+        is_excalidraw = base_name.endswith('_excalidraw.svg')
         return render_template('svg_view.html', 
                              svg_content=svg_content, 
                              file_path=file_path, 
@@ -1102,8 +1102,8 @@ def create_excalidraw():
             <rect x="0" y="0" width="20" height="20" fill="#ffffff"></rect></svg>
             """
             # バイナリモードで書き込み
-            with open(file_path, 'w', encoding='utf-8') as f:
-                json.dump(empty_data, f)
+            # with open(file_path, 'w', encoding='utf-8') as f:
+            #     json.dump(empty_data, f)
                 
         # 相対パスを返す
         relative_path = os.path.relpath(file_path, BASE_DIR)
@@ -1234,7 +1234,7 @@ def save_excalidraw():
         # SVGファイルとして保存
         svg_dir = os.path.dirname(file_path)
         if drawing_data.get('svg'):
-            svg_path = os.path.join(svg_dir, f"{base_name}.svg")
+            svg_path = os.path.join(svg_dir, f"{base_name}_excalidraw.svg")
             with open(svg_path, 'w', encoding='utf-8') as f:
                 f.write(drawing_data['svg'])
             app.logger.info(f"Successfully saved SVG to {svg_path}")
