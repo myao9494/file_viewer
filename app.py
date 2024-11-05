@@ -1246,6 +1246,116 @@ def save_excalidraw():
         app.logger.error(f"Error saving excalidraw: {str(e)}")
         return jsonify({'success': False, 'error': str(e)}), 500
 
+@app.route('/excalidraw-server/<path:file_path>')
+def excalidraw_server(file_path):
+    """
+    サーバー側で状態を管理するExcalidrawエディタを表示
+    """
+    full_path = normalize_path(os.path.join(BASE_DIR, file_path))
+    if not os.path.exists(os.path.dirname(full_path)):
+        abort(404)
+        
+    current_item = f"Excalidraw Server - {os.path.basename(file_path)}"
+    return render_template('excalidraw_server.html', 
+                         file_path=file_path, 
+                         full_path=full_path, 
+                         current_item=current_item)
+
+@app.route('/load-excalidraw-data/<path:file_path>')
+def load_excalidraw_data(file_path):
+    """
+    Excalidrawデータをロード
+    """
+    try:
+        full_path = normalize_path(os.path.join(BASE_DIR, file_path))
+        excalidraw_dir = os.path.join(os.path.dirname(full_path), 'excalidraw')
+        base_name = os.path.splitext(os.path.basename(full_path))[0]
+        if base_name.endswith('.excalidraw'):
+            base_name = base_name[:-11]
+            
+        excalidraw_path = os.path.join(excalidraw_dir, f"{base_name}.excalidraw")
+        
+        app.logger.info(f"Loading from: {excalidraw_path}")
+        
+        initial_data = {
+            "type": "excalidraw",
+            "version": 2,
+            "source": request.host_url,
+            "elements": [],
+            "appState": {
+                "viewBackgroundColor": "#ffffff",
+                "currentItemFontFamily": 1,
+                "gridSize": None,
+                "theme": "light",
+                "name": "Excalidraw"
+            },
+            "files": {}
+        }
+        
+        if os.path.exists(excalidraw_path):
+            with open(excalidraw_path, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+                # データの整合性チェックと正規化
+                if not isinstance(data.get('elements'), list):
+                    data['elements'] = []
+                if not isinstance(data.get('files'), dict):
+                    data['files'] = {}
+                if not isinstance(data.get('appState'), dict):
+                    data['appState'] = initial_data['appState']
+                    
+                app.logger.info(f"Loaded {len(data['elements'])} elements")
+                return jsonify(data)
+        else:
+            app.logger.info("No existing file found, returning initial data")
+            return jsonify(initial_data)
+            
+    except Exception as e:
+        app.logger.error(f"Error loading excalidraw data: {str(e)}")
+        return jsonify(initial_data), 200  # エラー時も初期データを返す
+
+@app.route('/save-excalidraw-data/<path:file_path>', methods=['POST'])
+def save_excalidraw_data(file_path):
+    """
+    Excalidrawデータを保存
+    """
+    try:
+        data = request.json
+        full_path = normalize_path(os.path.join(BASE_DIR, file_path))
+        excalidraw_dir = os.path.join(os.path.dirname(full_path), 'excalidraw')
+        os.makedirs(excalidraw_dir, exist_ok=True)
+        
+        base_name = os.path.splitext(os.path.basename(full_path))[0]
+        if base_name.endswith('.excalidraw'):
+            base_name = base_name[:-11]
+            
+        excalidraw_path = os.path.join(excalidraw_dir, f"{base_name}.excalidraw")
+        
+        app.logger.info(f"Saving to: {excalidraw_path}")
+        app.logger.info(f"Saving {len(data.get('elements', []))} elements")
+        
+        scene_data = {
+            "type": "excalidraw",
+            "version": 2,
+            "source": request.host_url,
+            "elements": data.get("elements", []),
+            "appState": data.get("appState", {
+                "viewBackgroundColor": "#ffffff",
+                "currentItemFontFamily": 1,
+                "gridSize": None,
+                "theme": "light"
+            }),
+            "files": data.get("files", {})
+        }
+        
+        with open(excalidraw_path, 'w', encoding='utf-8') as f:
+            json.dump(scene_data, f, ensure_ascii=False, indent=2)
+            
+        app.logger.info("Data saved successfully")
+        return jsonify({"success": True})
+    except Exception as e:
+        app.logger.error(f"Error saving excalidraw data: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
 if __name__ == '__main__':
     app.secret_key = 'your_secret_key_here'  # セッション用の秘密鍵
     # デバッグモードでアプリケーションを実行

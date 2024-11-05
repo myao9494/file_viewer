@@ -1,0 +1,224 @@
+{% extends "base.html" %}
+
+{% block head %}
+<script src="{{ url_for('static', filename='js/react.production.min.js') }}"></script>
+<script src="{{ url_for('static', filename='js/react-dom.production.min.js') }}"></script>
+<script src="{{ url_for('static', filename='js/excalidraw.production.min.js') }}"></script>
+<script src="{{ url_for('static', filename='js/excalidraw-assets/vendor-677e88ca78c86bddf13d.js') }}"></script>
+
+<link rel="preload" href="{{ url_for('static', filename='fonts/Virgil.woff2') }}" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="{{ url_for('static', filename='fonts/Cascadia.woff2') }}" as="font" type="font/woff2" crossorigin>
+
+<style>
+    .excalidraw-wrapper {
+        height: calc(100vh - 50px);
+        margin-top: 10px;
+    }
+    #excalidraw-container {
+        height: 100%;
+    }
+    @font-face {
+        font-family: "Virgil";
+        src: url("{{ url_for('static', filename='fonts/Virgil.woff2') }}") format("woff2");
+        font-display: swap;
+    }
+    @font-face {
+        font-family: "Cascadia";
+        src: url("{{ url_for('static', filename='fonts/Cascadia.woff2') }}") format("woff2");
+        font-display: swap;
+    }
+</style>
+{% endblock %}
+
+{% block folder_path %}
+<div class="folder-path">
+    <span title="{{ full_path }}">{{ full_path }}</span>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="excalidraw-wrapper">
+    <button id="add-sticky-note" style="position: fixed; top: 10px; right: 20px; z-index: 1000; padding: 8px;">付箋を追加</button>
+    <div id="excalidraw-container"></div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', async () => {
+        const App = () => {
+            const [excalidrawAPI, setExcalidrawAPI] = React.useState(null);
+            const [sceneData, setSceneData] = React.useState(null);
+            const previousElementsRef = React.useRef(null);
+
+            // データの読み込み
+            React.useEffect(() => {
+                const loadData = async () => {
+                    try {
+                        console.log("Loading data...");
+                        const response = await fetch("{{ url_for('load_excalidraw_data', file_path=file_path) }}");
+                        if (!response.ok) throw new Error('データの読み込みに失敗しました');
+                        const data = await response.json();
+                        console.log("Loaded data:", data);
+                        
+                        // データ構造を正規化
+                        const normalizedData = {
+                            elements: Array.isArray(data.elements) ? data.elements : [],
+                            appState: {
+                                viewBackgroundColor: data.appState?.viewBackgroundColor || "#ffffff",
+                                currentItemFontFamily: data.appState?.currentItemFontFamily || 1,
+                                gridSize: data.appState?.gridSize || null,
+                                theme: data.appState?.theme || "light",
+                                name: "Excalidraw"
+                            },
+                            files: data.files || {}
+                        };
+                        
+                        console.log("Normalized data:", normalizedData);
+                        setSceneData(normalizedData);
+                    } catch (error) {
+                        console.error('データ読み込みエラー:', error);
+                        // エラー時のフォールバックデータ
+                        setSceneData({
+                            elements: [],
+                            appState: {
+                                viewBackgroundColor: "#ffffff",
+                                currentItemFontFamily: 1,
+                                gridSize: null,
+                                theme: "light",
+                                name: "Excalidraw"
+                            },
+                            files: {}
+                        });
+                    }
+                };
+                loadData();
+            }, []);
+
+            // 変更の保存
+            const saveDrawing = async (elements, appState, files) => {
+                try {
+                    console.log("Saving data...", elements.length, "elements");
+                    const response = await fetch("{{ url_for('save_excalidraw_data', file_path=file_path) }}", {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            elements: elements,
+                            appState: appState,
+                            files: files
+                        })
+                    });
+                    if (!response.ok) throw new Error('保存に失敗しました');
+                    console.log("Data saved successfully");
+                } catch (error) {
+                    console.error('保存エラー:', error);
+                }
+            };
+
+            // 付箋追加機能
+            const addStickyNote = React.useCallback(() => {
+                if (!excalidrawAPI) return;
+                
+                const viewportPosition = {
+                    x: excalidrawAPI.getAppState().scrollX + window.innerWidth / 2,
+                    y: excalidrawAPI.getAppState().scrollY + window.innerHeight / 2
+                };
+
+                const newElement = {
+                    id: Math.random().toString(36).substr(2, 9),
+                    type: 'rectangle',
+                    x: viewportPosition.x - 100,
+                    y: viewportPosition.y - 50,
+                    width: 200,
+                    height: 100,
+                    angle: 0,
+                    strokeColor: '#000000',
+                    backgroundColor: '#fef3bd',
+                    fillStyle: 'solid',
+                    strokeWidth: 1,
+                    strokeStyle: 'solid',
+                    roughness: 0,
+                    opacity: 100,
+                    groupIds: [],
+                    seed: Math.random(),
+                    version: 1,
+                    versionNonce: 0,
+                    isDeleted: false,
+                    boundElements: null,
+                    updated: Date.now(),
+                    link: null,
+                    locked: false,
+                };
+                
+                excalidrawAPI.updateScene({
+                    elements: [...excalidrawAPI.getSceneElements(), newElement]
+                });
+            }, [excalidrawAPI]);
+
+            // 要素が変更されたかチェック
+            const hasElementsChanged = (newElements, prevElements) => {
+                if (!prevElements || prevElements.length !== newElements.length) {
+                    return true;
+                }
+                return JSON.stringify(newElements) !== JSON.stringify(prevElements);
+            };
+
+            // Excalidrawコンポーネントの設定を修正
+            const excalidrawProps = {
+                onChange: (elements, state, files) => {
+                    if (!previousElementsRef.current || hasElementsChanged(elements, previousElementsRef.current)) {
+                        console.log("Elements changed, saving...", elements);
+                        saveDrawing(elements, state, files);
+                        previousElementsRef.current = JSON.parse(JSON.stringify(elements));
+                    }
+                },
+                onPointerUp: () => {
+                    if (excalidrawAPI) {
+                        const elements = excalidrawAPI.getSceneElements();
+                        const appState = excalidrawAPI.getAppState();
+                        const files = excalidrawAPI.getFiles();
+                        console.log("Saving on pointer up:", elements);
+                        saveDrawing(elements, appState, files);
+                    }
+                },
+                onExcalidrawAPI: (api) => {
+                    console.log("Excalidraw API initialized");
+                    setExcalidrawAPI(api);
+                },
+                initialData: sceneData || {
+                    elements: [],
+                    appState: {
+                        viewBackgroundColor: "#ffffff",
+                        currentItemFontFamily: 1,
+                        gridSize: null,
+                        theme: "light",
+                        name: "Excalidraw"
+                    },
+                    files: {}
+                },
+                langCode: "ja-JP"
+            };
+
+            // ボタンのイベントリスナー設定
+            React.useEffect(() => {
+                const button = document.getElementById('add-sticky-note');
+                if (button) {
+                    button.addEventListener('click', addStickyNote);
+                    return () => button.removeEventListener('click', addStickyNote);
+                }
+            }, [addStickyNote]);
+
+            // データがロードされるまで待機
+            if (!sceneData) {
+                return React.createElement('div', null, 'Loading...');
+            }
+
+            console.log("Rendering with data:", sceneData);
+            return React.createElement(ExcalidrawLib.Excalidraw, excalidrawProps);
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('excalidraw-container'));
+        root.render(React.createElement(App));
+    });
+</script>
+{% endblock %}
