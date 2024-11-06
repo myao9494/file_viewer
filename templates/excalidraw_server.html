@@ -93,6 +93,145 @@
             const previousElementsRef = React.useRef(null);
             const excalidrawRef = React.useRef(null);
 
+            // 付箋を追加する関数
+            const addStickyNote = React.useCallback(() => {
+                if (!excalidrawAPI) {
+                    console.warn('Excalidraw API not ready');
+                    return;
+                }
+                
+                try {
+                    const viewportPosition = {
+                        x: excalidrawAPI.getAppState().scrollX + window.innerWidth / 2,
+                        y: excalidrawAPI.getAppState().scrollY + window.innerHeight / 2
+                    };
+
+                    const newElement = {
+                        id: Math.random().toString(36).substr(2, 9),
+                        type: 'rectangle',
+                        x: viewportPosition.x - 100,
+                        y: viewportPosition.y - 50,
+                        width: 200,
+                        height: 100,
+                        angle: 0,
+                        strokeColor: '#000000',
+                        backgroundColor: '#fef3bd',
+                        fillStyle: 'solid',
+                        strokeWidth: 1,
+                        strokeStyle: 'solid',
+                        roughness: 0,
+                        opacity: 100,
+                        groupIds: [],
+                        seed: Math.random(),
+                        version: 1,
+                        versionNonce: 0,
+                        isDeleted: false,
+                        boundElements: null,
+                        updated: Date.now(),
+                        link: null,
+                        locked: false,
+                    };
+                    
+                    excalidrawAPI.updateScene({
+                        elements: [...excalidrawAPI.getSceneElements(), newElement]
+                    });
+                    console.log('付箋を追加しました:', newElement);
+                } catch (error) {
+                    console.error('付箋の追加に失敗しました:', error);
+                }
+            }, [excalidrawAPI]);
+
+            // ボタンのイベントリスナーを設定
+            React.useEffect(() => {
+                if (!excalidrawAPI) return;
+
+                const button = document.getElementById('add-sticky-note');
+                if (button) {
+                    button.addEventListener('click', addStickyNote);
+                    console.log('ボタンのイベントリスナーを設定しました');
+                }
+
+                return () => {
+                    const button = document.getElementById('add-sticky-note');
+                    if (button) {
+                        button.removeEventListener('click', addStickyNote);
+                    }
+                };
+            }, [excalidrawAPI, addStickyNote]);
+
+            // キーボードショートカットとマウス位置の処理
+            React.useEffect(() => {
+                if (!excalidrawAPI) return;
+
+                let mouseX = 0;
+                let mouseY = 0;
+
+                const handleMouseMove = (event) => {
+                    mouseX = event.clientX;
+                    mouseY = event.clientY;
+                };
+
+                const handleKeyPress = (event) => {
+                    if (event.key.toLowerCase() === 'n' && 
+                        !event.target.matches('input, textarea, [contenteditable]')) {
+                        event.preventDefault();
+                        
+                        const viewportPosition = {
+                            x: mouseX + excalidrawAPI.getAppState().scrollX,
+                            y: mouseY + excalidrawAPI.getAppState().scrollY
+                        };
+                        
+                        console.log('マウスの位置:', {
+                            viewport: viewportPosition,
+                            mouse: { x: mouseX, y: mouseY },
+                            scroll: {
+                                x: excalidrawAPI.getAppState().scrollX,
+                                y: excalidrawAPI.getAppState().scrollY
+                            }
+                        });
+
+                        // 付箋をマウス位置に追加
+                        const newElement = {
+                            id: Math.random().toString(36).substr(2, 9),
+                            type: 'rectangle',
+                            x: viewportPosition.x - 100,
+                            y: viewportPosition.y - 50,
+                            width: 200,
+                            height: 100,
+                            angle: 0,
+                            strokeColor: '#000000',
+                            backgroundColor: '#fef3bd',
+                            fillStyle: 'solid',
+                            strokeWidth: 1,
+                            strokeStyle: 'solid',
+                            roughness: 0,
+                            opacity: 100,
+                            groupIds: [],
+                            seed: Math.random(),
+                            version: 1,
+                            versionNonce: 0,
+                            isDeleted: false,
+                            boundElements: null,
+                            updated: Date.now(),
+                            link: null,
+                            locked: false,
+                        };
+
+                        excalidrawAPI.updateScene({
+                            elements: [...excalidrawAPI.getSceneElements(), newElement]
+                        });
+                    }
+                };
+
+                document.addEventListener('mousemove', handleMouseMove);
+                document.addEventListener('keydown', handleKeyPress);
+                
+                return () => {
+                    document.removeEventListener('mousemove', handleMouseMove);
+                    document.removeEventListener('keydown', handleKeyPress);
+                };
+            }, [excalidrawAPI]);
+
             // データの読み込み
             React.useEffect(() => {
                 const loadData = async () => {
@@ -150,59 +289,11 @@
                             files: files
                         })
                     });
-                    if (!response.ok) throw new Error('保存に失敗しました');
+                    if (!response.ok) throw new Error('保存に失敗しま��た');
                     console.log("Data saved successfully");
                 } catch (error) {
                     console.error('保存エラー:', error);
                 }
-            };
-
-            // 付箋追加機能
-            const addStickyNote = React.useCallback(() => {
-                if (!excalidrawAPI) return;
-                
-                const viewportPosition = {
-                    x: excalidrawAPI.getAppState().scrollX + window.innerWidth / 2,
-                    y: excalidrawAPI.getAppState().scrollY + window.innerHeight / 2
-                };
-
-                const newElement = {
-                    id: Math.random().toString(36).substr(2, 9),
-                    type: 'rectangle',
-                    x: viewportPosition.x - 100,
-                    y: viewportPosition.y - 50,
-                    width: 200,
-                    height: 100,
-                    angle: 0,
-                    strokeColor: '#000000',
-                    backgroundColor: '#fef3bd',
-                    fillStyle: 'solid',
-                    strokeWidth: 1,
-                    strokeStyle: 'solid',
-                    roughness: 0,
-                    opacity: 100,
-                    groupIds: [],
-                    seed: Math.random(),
-                    version: 1,
-                    versionNonce: 0,
-                    isDeleted: false,
-                    boundElements: null,
-                    updated: Date.now(),
-                    link: null,
-                    locked: false,
-                };
-                
-                excalidrawAPI.updateScene({
-                    elements: [...excalidrawAPI.getSceneElements(), newElement]
-                });
-            }, [excalidrawAPI]);
-
-            // 要素が変更されたかチェック
-            const hasElementsChanged = (newElements, prevElements) => {
-                if (!prevElements || prevElements.length !== newElements.length) {
-                    return true;
-                }
-                return JSON.stringify(newElements) !== JSON.stringify(prevElements);
             };
 
             // ライブラリの変更を監視して保存する関数を追加
@@ -230,6 +321,22 @@
                     console.error('ライブラリの保存エラー:', error);
                 }
             }, []);
+
+            // 要素の変更を検出する関数を追加
+            const hasElementsChanged = (newElements, oldElements) => {
+                if (!oldElements) return true;
+                if (newElements.length !== oldElements.length) return true;
+                
+                return newElements.some((element, index) => {
+                    const oldElement = oldElements[index];
+                    return (
+                        element.id !== oldElement.id ||
+                        element.version !== oldElement.version ||
+                        element.versionNonce !== oldElement.versionNonce ||
+                        element.updated !== oldElement.updated
+                    );
+                });
+            };
 
             if (!sceneData) {
                 return React.createElement('div', null, 'Loading...');
