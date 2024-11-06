@@ -398,8 +398,8 @@ window.addEventListener('resize', updateSvgContentSize);
 function editInExcalidraw() {
     // .excalidraw.svg を .excalidraw に変更してリダイレクト
     const currentPath = '{{ file_path }}';
-    // const excalidrawPath = currentPath.replace('.excalidraw.svg', '.excalidraw');
-    window.location.href = '/excalidraw/' + currentPath;
+    const excalidrawPath = currentPath.replace('_excalidraw.svg', '.excalidraw');
+    window.location.href = '/excalidraw-server/' + excalidrawPath;
 }
 </script>
 {% endblock %}

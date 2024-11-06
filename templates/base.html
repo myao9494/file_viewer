@@ -328,34 +328,9 @@
         const fileName = prompt('新しい図の名前を入力してください（_excalidraw.svg は自動的に追加されます）:');
         
         if (fileName) {
-            // 拡張子を追加
-            const fullFileName = fileName.endsWith('_excalidraw.svg') ? 
-                fileName : `${fileName}_excalidraw.svg`;
-                
-            // サーバーにファイル作成をリクエスト
-            fetch('/create-excalidraw', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    directory: currentDir,
-                    filename: fullFileName
-                })
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    // 作成されたファイルのExcalidrawページに移動
-                    window.location.href = `/excalidraw/${data.file_path}`;
-                } else {
-                    alert('エラーが発生しました: ' + data.error);
-                }
-            })
-            .catch(error => {
-                console.error('Error:', error);
-                alert('エラーが発生しました。');
-            });
+            // サーバーにファイル作成をリクエストせずに直接URLを構築
+            const filePath = currentDir ? `${currentDir}/${fileName}` : fileName;
+            window.location.href = `/excalidraw-server/${filePath}`;
         }
     }
 
