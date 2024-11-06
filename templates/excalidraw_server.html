@@ -205,6 +205,32 @@
                 return JSON.stringify(newElements) !== JSON.stringify(prevElements);
             };
 
+            // ライブラリの変更を監視して保存する関数を追加
+            const onLibraryChange = React.useCallback(async (libraryItems) => {
+                try {
+                    const libraryData = {
+                        type: "excalidrawlib",
+                        version: 2,
+                        libraryItems
+                    };
+
+                    const response = await fetch("{{ url_for('save_library') }}", {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify(libraryData)
+                    });
+
+                    if (!response.ok) {
+                        throw new Error('ライブラリの保存に失敗しました');
+                    }
+                    console.log('ライブラリを保存しました');
+                } catch (error) {
+                    console.error('ライブラリの保存エラー:', error);
+                }
+            }, []);
+
             if (!sceneData) {
                 return React.createElement('div', null, 'Loading...');
             }
@@ -247,6 +273,7 @@
                         saveDrawing(elements, appState, files);
                     }
                 },
+                onLibraryChange: onLibraryChange,  // ライブラリ変更ハンドラを追加
                 langCode: "ja-JP"
             });
         };
