@@ -978,7 +978,7 @@ def copy_images_to_clipboard():
         if cancelled:
             return jsonify({'success': True, 'message': f'{processed_images}個の画像をコピーした後、処理を中断しました。'})
         else:
-            return jsonify({'success': True, 'message': f'すべての画像（{processed_images}個）をクリップボードにコピーしました。'})
+            return jsonify({'success': True, 'message': f'すべての画像（{processed_images}個）を��リップボードにコピーしました。'})
     except Exception as e:
         app.logger.exception("エラーが発生しました")
         return jsonify({'success': False, 'error': str(e)})
@@ -1200,51 +1200,57 @@ def save_library():
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
-@app.route('/save_excalidraw', methods=['POST'])
-def save_excalidraw():
+@app.route('/save-excalidraw-data/<path:file_path>', methods=['POST'])
+def save_excalidraw_data(file_path):
+    """
+    Excalidrawデータを保存
+    """
     try:
         data = request.json
-        file_path = data['path']
-        drawing_data = data['data']
-        
-        # excalidrawフォルダのパスを作成
-        excalidraw_dir = os.path.join(os.path.dirname(file_path), 'excalidraw')
+        full_path = normalize_path(os.path.join(BASE_DIR, file_path))
+        excalidraw_dir = os.path.join(os.path.dirname(full_path), 'excalidraw')
         os.makedirs(excalidraw_dir, exist_ok=True)
         
-        # 保存するデータを準備
+        base_name = os.path.splitext(os.path.basename(full_path))[0]
+        if base_name.endswith('.excalidraw'):
+            base_name = base_name[:-11]
+            
+        # excalidrawファイルとして保存
+        excalidraw_path = os.path.join(excalidraw_dir, f"{base_name}.excalidraw")
+        
+        app.logger.info(f"Saving to: {excalidraw_path}")
+        app.logger.info(f"Saving {len(data.get('elements', []))} elements")
+        
         scene_data = {
             "type": "excalidraw",
             "version": 2,
-            "source": "http://localhost:5001",
-            "elements": drawing_data.get("elements", []),
-            "appState": drawing_data.get("appState", {}),
-            "files": drawing_data.get("files", {})
+            "source": request.host_url,
+            "elements": data.get("elements", []),
+            "appState": data.get("appState", {
+                "viewBackgroundColor": "#ffffff",
+                "currentItemFontFamily": 1,
+                "gridSize": None,
+                "theme": "light"
+            }),
+            "files": data.get("files", {})
         }
         
-        # ベースファイル名を作成
-        base_name = os.path.splitext(os.path.basename(file_path))[0]
-        if base_name.endswith('.excalidraw'):
-            base_name = base_name[:-11]  # .excalidrawを除去
-        
-        # excalidrawファイルとして保存
-        excalidraw_path = os.path.join(excalidraw_dir, f"{base_name}.excalidraw")
+        # excalidrawファイルを保存
         with open(excalidraw_path, 'w', encoding='utf-8') as f:
             json.dump(scene_data, f, ensure_ascii=False, indent=2)
-        
-        # SVGファイルとして保存
-        svg_dir = os.path.dirname(file_path)
-        if drawing_data.get('svg'):
-            svg_path = os.path.join(svg_dir, f"{base_name}_excalidraw.svg")
+            
+        # SVGファイルを保存
+        if data.get('svg'):
+            svg_path = os.path.join(os.path.dirname(full_path), f"{base_name}_excalidraw.svg")
             with open(svg_path, 'w', encoding='utf-8') as f:
-                f.write(drawing_data['svg'])
+                f.write(data['svg'])
             app.logger.info(f"Successfully saved SVG to {svg_path}")
             
-        app.logger.info(f"Successfully saved to {excalidraw_path}")
-        return jsonify({'success': True})
-        
+        app.logger.info("Data saved successfully")
+        return jsonify({"success": True})
     except Exception as e:
-        app.logger.error(f"Error saving excalidraw: {str(e)}")
-        return jsonify({'success': False, 'error': str(e)}), 500
+        app.logger.error(f"Error saving excalidraw data: {str(e)}")
+        return jsonify({"error": str(e)}), 500
 
 @app.route('/excalidraw-server/<path:file_path>')
 def excalidraw_server(file_path):
@@ -1312,49 +1318,6 @@ def load_excalidraw_data(file_path):
     except Exception as e:
         app.logger.error(f"Error loading excalidraw data: {str(e)}")
         return jsonify(initial_data), 200  # エラー時も初期データを返す
-
-@app.route('/save-excalidraw-data/<path:file_path>', methods=['POST'])
-def save_excalidraw_data(file_path):
-    """
-    Excalidrawデータを保存
-    """
-    try:
-        data = request.json
-        full_path = normalize_path(os.path.join(BASE_DIR, file_path))
-        excalidraw_dir = os.path.join(os.path.dirname(full_path), 'excalidraw')
-        os.makedirs(excalidraw_dir, exist_ok=True)
-        
-        base_name = os.path.splitext(os.path.basename(full_path))[0]
-        if base_name.endswith('.excalidraw'):
-            base_name = base_name[:-11]
-            
-        excalidraw_path = os.path.join(excalidraw_dir, f"{base_name}.excalidraw")
-        
-        app.logger.info(f"Saving to: {excalidraw_path}")
-        app.logger.info(f"Saving {len(data.get('elements', []))} elements")
-        
-        scene_data = {
-            "type": "excalidraw",
-            "version": 2,
-            "source": request.host_url,
-            "elements": data.get("elements", []),
-            "appState": data.get("appState", {
-                "viewBackgroundColor": "#ffffff",
-                "currentItemFontFamily": 1,
-                "gridSize": None,
-                "theme": "light"
-            }),
-            "files": data.get("files", {})
-        }
-        
-        with open(excalidraw_path, 'w', encoding='utf-8') as f:
-            json.dump(scene_data, f, ensure_ascii=False, indent=2)
-            
-        app.logger.info("Data saved successfully")
-        return jsonify({"success": True})
-    except Exception as e:
-        app.logger.error(f"Error saving excalidraw data: {str(e)}")
-        return jsonify({"error": str(e)}), 500
 
 if __name__ == '__main__':
     app.secret_key = 'your_secret_key_here'  # セッション用の秘密鍵

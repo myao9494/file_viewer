@@ -280,16 +280,30 @@
             const saveDrawing = async (elements, appState, files) => {
                 try {
                     console.log("Saving data...", elements.length, "elements");
+                    
+                    // SVGをエクスポート
+                    const svgString = await ExcalidrawLib.exportToSvg({
+                        elements: elements,
+                        appState: {
+                            ...appState,
+                            exportWithDarkMode: false,
+                            exportBackground: true,
+                            viewBackgroundColor: "#ffffff"
+                        },
+                        files: files
+                    });
+
                     const response = await fetch("{{ url_for('save_excalidraw_data', file_path=file_path) }}", {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
                             elements: elements,
                             appState: appState,
-                            files: files
+                            files: files,
+                            svg: svgString.outerHTML  // SVGデータを追加
                         })
                     });
-                    if (!response.ok) throw new Error('保存に失敗しま��た');
+                    if (!response.ok) throw new Error('保存に失敗しました');
                     console.log("Data saved successfully");
                 } catch (error) {
                     console.error('保存エラー:', error);
