@@ -46,10 +46,52 @@
 {% block scripts %}
 <script>
     document.addEventListener('DOMContentLoaded', async () => {
+        // ライブラリファイルを読み込む関数を追加
+        async function loadExcalidrawLibrary() {
+            try {
+                const response = await fetch("{{ url_for('static', filename='excalidraw_lib/my_lib.excalidrawlib') }}");
+                console.log("aaaaaaaa",response);
+                if (!response.ok) {
+                    throw new Error('ライブラリの読み込みに失敗しました');
+                }
+                return await response.json();
+            } catch (error) {
+                console.error('ライブラリの読み込みエラー:', error);
+                return null;
+            }
+        }
+
+        // クリップボードの処理を修正
+        setTimeout(async () => {
+            try {
+                const originalPath = '{{ full_path }}';
+                const isWindows = navigator.platform.toLowerCase().includes('win');
+                const pathToCopy = isWindows 
+                    ? originalPath.replace(/\//g, '\\')
+                    : originalPath;
+                
+                // クリップボード処理を Promise で適切に処理
+                await new Promise((resolve, reject) => {
+                    navigator.clipboard.writeText(pathToCopy)
+                        .then(() => {
+                            console.log('パスをクリップボードにコピーしました:', pathToCopy);
+                            resolve();
+                        })
+                        .catch(err => {
+                            console.error('クリップボードへのコピーに失敗しました:', err);
+                            reject(err);
+                        });
+                });
+            } catch (err) {
+                console.error('クリップボード処理中にエラーが発生しました:', err);
+            }
+        }, 500);
+
         const App = () => {
             const [excalidrawAPI, setExcalidrawAPI] = React.useState(null);
             const [sceneData, setSceneData] = React.useState(null);
             const previousElementsRef = React.useRef(null);
+            const excalidrawRef = React.useRef(null);
 
             // データの読み込み
             React.useEffect(() => {
@@ -163,8 +205,32 @@
                 return JSON.stringify(newElements) !== JSON.stringify(prevElements);
             };
 
-            // Excalidrawコンポーネントの設定を修正
-            const excalidrawProps = {
+            if (!sceneData) {
+                return React.createElement('div', null, 'Loading...');
+            }
+
+            console.log("Rendering with data:", sceneData);
+            
+            // Excalidrawコンポーネントを直接レンダリング
+            const ExcalidrawComponent = ExcalidrawLib.Excalidraw;
+            return React.createElement(ExcalidrawComponent, {
+                excalidrawAPI: (api) => {
+                    console.log("Excalidraw API being initialized with api:", api);
+                    setExcalidrawAPI(api);
+                    excalidrawRef.current = api;
+                    
+                    // APIが初期化された直後にライブラリを読み込む
+                    loadExcalidrawLibrary().then(libraryItems => {
+                        console.log("Library items loaded:", libraryItems);
+                        if (libraryItems && api) {
+                            api.updateLibrary({
+                                libraryItems: libraryItems.libraryItems || []
+                            });
+                            console.log('ライブラリを読み込みました');
+                        }
+                    });
+                },
+                initialData: sceneData,
                 onChange: (elements, state, files) => {
                     if (!previousElementsRef.current || hasElementsChanged(elements, previousElementsRef.current)) {
                         console.log("Elements changed, saving...", elements);
@@ -173,48 +239,16 @@
                     }
                 },
                 onPointerUp: () => {
-                    if (excalidrawAPI) {
-                        const elements = excalidrawAPI.getSceneElements();
-                        const appState = excalidrawAPI.getAppState();
-                        const files = excalidrawAPI.getFiles();
+                    if (excalidrawRef.current) {
+                        const elements = excalidrawRef.current.getSceneElements();
+                        const appState = excalidrawRef.current.getAppState();
+                        const files = excalidrawRef.current.getFiles();
                         console.log("Saving on pointer up:", elements);
                         saveDrawing(elements, appState, files);
                     }
                 },
-                onExcalidrawAPI: (api) => {
-                    console.log("Excalidraw API initialized");
-                    setExcalidrawAPI(api);
-                },
-                initialData: sceneData || {
-                    elements: [],
-                    appState: {
-                        viewBackgroundColor: "#ffffff",
-                        currentItemFontFamily: 1,
-                        gridSize: null,
-                        theme: "light",
-                        name: "Excalidraw"
-                    },
-                    files: {}
-                },
                 langCode: "ja-JP"
-            };
-
-            // ボタンのイベントリスナー設定
-            React.useEffect(() => {
-                const button = document.getElementById('add-sticky-note');
-                if (button) {
-                    button.addEventListener('click', addStickyNote);
-                    return () => button.removeEventListener('click', addStickyNote);
-                }
-            }, [addStickyNote]);
-
-            // データがロードされるまで待機
-            if (!sceneData) {
-                return React.createElement('div', null, 'Loading...');
-            }
-
-            console.log("Rendering with data:", sceneData);
-            return React.createElement(ExcalidrawLib.Excalidraw, excalidrawProps);
+            });
         };
 
         const root = ReactDOM.createRoot(document.getElementById('excalidraw-container'));
