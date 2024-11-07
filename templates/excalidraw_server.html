@@ -221,6 +221,64 @@
                             elements: [...excalidrawAPI.getSceneElements(), newElement]
                         });
                     }
+
+                    if (event.key.toLowerCase() === 'w' && 
+                        !event.target.matches('input, textarea, [contenteditable]')) {
+                        event.preventDefault();
+                        
+                        navigator.clipboard.readText().then(clipboardText => {
+                            const pathParts = clipboardText.split(/[\/\\]/);
+                            const displayText = pathParts[pathParts.length - 1];
+                            
+                            const viewportPosition = {
+                                x: mouseX + excalidrawAPI.getAppState().scrollX,
+                                y: mouseY + excalidrawAPI.getAppState().scrollY
+                            };
+
+                            const stickyNote = {
+                                type: "rectangle",
+                                id: Math.random().toString(36).substr(2, 9),
+                                x: viewportPosition.x - 100,
+                                y: viewportPosition.y - 25,
+                                width: 200,
+                                height: 50,
+                                angle: 0,
+                                strokeColor: "#000000",
+                                backgroundColor: "#fef3bd",
+                                fillStyle: "solid",
+                                strokeWidth: 1,
+                                strokeStyle: "solid",
+                                roughness: 0,
+                                opacity: 100,
+                                groupIds: [],
+                                seed: Math.random(),
+                                version: 1,
+                                versionNonce: 0,
+                                isDeleted: false,
+                                boundElements: null,
+                                updated: Date.now(),
+                                link: clipboardText,
+                                locked: false,
+                                text: displayText,
+                                fontSize: 10,
+                                fontFamily: 1,
+                                textAlign: "center",
+                                verticalAlign: "middle",
+                                baseline: 25,
+                            };
+
+                            // 要素の追加と選択状態の設定を同時に行う
+                            excalidrawAPI.updateScene({
+                                elements: [...excalidrawAPI.getSceneElements(), stickyNote],
+                                appState: {
+                                    ...excalidrawAPI.getAppState(),
+                                    selectedElementIds: { [stickyNote.id]: true }
+                                }
+                            });
+                        }).catch(error => {
+                            console.error('クリップボードの読み取りに失敗しました:', error);
+                        });
+                    }
                 };
 
                 document.addEventListener('mousemove', handleMouseMove);
