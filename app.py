@@ -202,10 +202,6 @@ def view_file(file_path):
         return render_template('markdown_view.html', content=content, file_path=file_path, full_path=full_path, folder_path=folder_path, BASE_DIR=BASE_DIR, current_item=current_item)
 
     # CSVファイルの場合
-    # CSVファイルの場合
-    # if file_extension == '.csv':
-    #     content = render_csv(full_path)
-    #     return render_template('data_table_view_tabulator.html', content=content, file_path=file_path, full_path=full_path, BASE_DIR=BASE_DIR, current_item=current_item)
     # if file_extension == '.csv':
     #     content = render_csv(full_path)
     #     return render_template('data_table_view.html', content=content, file_path=file_path, full_path=full_path, BASE_DIR=BASE_DIR, current_item=current_item)
@@ -214,9 +210,13 @@ def view_file(file_path):
     #     content = render_csv(full_path)
     #     return render_template('ag_grid_view.html', content=content, file_path=file_path, full_path=full_path, BASE_DIR=BASE_DIR, current_item=current_item)
     if file_extension == '.csv':
-        content = render_csv2(full_path)
-        return render_template('csv_view.html', content=content, file_path=file_path, full_path=full_path, BASE_DIR=BASE_DIR, current_item=current_item)
-
+        if full_path.endswith('_tabulator.csv'):
+            content = render_csv(full_path)
+            return render_template('data_table_view_tabulator.html', content=content, file_path=file_path, full_path=full_path, BASE_DIR=BASE_DIR, current_item=current_item)
+        else:
+            content = render_csv2(full_path)
+            return render_template('csv_view.html', content=content, file_path=file_path, full_path=full_path, BASE_DIR=BASE_DIR, current_item=current_item)
+    
     # ipynbファイルの場合
     if file_extension == '.ipynb':
         # ファイルパスをベースディレクトリからの相対パスに変換

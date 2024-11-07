@@ -103,10 +103,6 @@
             <button id="createMarkdownBtn" title="Markdownファイルを作成" onclick="createMarkdown()">
                 <i class="fas fa-file-alt"></i>
             </button>
-            <!-- 新しく追加するメモ用ボタン -->
-            <a href="/excalidraw-memo" title="Excalidraw Memo" class="top-button">
-                <i class="fas fa-sticky-note"></i>
-            </a>
         </div>
         {% block folder_path %}{% endblock %}
     </div>
@@ -133,8 +129,10 @@
         var currentPath = window.location.pathname;
 
         function updateHref() {
-            if (currentPath.startsWith('/view/')) {
-                var filePath = currentPath.substring(6);
+            if (currentPath.startsWith('/view/') || currentPath.startsWith('/excalidraw-server/')) {
+                var prefix = currentPath.startsWith('/view/') ? '/view/' : '/excalidraw-server/';
+                var filePath = currentPath.substring(prefix.length);
+                
                 if (filePath) {
                     var parentPath = filePath.split('/').slice(0, -1).join('/');
                     showDirectoryBtn.href = '/view/' + parentPath;
