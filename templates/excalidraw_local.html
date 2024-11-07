@@ -275,9 +275,18 @@
                         !event.target.matches('input, textarea, [contenteditable]')) {
                         event.preventDefault();
                         
-                        navigator.clipboard.readText().then(clipboardText => {
+                        navigator.clipboard.readText().then(async clipboardText => {
                             const pathParts = clipboardText.split(/[\/\\]/);
-                            const displayText = pathParts[pathParts.length - 1];
+                            // URLデコードを追加
+                            const displayText = decodeURIComponent(pathParts[pathParts.length - 1]);
+                            
+                            // デコードしたdisplayTextをクリップボードに保存
+                            try {
+                                await navigator.clipboard.writeText(displayText);
+                                console.log('デコードしたファイル名をクリップボードにコピーしました:', displayText);
+                            } catch (error) {
+                                console.error('クリップボードへのコピーに失敗しました:', error);
+                            }
                             
                             const viewportPosition = {
                                 x: mouseX + excalidrawAPI.getAppState().scrollX,
