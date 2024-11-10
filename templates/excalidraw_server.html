@@ -175,10 +175,11 @@
                     if (event.key.toLowerCase() === 'n' && 
                         !event.target.matches('input, textarea, [contenteditable]')) {
                         event.preventDefault();
-                        
+                        // ズーム倍率を考慮した位置計算
+                        const zoom = excalidrawAPI.getAppState().zoom.value;
                         const viewportPosition = {
-                            x: mouseX + excalidrawAPI.getAppState().scrollX,
-                            y: mouseY + excalidrawAPI.getAppState().scrollY
+                            x: (excalidrawAPI.getAppState().scrollX * -1) + mouseX / zoom ,
+                            y: (excalidrawAPI.getAppState().scrollY * -1 )+ mouseY / zoom
                         };
                         
                         console.log('マウスの位置:', {
@@ -195,7 +196,7 @@
                             id: Math.random().toString(36).substr(2, 9),
                             type: 'rectangle',
                             x: viewportPosition.x - 100,
-                            y: viewportPosition.y - 50,
+                            y: viewportPosition.y - 80,
                             width: 200,
                             height: 100,
                             angle: 0,
@@ -238,17 +239,18 @@
                             } catch (error) {
                                 console.error('クリップボードへのコピーに失敗しました:', error);
                             }
-
+                            // ズーム倍率を考慮した位置計算
+                            const zoom = excalidrawAPI.getAppState().zoom.value;
                             const viewportPosition = {
-                                x: mouseX + excalidrawAPI.getAppState().scrollX,
-                                y: mouseY + excalidrawAPI.getAppState().scrollY
+                                x: (excalidrawAPI.getAppState().scrollX * -1) + mouseX / zoom ,
+                                y: (excalidrawAPI.getAppState().scrollY * -1 )+ mouseY / zoom
                             };
 
                             const stickyNote = {
                                 type: "rectangle",
                                 id: Math.random().toString(36).substr(2, 9),
                                 x: viewportPosition.x - 100,
-                                y: viewportPosition.y - 25,
+                                y: viewportPosition.y - 80,
                                 width: 200,
                                 height: 50,
                                 angle: 0,

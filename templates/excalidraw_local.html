@@ -80,17 +80,17 @@
                     : originalPath;
                 
                 // クリップボード処理を Promise で適切に処理
-                await new Promise((resolve, reject) => {
-                    navigator.clipboard.writeText(pathToCopy)
-                        .then(() => {
-                            console.log('パスをクリップボードにコピーしました:', pathToCopy);
-                            resolve();
-                        })
-                        .catch(err => {
-                            console.error('クリップボードへのコピーに失敗しました:', err);
-                            reject(err);
-                        });
-                });
+                // await new Promise((resolve, reject) => {
+                //     navigator.clipboard.writeText(pathToCopy)
+                //         .then(() => {
+                //             console.log('パスをクリップボードにコピーしました:', pathToCopy);
+                //             resolve();
+                //         })
+                //         .catch(err => {
+                //             console.error('クリップボードへのコピーに失敗しました:', err);
+                //             reject(err);
+                //         });
+                // });
             } catch (err) {
                 console.error('クリップボード処理中にエラーが発生しました:', err);
             }
@@ -169,7 +169,7 @@
                     });
                     console.log('付箋を追加しました:', newElement);
                 } catch (error) {
-                    console.error('付箋の追加に���敗しました:', error);
+                    console.error('付箋の追加に失敗しました:', error);
                 }
             }, [excalidrawAPI]);
 
@@ -205,17 +205,27 @@
                 };
 
                 const handleKeyPress = (event) => {
-                    // Nキが押された時（かつ、テキスト入力中でない時）
+                    // Nキーが押された時（かつ、テキスト入力中でない時）
                     if (event.key.toLowerCase() === 'n' && 
                         !event.target.matches('input, textarea, [contenteditable]')) {
                         event.preventDefault();
                         
-                        // マウスの位置をログ出力
+                        // ズーム倍率を考慮した位置計算
+                        const zoom = excalidrawAPI.getAppState().zoom.value;
                         const viewportPosition = {
-                            x: mouseX + excalidrawAPI.getAppState().scrollX,
-                            y: mouseY + excalidrawAPI.getAppState().scrollY
+                            // x: (mouseX - excalidrawAPI.getAppState().offsetLeft) / zoom + excalidrawAPI.getAppState().scrollX,
+                            // y: (mouseY - excalidrawAPI.getAppState().offsetTop) / zoom + excalidrawAPI.getAppState().scrollY
+                            x: (excalidrawAPI.getAppState().scrollX * -1) + mouseX / zoom ,
+                            y: (excalidrawAPI.getAppState().scrollY * -1 )+ mouseY / zoom
                         };
+
+                        // マウスの位置をログ出力
                         console.log('マウスの位置:', {
+                            offset: {
+                                left_x: excalidrawAPI.getAppState().offsetLeft,
+                                top_y: excalidrawAPI.getAppState().offsetTop
+                            },
+                            zoom : zoom ,
                             viewport: viewportPosition,
                             mouse: { x: mouseX, y: mouseY },
                             scroll: {
@@ -236,8 +246,8 @@
                                 const newElement = {
                                     id: Math.random().toString(36).substr(2, 9),
                                     type: 'rectangle',
-                                    x: viewportPosition.x - 100,
-                                    y: viewportPosition.y - 50,
+                                    x: viewportPosition.x -100,
+                                    y: viewportPosition.y -80,
                                     width: 200,
                                     height: 100,
                                     angle: 0,
@@ -285,19 +295,22 @@
                                 await navigator.clipboard.writeText(displayText);
                                 console.log('デコードしたファイル名をクリップボードにコピーしました:', displayText);
                             } catch (error) {
-                                console.error('クリップボードへのコピーに失敗しました:', error);
+                                console.error('クリップボードへのコピに失敗しました:', error);
                             }
-                            
+                            // ズーム倍率を考慮した位置計算
+                            const zoom = excalidrawAPI.getAppState().zoom.value;
                             const viewportPosition = {
-                                x: mouseX + excalidrawAPI.getAppState().scrollX,
-                                y: mouseY + excalidrawAPI.getAppState().scrollY
+                                // x: mouseX + excalidrawAPI.getAppState().scrollX,
+                                // y: mouseY + excalidrawAPI.getAppState().scrollY
+                                x: (excalidrawAPI.getAppState().scrollX * -1) + mouseX / zoom ,
+                                y: (excalidrawAPI.getAppState().scrollY * -1 )+ mouseY / zoom
                             };
 
                             const stickyNote = {
                                 type: "rectangle",
                                 id: Math.random().toString(36).substr(2, 9),
                                 x: viewportPosition.x - 100,
-                                y: viewportPosition.y - 25,
+                                y: viewportPosition.y - 80,
                                 width: 200,
                                 height: 50,
                                 angle: 0,

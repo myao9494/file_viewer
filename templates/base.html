@@ -214,7 +214,13 @@
 
     function openInVSCode() {
         var currentPath = window.location.pathname;
-        var filePath = currentPath.startsWith('/view/') ? currentPath.substring(6) : '';
+        var filePath = '';
+        
+        if (currentPath.startsWith('/view/')) {
+            filePath = currentPath.substring(6);
+        } else if (currentPath.startsWith('/excalidraw-server/')) {
+            filePath = currentPath.substring(18);
+        }
         
         fetch('/open-in-code2', {
             method: 'POST',
@@ -328,7 +334,7 @@
         if (fileName) {
             // サーバーにファイル作成をリクエストせずに直接URLを構築
             const filePath = currentDir ? `${currentDir}/${fileName}` : fileName;
-            window.location.href = `/excalidraw-server/${filePath}`;
+            window.location.href = `/excalidraw-server/${filePath}.excalidraw`;
         }
     }
 

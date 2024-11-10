@@ -402,6 +402,10 @@ def open_in_code2():
 
 @app.route('/open-folder', methods=['POST'])
 def open_folder():
+    def is_file_path(file_path):
+        # パスがディレクトリっぽくなく、拡張子があるかどうかで判断
+        return not file_path.endswith(os.path.sep) and os.path.splitext(file_path)[1] != ""
+
     data = request.json
     file_path = data.get('path')
     app.logger.info(f"受信したfile_path: {repr(file_path)}")
@@ -411,7 +415,7 @@ def open_folder():
     
     try:
         # file_pathがファイルの場合は親ディレクトリを、ディレクトリの場合はそのまま使用
-        if os.path.isfile(file_path):
+        if is_file_path(file_path):
             folder_path = os.path.dirname(file_path)
         else:
             folder_path = file_path
