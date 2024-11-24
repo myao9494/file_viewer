@@ -305,7 +305,13 @@ def open_in_code():
             # URLデコードを行う
             decoded_path = urllib.parse.unquote(file_path)
             normalized_path = normalize_path(file_path)
-            target_path = os.path.dirname(normalized_path) if os.path.isfile(normalized_path) else normalized_path
+            
+            # ファイルが存在するか確認し、存在しない場合は親ディレクトリを使用
+            if os.path.exists(normalized_path):
+                target_path = os.path.dirname(normalized_path) if os.path.isfile(normalized_path) else normalized_path
+            else:
+                # ファイルが見つからない場合は親ディレクトリを使用
+                target_path = os.path.dirname(normalized_path)
             
             if IS_WINDOWS:
                 # Windowsの場合
@@ -338,7 +344,6 @@ def open_in_code():
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)})
 
-
 @app.route('/open-in-code2', methods=['POST'])
 def open_in_code2():
     data = request.json
@@ -362,8 +367,14 @@ def open_in_code2():
             normalized_path = normalize_path(decoded_path)
             cleaned_path = normalized_path.replace('/viewer/', '/').replace('/viewer-main/', '/').replace('/file_viewer/', '/',1).replace('file_view-main/', '')
             
-            target_path = os.path.join(BASE_DIR, cleaned_path)
-            target_path = os.path.dirname(target_path) if os.path.isfile(target_path) else target_path
+            full_path = os.path.join(BASE_DIR, cleaned_path)
+            
+            # ファイルが存在するか確認し、存在しない場合は親ディレクトリを使用
+            if os.path.exists(normalized_path):
+                target_path = os.path.dirname(normalized_path) if os.path.isfile(normalized_path) else normalized_path
+            else:
+                # ファイルが見つからない場合は親ディレクトリを使用
+                target_path = os.path.dirname(normalized_path)
             
             app.logger.info(f"開こうとしているtarget_path: {repr(target_path)}")
             
@@ -982,7 +993,7 @@ def copy_images_to_clipboard():
         if cancelled:
             return jsonify({'success': True, 'message': f'{processed_images}個の画像をコピーした後、処理を中断しました。'})
         else:
-            return jsonify({'success': True, 'message': f'すべての画像（{processed_images}個）を��リップボードにコピーしました。'})
+            return jsonify({'success': True, 'message': f'すべての画像（{processed_images}個）をクリップボードにコピーしました。'})
     except Exception as e:
         app.logger.exception("エラーが発生しました")
         return jsonify({'success': False, 'error': str(e)})

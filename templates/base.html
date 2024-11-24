@@ -213,21 +213,22 @@
     }
 
     function openInVSCode() {
-        var currentPath = window.location.pathname;
-        var filePath = '';
+        // var currentPath = window.location.pathname;
+        // var filePath = '';
         
-        if (currentPath.startsWith('/view/')) {
-            filePath = currentPath.substring(6);
-        } else if (currentPath.startsWith('/excalidraw-server/')) {
-            filePath = currentPath.substring(18);
-        }
+        // if (currentPath.startsWith('/view/')) {
+        //     filePath = currentPath.substring(6);
+        // } else if (currentPath.startsWith('/excalidraw-server/')) {
+        //     filePath = currentPath.substring(18);
+        // }
         
         fetch('/open-in-code2', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
             },
-            body: JSON.stringify({ path: filePath })
+            // body: JSON.stringify({ path: filePath })
+            body: JSON.stringify({ path: '{{ full_path | trim }}' }),
         })
         .then(response => response.json())
         .then(data => {
