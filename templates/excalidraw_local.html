@@ -243,13 +243,14 @@
                             if (!excalidrawAPI) return;
                             
                             try {
-                                const newElement = {
+                                // まず付箋（rectangle）を作成
+                                const rectangleElement = {
                                     id: Math.random().toString(36).substr(2, 9),
                                     type: 'rectangle',
                                     x: viewportPosition.x -100,
                                     y: viewportPosition.y -80,
                                     width: 200,
-                                    height: 100,
+                                    height: 50,
                                     angle: 0,
                                     strokeColor: '#000000',
                                     backgroundColor: '#fef3bd',
@@ -263,14 +264,58 @@
                                     version: 1,
                                     versionNonce: 0,
                                     isDeleted: false,
-                                    boundElements: null,
+                                    boundElements: [{ type: "text", id: "text-" + Math.random().toString(36).substr(2, 9) }],
                                     updated: Date.now(),
                                     link: null,
                                     locked: false,
                                 };
+
+                                // テキスト要素を作成
+                                const textElement = {
+                                    id: rectangleElement.boundElements[0].id,
+                                    type: 'text',
+                                    x: rectangleElement.x + 10,
+                                    y: rectangleElement.y + 20,
+                                    width: rectangleElement.width - 20,
+                                    height: rectangleElement.height - 20,
+                                    angle: 0,
+                                    strokeColor: '#000000',
+                                    backgroundColor: 'transparent',
+                                    fillStyle: 'solid',
+                                    strokeWidth: 1,
+                                    strokeStyle: 'solid',
+                                    roughness: 0,
+                                    opacity: 100,
+                                    groupIds: [],
+                                    seed: Math.random(),
+                                    version: 1,
+                                    versionNonce: 0,
+                                    isDeleted: false,
+                                    text: "メモを入力",
+                                    fontSize: 17,
+                                    fontFamily: 1,
+                                    textAlign: "left",
+                                    verticalAlign: "top",
+                                    baseline: 12,
+                                    containerId: rectangleElement.id,
+                                    originalText: "メモを入力",
+                                    lineHeight: 1.1,
+                                };
                                 
+                                // 両方の要素を同時に追加
+                                const updatedElements = [
+                                    ...excalidrawAPI.getSceneElements(),
+                                    rectangleElement,
+                                    textElement
+                                ];
+
+                                // シーンを即時更新
                                 excalidrawAPI.updateScene({
-                                    elements: [...excalidrawAPI.getSceneElements(), newElement]
+                                    elements: updatedElements,
+                                    appState: {
+                                        ...excalidrawAPI.getAppState(),
+                                        selectedElementIds: { [textElement.id]: true }
+                                    }
                                 });
                             } catch (error) {
                                 console.error('付箋の追加に失敗しました:', error);
@@ -285,70 +330,142 @@
                         !event.target.matches('input, textarea, [contenteditable]')) {
                         event.preventDefault();
                         
+                        // ズーム倍率を考慮した位置計算を追加
+                        const zoom = excalidrawAPI.getAppState().zoom.value;
+                        const viewportPosition = {
+                            x: (excalidrawAPI.getAppState().scrollX * -1) + mouseX / zoom,
+                            y: (excalidrawAPI.getAppState().scrollY * -1) + mouseY / zoom
+                        };
+                        
                         navigator.clipboard.readText().then(async clipboardText => {
                             const pathParts = clipboardText.split(/[\/\\]/);
-                            // URLデコードを追加
                             const displayText = decodeURIComponent(pathParts[pathParts.length - 1]);
                             
-                            // デコードしたdisplayTextをクリップボードに保存
                             try {
-                                await navigator.clipboard.writeText(displayText);
-                                console.log('デコードしたファイル名をクリップボードにコピーしました:', displayText);
-                            } catch (error) {
-                                console.error('クリップボードへのコピに失敗しました:', error);
-                            }
-                            // ズーム倍率を考慮した位置計算
-                            const zoom = excalidrawAPI.getAppState().zoom.value;
-                            const viewportPosition = {
-                                // x: mouseX + excalidrawAPI.getAppState().scrollX,
-                                // y: mouseY + excalidrawAPI.getAppState().scrollY
-                                x: (excalidrawAPI.getAppState().scrollX * -1) + mouseX / zoom ,
-                                y: (excalidrawAPI.getAppState().scrollY * -1 )+ mouseY / zoom
-                            };
+                                // await navigator.clipboard.writeText(displayText);
+                                
+                                // 付箋（rectangle）を作成
+                                const rectangleElement = {
+                                    id: Math.random().toString(36).substr(2, 9),
+                                    type: 'rectangle',
+                                    x: viewportPosition.x - 100,
+                                    y: viewportPosition.y - 80,
+                                    width: 200,
+                                    height: 50,
+                                    angle: 0,
+                                    strokeColor: '#000000',
+                                    backgroundColor: '#fef3bd',
+                                    fillStyle: 'solid',
+                                    strokeWidth: 1,
+                                    strokeStyle: 'solid',
+                                    roughness: 0,
+                                    opacity: 100,
+                                    groupIds: [],
+                                    seed: Math.random(),
+                                    version: 1,
+                                    versionNonce: 0,
+                                    isDeleted: false,
+                                    boundElements: [{ type: "text", id: "text-" + Math.random().toString(36).substr(2, 9) }],
+                                    updated: Date.now(),
+                                    link: clipboardText,  // オリジナルのパスをリンクとして保持
+                                    locked: false,
+                                };
 
-                            const stickyNote = {
-                                type: "rectangle",
-                                id: Math.random().toString(36).substr(2, 9),
-                                x: viewportPosition.x - 100,
-                                y: viewportPosition.y - 80,
-                                width: 200,
-                                height: 50,
-                                angle: 0,
-                                strokeColor: "#000000",
-                                backgroundColor: "#fef3bd",
-                                fillStyle: "solid",
-                                strokeWidth: 1,
-                                strokeStyle: "solid",
-                                roughness: 0,
-                                opacity: 100,
-                                groupIds: [],
-                                seed: Math.random(),
-                                version: 1,
-                                versionNonce: 0,
-                                isDeleted: false,
-                                boundElements: null,
-                                updated: Date.now(),
-                                link: clipboardText,
-                                locked: false,
-                                text: displayText,
-                                fontSize: 10,
-                                fontFamily: 1,
-                                textAlign: "center",
-                                verticalAlign: "middle",
-                                baseline: 25,
-                            };
+                                // テキスト要素を作成
+                                const textElement = {
+                                    id: rectangleElement.boundElements[0].id,
+                                    type: 'text',
+                                    x: rectangleElement.x + 10,
+                                    y: rectangleElement.y + 10,
+                                    width: rectangleElement.width - 20,
+                                    height: rectangleElement.height - 20,
+                                    angle: 0,
+                                    strokeColor: '#000000',
+                                    backgroundColor: 'transparent',
+                                    fillStyle: 'solid',
+                                    strokeWidth: 1,
+                                    strokeStyle: 'solid',
+                                    roughness: 0,
+                                    opacity: 100,
+                                    groupIds: [],
+                                    seed: Math.random(),
+                                    version: 1,
+                                    versionNonce: 0,
+                                    isDeleted: false,
+                                    text: displayText,  // クリップボードから取得したファイル名をデフォルトテキストに
+                                    fontSize: 17,
+                                    fontFamily: 1,
+                                    textAlign: "left",
+                                    verticalAlign: "top",
+                                    baseline: 12,
+                                    containerId: rectangleElement.id,
+                                    originalText: displayText,
+                                    lineHeight: 1.1,
+                                };
 
                             // 要素の追加と選択状態の設定を同時に行う
-                            excalidrawAPI.updateScene({
-                                elements: [...excalidrawAPI.getSceneElements(), stickyNote],
-                                appState: {
-                                    ...excalidrawAPI.getAppState(),
-                                    selectedElementIds: { [stickyNote.id]: true }
-                                }
-                            });
+                                excalidrawAPI.updateScene({
+                                    elements: [...excalidrawAPI.getSceneElements(), rectangleElement, textElement],
+                                    appState: {
+                                        ...excalidrawAPI.getAppState(),
+                                        selectedElementIds: { [textElement.id]: true }
+                                    }
+                                });
+
+                            } catch (error) {
+                                console.error('付箋の追加に失敗しました:', error);
+                            }
                         }).catch(error => {
                             console.error('クリップボードの読み取りに失敗しました:', error);
                         });
+                    }
+
+                    // Cキーが押された時の処理を追加
+                    if (event.key.toLowerCase() === 'c' && 
+                        !event.target.matches('input, textarea, [contenteditable]')) {
+                        event.preventDefault();
+                        
+                        try {
+                            // 現在のシーン要素の数を記録
+                            const currentElementsCount = excalidrawAPI.getSceneElements().length;
+                            
+                            excalidrawAPI.setActiveTool({
+                                type: "arrow",
+                                customType: null,
+                                locked: false,
+                                strokeColor: "#000000",
+                                backgroundColor: "transparent",
+                                fillStyle: "solid",
+                                strokeWidth: 1,
+                                roughness: 0
+                            });
+
+                            // 新しい要素が追加されたときのイベントリスナー
+                            const checkNewElement = () => {
+                                const elements = excalidrawAPI.getSceneElements();
+                                if (elements.length > currentElementsCount) {
+                                    // 最後に追加された要素を取得
+                                    const newElement = elements[elements.length - 1];
+                                    if (newElement.type === "arrow") {
+                                        // 矢印をnullに設定
+                                        newElement.startArrowhead = null;
+                                        newElement.endArrowhead = null;
+                                        // シーンを更新
+                                        excalidrawAPI.updateScene({
+                                            elements: elements
+                                        });
+                                    }
+                                    // リスナーを削除
+                                    document.removeEventListener("pointerup", checkNewElement);
+                                }
+                            };
+
+                            // pointerupイベントでチェック
+                            document.addEventListener("pointerup", checkNewElement);
+
+                        } catch (error) {
+                            console.error('線ツールの設定に失敗しました:', error);
+                        }
                     }
                 };
 
