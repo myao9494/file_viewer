@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 
 {% block head %}
+<script src="{{ url_for('static', filename='js/lodash.min.js') }}"></script>
 <link rel="shortcut icon" type="image/svg+xml" href="{{ url_for('static', filename='images/white_board.svg') }}" />
 <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='images/white_board.svg') }}" />
 <!-- <script src="https://unpkg.com/react@18.2.0/umd/react.production.min.js"></script>
@@ -488,16 +489,56 @@
 
             console.log('Rendering Excalidraw component');
 
-            // シーンが変更されたときの処理
+            // 最適化されたelements更新処理
+            const debouncedSave = React.useCallback(
+                _.debounce((newElements, newFiles) => {
+                    Promise.all([
+                        localStorage.setItem('excalidraw-elements', JSON.stringify(newElements)),
+                        localStorage.setItem('excalidraw-files', JSON.stringify(newFiles))
+                    ]).catch(err => console.error('データの保存に失敗:', err));
+                }, 100),
+                []
+            );
+
+            // 最適化されたonChange関数
             const onChange = React.useCallback((newElements, _, newFiles) => {
                 setElements(newElements);
                 setFiles(newFiles);
-                // ローカルストレージへの保存を非同期で実行
-                Promise.all([
-                    localStorage.setItem('excalidraw-elements', JSON.stringify(newElements)),
-                    localStorage.setItem('excalidraw-files', JSON.stringify(newFiles))
-                ]).catch(err => console.error('データの保存に失敗:', err));
-            }, []);
+                // 即時保存も追加
+                localStorage.setItem('excalidraw-elements', JSON.stringify(newElements));
+                localStorage.setItem('excalidraw-files', JSON.stringify(newFiles));
+                debouncedSave(newElements, newFiles);
+            }, [debouncedSave]);
+
+            // ページ遷移前の保存処理を追加
+            React.useEffect(() => {
+                const handleBeforeUnload = () => {
+                    localStorage.setItem('excalidraw-elements', JSON.stringify(elements));
+                    localStorage.setItem('excalidraw-files', JSON.stringify(files));
+                };
+
+                window.addEventListener('beforeunload', handleBeforeUnload);
+                return () => {
+                    window.removeEventListener('beforeunload', handleBeforeUnload);
+                };
+            }, [elements, files]);
+
+            // レンダリングの最適化
+            const renderConfig = React.useMemo(() => ({
+                canvasBackgroundColor: "#ffffff",
+                shouldCacheText: true,
+                imageCache: true,
+                throttleRedraw: true
+            }), []);
+
+            // UIオプションの最適化
+            const uiOptions = React.useMemo(() => ({
+                canvasActions: {
+                    export: false,
+                    loadScene: false,
+                    saveAsImage: false
+                }
+            }), []);
 
             // ライブラリの変更を監視して保存する関数を追加
             const onLibraryChange = React.useCallback(async (libraryItems) => {
@@ -540,7 +581,9 @@
                 onLibraryChange: onLibraryChange,  // ライブラリ変更ハンドラを追加
                 excalidrawAPI: (api) => {
                     setExcalidrawAPI(api);
-                }
+                },
+                renderConfig: renderConfig,
+                UIOptions: uiOptions
             });
         };
 

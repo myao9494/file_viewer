@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 
 {% block head %}
+<script src="{{ url_for('static', filename='js/lodash.min.js') }}"></script>
 <script src="{{ url_for('static', filename='js/react.production.min.js') }}"></script>
 <script src="{{ url_for('static', filename='js/react-dom.production.min.js') }}"></script>
 <script src="{{ url_for('static', filename='js/excalidraw.production.min.js') }}"></script>
@@ -28,6 +29,12 @@
         font-display: swap;
     }
 </style>
+
+<script>
+    // 画像の遅延読み込みを有効化
+    window.EXCALIDRAW_ASSET_PATH = "{{ url_for('static', filename='js/excalidraw-assets/') }}";
+    window.EXCALIDRAW_THROTTLE_RENDER = true;  // レンダリングの制御を有効化
+</script>
 {% endblock %}
 
 {% block folder_path %}
@@ -92,6 +99,37 @@
             const [sceneData, setSceneData] = React.useState(null);
             const previousElementsRef = React.useRef(null);
             const excalidrawRef = React.useRef(null);
+
+            // 画像の最適化関数を追加
+            const optimizeElements = React.useCallback((elements) => {
+                return elements.map(element => {
+                    if (element.type === 'image') {
+                        // 画像要素の場合、必要最小限のプロパティのみを保持
+                        return {
+                            ...element,
+                            cached: true,
+                            scale: element.scale || [1, 1]
+                        };
+                    }
+                    return element;
+                });
+            }, []);
+
+            // 変更検知の最適化
+            const debouncedSave = React.useCallback(
+                _.debounce((elements, state, files) => {
+                    saveDrawing(optimizeElements(elements), state, files);
+                }, 1000),
+                []
+            );
+
+            // onChange関数を更新
+            const handleChange = React.useCallback((elements, state, files) => {
+                if (!previousElementsRef.current || hasElementsChanged(elements, previousElementsRef.current)) {
+                    debouncedSave(elements, state, files);
+                    previousElementsRef.current = JSON.parse(JSON.stringify(elements));
+                }
+            }, [debouncedSave]);
 
             // 付箋を追加する関数
             const addStickyNote = React.useCallback(() => {
@@ -555,13 +593,7 @@
                     });
                 },
                 initialData: sceneData,
-                onChange: (elements, state, files) => {
-                    if (!previousElementsRef.current || hasElementsChanged(elements, previousElementsRef.current)) {
-                        console.log("Elements changed, saving...", elements);
-                        saveDrawing(elements, state, files);
-                        previousElementsRef.current = JSON.parse(JSON.stringify(elements));
-                    }
-                },
+                onChange: handleChange,
                 onPointerUp: () => {
                     if (excalidrawRef.current) {
                         const elements = excalidrawRef.current.getSceneElements();
@@ -572,7 +604,20 @@
                     }
                 },
                 onLibraryChange: onLibraryChange,  // ライブラリ変更ハンドラを追加
-                langCode: "ja-JP"
+                langCode: "ja-JP",
+                renderConfig: {
+                    canvasBackgroundColor: "#ffffff",
+                    shouldCacheText: true,  // テキストのキャッシュを有効化
+                    imageCache: true,       // 画像のキャッシュを有効化
+                    throttleRedraw: true    // 再描画の制御
+                },
+                UIOptions: {
+                    canvasActions: {
+                        export: false,      // 不要な機能を無効化
+                        loadScene: false,
+                        saveAsImage: false
+                    }
+                }
             });
         };
 
