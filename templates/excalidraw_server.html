@@ -383,6 +383,12 @@
                                         selectedElementIds: { [textElement.id]: true }
                                     }
                                 });
+
+                                // 追加：シーンの更新後に保存を実行
+                                const updatedElements = excalidrawAPI.getSceneElements();
+                                const updatedAppState = excalidrawAPI.getAppState();
+                                const updatedFiles = excalidrawAPI.getFiles();
+                                saveDrawing(updatedElements, updatedAppState, updatedFiles);
                             } catch (error) {
                                 console.error('付箋の追加に失敗しました:', error);
                             }
@@ -444,6 +450,33 @@
                 return () => {
                     document.removeEventListener('mousemove', handleMouseMove);
                     document.removeEventListener('keydown', handleKeyPress);
+                };
+            }, [excalidrawAPI]);
+
+            // ページを離れる前の保存処理
+            const handleBeforeUnload = () => {
+                const elements = excalidrawAPI.getSceneElements();
+                const appState = excalidrawAPI.getAppState();
+                const files = excalidrawAPI.getFiles();
+                saveDrawing(elements, appState, files);
+            };
+
+            // タブの表示状態が変更された時の保存処理
+            const handleVisibilityChange = () => {
+                if (document.visibilityState === 'hidden') {
+                    handleBeforeUnload();
+                }
+            };
+
+            React.useEffect(() => {
+                if (!excalidrawAPI) return;
+
+                window.addEventListener('beforeunload', handleBeforeUnload);
+                document.addEventListener('visibilitychange', handleVisibilityChange);
+
+                return () => {
+                    window.removeEventListener('beforeunload', handleBeforeUnload);
+                    document.removeEventListener('visibilitychange', handleVisibilityChange);
                 };
             }, [excalidrawAPI]);
 
