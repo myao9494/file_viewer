@@ -210,6 +210,59 @@
                 };
 
                 const handleKeyPress = (event) => {
+                    // cmd/ctrlキーが押されている場合は、デフォルトの動作を許可
+                    if (event.metaKey || event.ctrlKey) {
+                        return;
+                    }
+
+                    // Cキーの処理
+                    if (event.key.toLowerCase() === 'c' && 
+                        !event.target.matches('input, textarea, [contenteditable]')) {
+                        event.preventDefault();
+                        
+                        try {
+                            // 現在のシーン要素の数を記録
+                            const currentElementsCount = excalidrawAPI.getSceneElements().length;
+                            
+                            excalidrawAPI.setActiveTool({
+                                type: "arrow",
+                                customType: null,
+                                locked: false,
+                                strokeColor: "#000000",
+                                backgroundColor: "transparent",
+                                fillStyle: "solid",
+                                strokeWidth: 1,
+                                roughness: 0
+                            });
+
+                            // 新しい要素が追加されたときのイベントリスナー
+                            const checkNewElement = () => {
+                                const elements = excalidrawAPI.getSceneElements();
+                                if (elements.length > currentElementsCount) {
+                                    // 最後に追加された要素を取得
+                                    const newElement = elements[elements.length - 1];
+                                    if (newElement.type === "arrow") {
+                                        // 矢印をnullに設定
+                                        newElement.startArrowhead = null;
+                                        newElement.endArrowhead = null;
+                                        // シーンを更新
+                                        excalidrawAPI.updateScene({
+                                            elements: elements
+                                        });
+                                    }
+                                    // リスナーを削除
+                                    document.removeEventListener("pointerup", checkNewElement);
+                                }
+                            };
+
+                            // pointerupイベントでチェック
+                            document.addEventListener("pointerup", checkNewElement);
+
+                        } catch (error) {
+                            console.error('線ツールの設定に失敗しました:', error);
+                        }
+                    }
+
                     // Nキーの処理
                     if (event.key.toLowerCase() === 'n' && 
                         !event.target.matches('input, textarea, [contenteditable]')) {
@@ -393,54 +446,6 @@
                                 console.error('付箋の追加に失敗しました:', error);
                             }
                         });
-                    }
-
-                    // Cキーの処理
-                    if (event.key.toLowerCase() === 'c' && 
-                        !event.target.matches('input, textarea, [contenteditable]')) {
-                        event.preventDefault();
-                        
-                        try {
-                            // 現在のシーン要素の数を記録
-                            const currentElementsCount = excalidrawAPI.getSceneElements().length;
-                            
-                            excalidrawAPI.setActiveTool({
-                                type: "arrow",
-                                customType: null,
-                                locked: false,
-                                strokeColor: "#000000",
-                                backgroundColor: "transparent",
-                                fillStyle: "solid",
-                                strokeWidth: 1,
-                                roughness: 0
-                            });
-
-                            // 新しい要素が追加されたときのイベントリスナー
-                            const checkNewElement = () => {
-                                const elements = excalidrawAPI.getSceneElements();
-                                if (elements.length > currentElementsCount) {
-                                    // 最後に追加された要素を取得
-                                    const newElement = elements[elements.length - 1];
-                                    if (newElement.type === "arrow") {
-                                        // 矢印をnullに設定
-                                        newElement.startArrowhead = null;
-                                        newElement.endArrowhead = null;
-                                        // シーンを更新
-                                        excalidrawAPI.updateScene({
-                                            elements: elements
-                                        });
-                                    }
-                                    // リスナーを削除
-                                    document.removeEventListener("pointerup", checkNewElement);
-                                }
-                            };
-
-                            // pointerupイベントでチェック
-                            document.addEventListener("pointerup", checkNewElement);
-
-                        } catch (error) {
-                            console.error('線ツールの設定に失敗しました:', error);
-                        }
                     }
                 };
 
