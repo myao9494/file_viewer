@@ -69,30 +69,30 @@
         }
 
         // クリップボードの処理を修正
-        setTimeout(async () => {
-            try {
-                const originalPath = '{{ full_path }}';
-                const isWindows = navigator.platform.toLowerCase().includes('win');
-                const pathToCopy = isWindows 
-                    ? originalPath.replace(/\//g, '\\')
-                    : originalPath;
+        // setTimeout(async () => {
+        //     try {
+        //         const originalPath = '{{ full_path }}';
+        //         const isWindows = navigator.platform.toLowerCase().includes('win');
+        //         const pathToCopy = isWindows 
+        //             ? originalPath.replace(/\//g, '\\')
+        //             : originalPath;
                 
-                // クリップボード処理を Promise で適切に処理
-                await new Promise((resolve, reject) => {
-                    navigator.clipboard.writeText(pathToCopy)
-                        .then(() => {
-                            console.log('パスをクリップボードにコピーしました:', pathToCopy);
-                            resolve();
-                        })
-                        .catch(err => {
-                            console.error('クリップボードへのコピーに失敗しました:', err);
-                            reject(err);
-                        });
-                });
-            } catch (err) {
-                console.error('クリップボード処理中にエラーが発生しました:', err);
-            }
-        }, 500);
+        //         // クリップボード処理を Promise で適切に処理
+        //         await new Promise((resolve, reject) => {
+        //             navigator.clipboard.writeText(pathToCopy)
+        //                 .then(() => {
+        //                     console.log('パスをクリップボードにコピーしました:', pathToCopy);
+        //                     resolve();
+        //                 })
+        //                 .catch(err => {
+        //                     console.error('クリップボードへのコピーに失敗しました:', err);
+        //                     reject(err);
+        //                 });
+        //         });
+        //     } catch (err) {
+        //         console.error('クリップボード処理中にエラーが発生しました:', err);
+        //     }
+        // }, 500);
 
         const App = () => {
             const [excalidrawAPI, setExcalidrawAPI] = React.useState(null);
