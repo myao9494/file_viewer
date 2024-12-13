@@ -25,6 +25,8 @@ from itertools import zip_longest  # この行を追加
 # import pyperclip
 from PIL import Image
 from datetime import datetime
+import time
+import glob
 if platform.system() == "Windows":
     import win32clipboard
     import PySimpleGUI as sg
@@ -1158,6 +1160,9 @@ def save_excalidraw_data(file_path):
         with open(excalidraw_path, 'w', encoding='utf-8') as f:
             json.dump(scene_data, f, ensure_ascii=False, indent=2)
             
+        # バックアップを作成
+        create_backup(excalidraw_path, scene_data)
+            
         # SVGファイルを保存
         if data.get('svg'):
             svg_path = os.path.join(os.path.dirname(full_path), f"{base_name}_excalidraw.svg")
@@ -1237,6 +1242,66 @@ def load_excalidraw_data(file_path):
     except Exception as e:
         app.logger.error(f"Error loading excalidraw data: {str(e)}")
         return jsonify(initial_data), 200  # エラー時も初期データを返す
+
+def create_backup(file_path, data):
+    """バックアップを作成する関数"""
+    
+    try:
+        # 元のexcalidrawファイルと同じディレクトリにバックアップディレクトリを作成
+        parent_dir = os.path.dirname(os.path.dirname(file_path))  # excalidrawフォルダの親ディレクトリ
+        backup_dir = os.path.join(parent_dir, 'excalidraw_bkk')
+        os.makedirs(backup_dir, exist_ok=True)
+        
+        # 最新のバックアップを確認
+        base_name = os.path.splitext(os.path.basename(file_path))[0]
+        pattern = os.path.join(backup_dir, f"{base_name}_*.excalidraw")
+        existing_backups = glob.glob(pattern)
+        
+        current_time = time.time()
+        
+        # 既存のバックアップがある場合、最新のものとの時間差をチェック
+        if existing_backups:
+            latest_backup = max(existing_backups, key=os.path.getctime)
+            last_backup_time = os.path.getctime(latest_backup)
+            
+            # 最後のバックアップから1分以内の場合はスキップ
+            if current_time - last_backup_time < 60:  # 60秒 = 1分
+                app.logger.info("前回のバックアップから1分経過していないため、バックアップをスキップします")
+                return
+        
+        # タイムスタンプを含むバックアップファイル名を生成
+        timestamp = time.strftime('%Y%m%d_%H%M%S')
+        backup_filename = f"{base_name}_{timestamp}.excalidraw"
+        backup_path = os.path.join(backup_dir, backup_filename)
+        
+        # バックアップを保存
+        with open(backup_path, 'w', encoding='utf-8') as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+            
+        # 古いバックアップを削除
+        cleanup_old_backups(file_path, backup_dir)
+        
+        app.logger.info(f"バックアップを作成しました: {backup_path}")
+        
+    except Exception as e:
+        app.logger.error(f"バックアップの作成に失敗しました: {str(e)}")
+
+def cleanup_old_backups(file_path, backup_dir):
+    """古いバックアップを削除する関数"""
+    MAX_BACKUPS = 5  # バックアップの最大保持数を定義
+    
+    try:
+        base_name = os.path.splitext(os.path.basename(file_path))[0]
+        pattern = os.path.join(backup_dir, f"{base_name}_*.excalidraw")
+        backup_files = sorted(glob.glob(pattern), key=os.path.getctime, reverse=True)
+        
+        # MAX_BACKUPS以上のバックアップがある場合、古いものを削除
+        for old_backup in backup_files[MAX_BACKUPS:]:
+            os.remove(old_backup)
+            app.logger.info(f"古いバックアップを削除しました: {old_backup}")
+            
+    except Exception as e:
+        app.logger.error(f"バックアップのクリーンアップに失敗しました: {str(e)}")
 
 if __name__ == '__main__':
     app.secret_key = 'your_secret_key_here'  # セッション用の秘密鍵
