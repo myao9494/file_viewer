@@ -1288,7 +1288,7 @@ def create_backup(file_path, data):
 
 def cleanup_old_backups(file_path, backup_dir):
     """古いバックアップを削除する関数"""
-    MAX_BACKUPS = 5  # バックアップの最大保持数を定義
+    MAX_BACKUPS = 20  # バックアップの最大保持数を定義
     
     try:
         base_name = os.path.splitext(os.path.basename(file_path))[0]
@@ -1302,6 +1302,89 @@ def cleanup_old_backups(file_path, backup_dir):
             
     except Exception as e:
         app.logger.error(f"バックアップのクリーンアップに失敗しました: {str(e)}")
+
+@app.route('/get-excalidraw-backups/<path:file_path>')
+def get_excalidraw_backups(file_path):
+    try:
+        full_path = normalize_path(os.path.join(BASE_DIR, file_path))
+        # excalidrawフォルダの親ディレクトリを取得
+        parent_dir = os.path.dirname(full_path)  # 修正: os.path.dirname(os.path.dirname(full_path))を変更
+        backup_dir = os.path.join(parent_dir, 'excalidraw_bkk')
+        
+        app.logger.info(f"Looking for backups in: {backup_dir}")  # ログ追加
+        
+        if not os.path.exists(backup_dir):
+            app.logger.info(f"Backup directory does not exist: {backup_dir}")  # ログ追加
+            return jsonify({'backups': []})
+            
+        base_name = os.path.splitext(os.path.basename(full_path))[0]
+        if base_name.endswith('.excalidraw'):
+            base_name = base_name[:-11]
+            
+        pattern = os.path.join(backup_dir, f"{base_name}_*.excalidraw")
+        backup_files = glob.glob(pattern)
+        
+        app.logger.info(f"Found {len(backup_files)} backup files")  # ログ追加
+        app.logger.info(f"Pattern used: {pattern}")  # ログ追加
+        
+        # バックアップファイルの情報を取得
+        backups = []
+        for backup_file in backup_files:
+            backup_name = os.path.basename(backup_file)
+            backup_time = datetime.fromtimestamp(os.path.getmtime(backup_file))
+            backups.append({
+                'name': backup_name,
+                'time': backup_time.strftime('%Y-%m-%d %H:%M:%S'),
+                'path': backup_file
+            })
+            
+        # 時間順に並び替え（新しい順）
+        backups.sort(key=lambda x: x['time'], reverse=True)
+        
+        app.logger.info(f"Returning {len(backups)} backups")  # ログ追加
+        return jsonify({'backups': backups})
+    except Exception as e:
+        app.logger.error(f"Error in get_excalidraw_backups: {str(e)}")  # ログ追加
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/restore-excalidraw-backup', methods=['POST'])
+def restore_excalidraw_backup():
+    try:
+        data = request.json
+        backup_path = data.get('backup_path')
+        current_path = data.get('current_path')
+        
+        app.logger.debug(f"backup path: {backup_path}")
+        app.logger.debug(f"original current path: {current_path}")
+        
+        # current_pathをexcalidrawフォルダ内のパスに修正
+        excalidraw_dir = os.path.join(os.path.dirname(current_path), 'excalidraw')
+        current_path = os.path.join(excalidraw_dir, os.path.basename(current_path))
+        
+        app.logger.debug(f"modified current path: {current_path}")
+        
+        if not backup_path or not current_path:
+            return jsonify({'error': '必要なパラメータが不足しています'}), 400
+            
+        # バックアップファイルを読み込む
+        with open(backup_path, 'r', encoding='utf-8') as f:
+            backup_data = json.load(f)
+            
+        # 現在のファイルが存在する場合は削除
+        if os.path.exists(current_path):
+            os.remove(current_path)
+            app.logger.info(f"既存のファイルを削除しました: {current_path}")
+            
+        # 新しいファイルとして保存
+        with open(current_path, 'w', encoding='utf-8') as f:
+            json.dump(backup_data, f, ensure_ascii=False, indent=2)
+            
+        app.logger.info(f"バックアップを復元しました: {current_path}")
+        return jsonify({'success': True, 'message': 'バックアップを復元しました'})
+    except Exception as e:
+        app.logger.error(f"バックアップの復元に失敗しました: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
 
 if __name__ == '__main__':
     app.secret_key = 'your_secret_key_here'  # セッション用の秘密鍵

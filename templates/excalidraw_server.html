@@ -45,7 +45,10 @@
 
 {% block content %}
 <div class="excalidraw-wrapper">
-    <button id="add-sticky-note" style="position: fixed; top: 10px; right: 20px; z-index: 1000; padding: 8px;">付箋を追加</button>
+    <div style="position: fixed; top: 10px; right: 20px; z-index: 1000;">
+        <button id="restore-backup" style="margin-right: 10px; padding: 8px;">バックアップから復元</button>
+        <button id="add-sticky-note" style="padding: 8px;">付箋を追加</button>
+    </div>
     <div id="excalidraw-container"></div>
 </div>
 {% endblock %}
@@ -459,17 +462,43 @@
             }, [excalidrawAPI]);
 
             // ページを離れる前の保存処理
-            const handleBeforeUnload = () => {
-                const elements = excalidrawAPI.getSceneElements();
-                const appState = excalidrawAPI.getAppState();
-                const files = excalidrawAPI.getFiles();
-                saveDrawing(elements, appState, files);
+            const handleBeforeUnload = async (event) => {
+                if (!excalidrawAPI) return;
+
+                // パフォーマンスAPI を使用してリロードかどうかを判断
+                const navigationEntry = performance.getEntriesByType("navigation")[0];
+                if (navigationEntry && navigationEntry.type === "reload") {
+                    // リロードの場合は保存をスキップ
+                    return;
+                }
+
+                // リロード以外（タブを閉じる、ブラウザを閉じる）の場合は保存を実行
+                event.preventDefault();
+                event.returnValue = '';
+
+                try {
+                    const elements = excalidrawAPI.getSceneElements();
+                    const appState = excalidrawAPI.getAppState();
+                    const files = excalidrawAPI.getFiles();
+                    
+                    await fetch("{{ url_for('save_excalidraw_data', file_path=file_path) }}", {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            elements: elements,
+                            appState: appState,
+                            files: files
+                        })
+                    });
+                } catch (error) {
+                    console.error('保存エラー:', error);
+                }
             };
 
             // タブの表示状態が変更された時の保存処理
             const handleVisibilityChange = () => {
                 if (document.visibilityState === 'hidden') {
-                    handleBeforeUnload();
+                    handleBeforeUnload({ preventDefault: () => {}, returnValue: '' });
                 }
             };
 
@@ -490,7 +519,14 @@
                 const loadData = async () => {
                     try {
                         console.log("Loading data...");
-                        const response = await fetch("{{ url_for('load_excalidraw_data', file_path=file_path) }}");
+                        const response = await fetch("{{ url_for('load_excalidraw_data', file_path=file_path) }}", {
+                            // キャッシュを無効化するオプションを追加
+                            cache: 'no-store',
+                            headers: {
+                                'Cache-Control': 'no-cache',
+                                'Pragma': 'no-cache'
+                            }
+                        });
                         if (!response.ok) throw new Error('データの読み込みに失敗しました');
                         const data = await response.json();
                         console.log("Loaded data:", data);
@@ -604,6 +640,112 @@
                     );
                 });
             };
+
+            // バックアップ復元ボタンのイベントハンドラを設定
+            React.useEffect(() => {
+                const restoreButton = document.getElementById('restore-backup');
+                if (restoreButton) {
+                    restoreButton.addEventListener('click', async () => {
+                        try {
+                            // バックアップリストを取得
+                            const response = await fetch(`{{ url_for('get_excalidraw_backups', file_path=file_path) }}`);
+                            const data = await response.json();
+                            
+                            if (!data.backups || data.backups.length === 0) {
+                                alert('利用可能なバックアップがありません。');
+                                return;
+                            }
+                            
+                            // バックアップ選択ダイアログを作成
+                            const dialog = document.createElement('div');
+                            dialog.style.cssText = `
+                                position: fixed;
+                                top: 50%;
+                                left: 50%;
+                                transform: translate(-50%, -50%);
+                                background: white;
+                                padding: 20px;
+                                border-radius: 8px;
+                                box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+                                z-index: 2000;
+                                max-height: 80vh;
+                                overflow-y: auto;
+                            `;
+                            
+                            dialog.innerHTML = `
+                                <h3>バックアップを選択</h3>
+                                <div style="margin: 10px 0;">
+                                    ${data.backups.map(backup => `
+                                        <div style="margin: 10px 0; padding: 10px; border: 1px solid #ddd; cursor: pointer;"
+                                             data-backup-path="${backup.path}">
+                                            ${backup.time} - ${backup.name}
+                                        </div>
+                                    `).join('')}
+                                </div>
+                                <button id="cancel-restore" style="margin-top: 10px;">キャンセル</button>
+                            `;
+                            
+                            document.body.appendChild(dialog);
+                            
+                            // オーバーレイを追加
+                            const overlay = document.createElement('div');
+                            overlay.style.cssText = `
+                                position: fixed;
+                                top: 0;
+                                left: 0;
+                                right: 0;
+                                bottom: 0;
+                                background: rgba(0,0,0,0.5);
+                                z-index: 1999;
+                            `;
+                            document.body.appendChild(overlay);
+                            
+                            // キャンセルボタンのイベントハンドラ
+                            document.getElementById('cancel-restore').addEventListener('click', () => {
+                                dialog.remove();
+                                overlay.remove();
+                            });
+                            
+                            // バックアップ選択のイベントハンドラ
+                            dialog.addEventListener('click', async (e) => {
+                                const backupPath = e.target.dataset.backupPath;
+                                if (backupPath) {
+                                    if (confirm('選択したバックアップを復元しますか？\n現在の内容は上書きされます。')) {
+                                        try {
+                                            const restoreResponse = await fetch("{{ url_for('restore_excalidraw_backup') }}", {
+                                                method: 'POST',
+                                                headers: {
+                                                    'Content-Type': 'application/json'
+                                                },
+                                                body: JSON.stringify({
+                                                    backup_path: backupPath,
+                                                    current_path: "{{ full_path }}"
+                                                })
+                                            });
+                                            
+                                            const result = await restoreResponse.json();
+                                            if (result.success) {
+                                                alert('バックアップを復元しました。ページをリロードします。');
+                                                window.location.reload();
+                                            } else {
+                                                throw new Error(result.error);
+                                            }
+                                        } catch (error) {
+                                            alert(`バックアップの復元に失敗しました: ${error.message}`);
+                                        }
+                                    }
+                                    dialog.remove();
+                                    overlay.remove();
+                                }
+                            });
+                            
+                        } catch (error) {
+                            console.error('バックアップの取得に失敗しました:', error);
+                            alert('バックアップの取得に失敗しました。');
+                        }
+                    });
+                }
+            }, []);
 
             if (!sceneData) {
                 return React.createElement('div', null, 'Loading...');
