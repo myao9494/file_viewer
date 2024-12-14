@@ -213,6 +213,139 @@
                 };
 
                 const handleKeyPress = (event) => {
+                    // Command/Ctrl + B の処理（最前面）
+                    if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'b') {
+                        console.log('最前面処理を実行します');
+                        event.preventDefault();
+                        
+                        try {
+                            const allElements = excalidrawAPI.getSceneElements();
+                            const selectedElementIds = excalidrawAPI.getAppState().selectedElementIds;
+                            
+                            console.log('全要素数:', allElements.length);
+                            console.log('選択された要素IDs:', selectedElementIds);
+                            
+                            // 選択された要素とそれに紐づくテキスト要素を特定
+                            let selectedElements = allElements.filter(element => 
+                                selectedElementIds[element.id]
+                            );
+                            
+                            console.log('選択された要素数:', selectedElements.length);
+                            
+                            // 選択された要素に紐づくテキスト要素も含める
+                            const boundElementIds = new Set();
+                            selectedElements.forEach(element => {
+                                if (element.boundElements) {
+                                    element.boundElements.forEach(bound => {
+                                        boundElementIds.add(bound.id);
+                                    });
+                                }
+                            });
+                            
+                            // 紐づくテキスト要素を追加
+                            selectedElements = [
+                                ...selectedElements,
+                                ...allElements.filter(element => boundElementIds.has(element.id))
+                            ];
+                            
+                            if (selectedElements.length === 0) {
+                                console.log('選択された要素がありません');
+                                return;
+                            }
+
+                            // 選択されていない要素を取得
+                            const nonSelectedElements = allElements.filter(
+                                element => !selectedElements.some(selected => selected.id === element.id)
+                            );
+                            
+                            // 選択された要素を最前面に配置（配列の末尾に置く）
+                            const newElements = [...nonSelectedElements, ...selectedElements];
+                            
+                            console.log('並び替え後の要素数:', newElements.length);
+                            
+                            excalidrawAPI.updateScene({
+                                elements: newElements,
+                                appState: {
+                                    ...excalidrawAPI.getAppState(),
+                                    selectedElementIds: selectedElementIds
+                                }
+                            });
+
+                            console.log('最前面移動が完了しました');
+
+                        } catch (error) {
+                            console.error('オブジェクトの最前面移動に失敗しました:', error);
+                            console.error('エラーの詳細:', error.stack);
+                        }
+                        return;
+                    }
+                    //  B の処理（最背面）
+                    if (event.key.toLowerCase() === 'b') {
+                    // else if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'b') {
+                        console.log('条件に一致しました！');
+                        event.preventDefault();
+                        
+                        console.log('Command/Ctrl + B が押されました');
+                        console.log('metaKey:', event.metaKey);
+                        console.log('ctrlKey:', event.ctrlKey);
+                        console.log('key:', event.key);
+                        
+                        try {
+                            const allElements = excalidrawAPI.getSceneElements();
+                            const selectedElementIds = excalidrawAPI.getAppState().selectedElementIds;
+                            
+                            // 選択された要素とそれに紐づくテキスト要素を特定
+                            let selectedElements = allElements.filter(element => 
+                                selectedElementIds[element.id]
+                            );
+                            
+                            // 選択された要素に紐づくテキスト要素も含める
+                            const boundElementIds = new Set();
+                            selectedElements.forEach(element => {
+                                if (element.boundElements) {
+                                    element.boundElements.forEach(bound => {
+                                        boundElementIds.add(bound.id);
+                                    });
+                                }
+                            });
+                            
+                            // 紐づくテキスト要素を追加
+                            selectedElements = [
+                                ...selectedElements,
+                                ...allElements.filter(element => boundElementIds.has(element.id))
+                            ];
+                            
+                            console.log('選択された要素（テキスト含む）:', selectedElements);
+                            
+                            if (selectedElements.length === 0) {
+                                console.log('選択された要素がありません');
+                                return;
+                            }
+
+                            // 選択されていない要素を取得
+                            const nonSelectedElements = allElements.filter(
+                                element => !selectedElements.some(selected => selected.id === element.id)
+                            );
+                            
+                            // 選択された要素とテキストを最背面に配置
+                            const newElements = [...selectedElements, ...nonSelectedElements];
+                            
+                            console.log('並び替え後の要素数:', newElements.length);
+                            
+                            excalidrawAPI.updateScene({
+                                elements: newElements,
+                                appState: {
+                                    ...excalidrawAPI.getAppState(),
+                                    selectedElementIds: selectedElementIds
+                                }
+                            });
+
+                        } catch (error) {
+                            console.error('オブジェクトの最背面移動に失敗しました:', error);
+                        }
+                        return;
+                    }
+
                     // cmd/ctrlキーが押されている場合は、デフォルトの動作を許可
                     if (event.metaKey || event.ctrlKey) {
                         return;
@@ -264,6 +397,7 @@
                         } catch (error) {
                             console.error('線ツールの設定に失敗しました:', error);
                         }
+                        return;
                     }
 
                     // Nキーの処理
@@ -352,6 +486,7 @@
                                 selectedElementIds: { [textElement.id]: true }
                             }
                         });
+                        return;
                     }
 
                     // Wキーの処理
@@ -450,6 +585,7 @@
                             }
                         });
                     }
+                    return;
                 };
 
                 document.addEventListener('mousemove', handleMouseMove);
