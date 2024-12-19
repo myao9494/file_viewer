@@ -886,6 +886,14 @@
                 }
             }, []);
 
+            // リンククリックのハンドラを追加
+            const onLinkOpen = React.useCallback((element, event) => {
+                event.preventDefault();
+                if (element.link) {
+                    window.open(element.link, '_blank', 'noopener,noreferrer');
+                }
+            }, []);
+
             if (!sceneData) {
                 return React.createElement('div', null, 'Loading...');
             }
@@ -936,7 +944,8 @@
                         loadScene: false,
                         saveAsImage: false
                     }
-                }
+                },
+                onLinkOpen: onLinkOpen,  // この行を追加
             });
         };
 
