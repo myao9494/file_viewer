@@ -100,6 +100,38 @@ def load_files():
 def view_file(file_path):
     app.logger.info(f"view_file関数が呼び出されました。file_path: {repr(file_path)}")
 
+    # cmd コマンドの処理を追加
+    if file_path.startswith('cmd '):
+        try:
+            command = file_path[4:]  # "cmd "の部分を除去
+            app.logger.info(f"実行するコマンド: {command}")
+            
+            # コマンドを実行し、出力を取得
+            result = subprocess.run(
+                command,
+                shell=True,
+                capture_output=True,
+                text=True,
+                encoding='utf-8'
+            )
+            
+            # 標準出力と標準エラー出力を結合
+            output = result.stdout + result.stderr
+            
+            # 結果をテキストとして表示
+            return render_template('view_file.html', 
+                                content=output, 
+                                file_path=f"Command: {command}", 
+                                full_path="", 
+                                current_item="Command Execution")
+        except Exception as e:
+            return render_template('view_file.html',
+                                content=f"Error executing command: {str(e)}",
+                                file_path=f"Command: {command}",
+                                full_path="",
+                                current_item="Command Execution Error")
+
+    # 既存のファイル処理コード
     depth = int(request.args.get('depth', 0))
 
     # 末尾のスラッシュを削除

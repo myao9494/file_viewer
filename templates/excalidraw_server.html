@@ -102,6 +102,9 @@
             const [sceneData, setSceneData] = React.useState(null);
             const previousElementsRef = React.useRef(null);
             const excalidrawRef = React.useRef(null);
+            
+            // BASE_DIRをFlaskから受け取る
+            const BASE_DIR = "{{ BASE_DIR }}";
 
             // 画像の最適化関数を追加
             const optimizeElements = React.useCallback((elements) => {
@@ -886,13 +889,26 @@
                 }
             }, []);
 
-            // リンククリックのハンドラを追加
+            // リンククリックのハンドラを修正
             const onLinkOpen = React.useCallback((element, event) => {
                 event.preventDefault();
                 if (element.link) {
-                    window.open(element.link, '_blank', 'noopener,noreferrer');
+                    // HTTPで始まるリンクは直接開く
+                    if (element.link.toLowerCase().startsWith('http')) {
+                        window.open(element.link, '_blank', 'noopener,noreferrer');
+                        return;
+                    }
+
+                    // 内部リンクの処理
+                    let path = element.link;
+                    if (path.startsWith(BASE_DIR)) {
+                        path = path.substring(BASE_DIR.length);
+                    }
+                    // /view/へのパスを構築
+                    const viewPath = `/view/${path.replace(/^\/+/, '')}`;
+                    window.open(viewPath, '_blank', 'noopener,noreferrer');
                 }
-            }, []);
+            }, [BASE_DIR]);
 
             if (!sceneData) {
                 return React.createElement('div', null, 'Loading...');
