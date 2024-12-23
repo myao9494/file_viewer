@@ -507,9 +507,14 @@
                         };
 
                         navigator.clipboard.readText().then(async clipboardText => {
-                            const pathParts = clipboardText.split(/[\/\\]/);
-                            // URLデコードを追加
-                            const displayText = decodeURIComponent(pathParts[pathParts.length - 1]);
+                            let PYTHON_EXECUTABLE = "python"
+                            let linkText = clipboardText;
+                            let displayText = decodeURIComponent(clipboardText.split(/[\/\\]/).pop());
+
+                            // .py ファイルの場合、cmd pythonコマンドを追加
+                            if (clipboardText.toLowerCase().endsWith('.py')) {
+                                linkText = `cmd ${PYTHON_EXECUTABLE} ${clipboardText}`;
+                            }
                             
                             try {
                                 // await navigator.clipboard.writeText(displayText);
@@ -537,7 +542,7 @@
                                     isDeleted: false,
                                     boundElements: [{ type: "text", id: "text-" + Math.random().toString(36).substr(2, 9) }],
                                     updated: Date.now(),
-                                    link: clipboardText,
+                                    link: linkText,  // 修正したリンクを設定
                                     locked: false,
                                 };
 

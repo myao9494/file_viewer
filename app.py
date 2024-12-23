@@ -106,14 +106,37 @@ def view_file(file_path):
             command = file_path[4:]  # "cmd "の部分を除去
             app.logger.info(f"実行するコマンド: {command}")
             
-            # コマンドを実行し、出力を取得
-            result = subprocess.run(
-                command,
-                shell=True,
-                capture_output=True,
-                text=True,
-                encoding='utf-8'
-            )
+            # Windowsの場合の特別な処理
+            if platform.system() == 'Windows':
+                # エクスプローラーを開くコマンドの特別処理
+                if command.lower().startswith('explorer'):
+                    path = command[9:].strip('"').strip()  # "explorer "の後のパスを取得
+                    path = path.replace('/', '\\')  # パスの区切り文字を変換
+                    subprocess.Popen(['explorer', path])
+                    return render_template('view_file.html',
+                                        content="エクスプローラーでフォルダを開きました。",
+                                        file_path=f"Command: {command}",
+                                        full_path="",
+                                        current_item="Command Execution")
+                
+                # その他のWindowsコマンド用の設定
+                result = subprocess.run(
+                    command,
+                    shell=True,
+                    capture_output=True,
+                    text=True,
+                    encoding='cp932',  # Windows用のエンコーディング
+                    errors='replace'   # エンコーディングエラーを置換文字で対処
+                )
+            else:
+                # Unix系OSの場合は既存の処理
+                result = subprocess.run(
+                    command,
+                    shell=True,
+                    capture_output=True,
+                    text=True,
+                    encoding='utf-8'
+                )
             
             # 標準出力と標準エラー出力を結合
             output = result.stdout + result.stderr
