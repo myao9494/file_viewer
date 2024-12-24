@@ -515,6 +515,10 @@
                             if (clipboardText.toLowerCase().endsWith('.py')) {
                                 linkText = `cmd ${PYTHON_EXECUTABLE} ${clipboardText}`;
                             }
+                            // .sh または .bat ファイルの場合、cmdコマンドを追加
+                            else if (clipboardText.toLowerCase().endsWith('.sh') || clipboardText.toLowerCase().endsWith('.bat')) {
+                                linkText = `cmd ${clipboardText}`;
+                            }
                             
                             try {
                                 // await navigator.clipboard.writeText(displayText);

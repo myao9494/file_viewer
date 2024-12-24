@@ -134,14 +134,14 @@
         <button type="submit">検索</button>
     </form>
     <div id="filter-options">
-        <button class="filter-btn" data-filter="md+svg+csv+pdf+ipynb+py+docx+xlsx+pptx+msg+lnk+excalidraw+excalidraw.svg+excalidraw.png">よく使うもの</button>
+        <button class="filter-btn" data-filter="md+svg+csv+pdf+ipynb+py+docx+xlsx+xlsm+pptx+msg+lnk+excalidraw+excalidraw.svg+excalidraw.png">よく使うもの</button>
         <button class="filter-btn" data-filter="md">MD</button>
         <button class="filter-btn" data-filter="svg">SVG</button>
         <button class="filter-btn" data-filter="csv">CSV</button>
         <button class="filter-btn" data-filter="pdf">PDF</button>
         <button class="filter-btn" data-filter="ipynb">IPYNB</button>
         <button class="filter-btn" data-filter="py">PY</button>
-        <button class="filter-btn" data-filter="docx+xlsx+pptx+msg">MS Office</button>
+        <button class="filter-btn" data-filter="docx+xlsx+xlsm+pptx+msg">MS Office</button>
         <button class="filter-btn" data-filter="jpg+jpeg+png+gif+bmp+tiff">image</button>
         <button class="filter-btn" data-filter="excalidraw+excalidraw.svg+excalidraw.png">Excalidraw</button>
         <button class="filter-btn" data-filter="all">全て</button>
@@ -318,7 +318,7 @@ document.addEventListener('DOMContentLoaded', function() {
         // デフォルト値の設定
         document.getElementById('depth').value = DEFAULT_DEPTH;
         hideFolders = DEFAULT_HIDE_FOLDERS;
-        const defaultFilter = 'md+svg+csv+pdf+ipynb+py+docx+xlsx+pptx';
+        const defaultFilter = 'md+svg+csv+pdf+ipynb+py+docx+xlsx+xlsm+pptx';
         
         // フィルターボタンの状態を更新
         document.querySelectorAll('.filter-btn').forEach(btn => {

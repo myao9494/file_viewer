@@ -297,7 +297,7 @@ def view_file(file_path):
         return render_template('view_file.html', content=content, file_path=file_path, full_path=full_path, current_item=current_item)
 
     # MS Officeファイルの場合
-    if file_extension in ['.docx', '.xlsx', '.pptx', '.doc', '.xls', '.ppt', '.msg']:
+    if file_extension in ['.docx', '.xlsx', '.xlsm', '.pptx', '.doc', '.xls', '.ppt', '.msg']:
         if open_with_default_app(full_path):
             return jsonify({'success': True, 'message': 'ファイルを開きました'})
         else:
