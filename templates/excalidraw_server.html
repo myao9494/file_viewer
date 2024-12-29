@@ -828,7 +828,7 @@
                                 <div style="margin: 10px 0;">
                                     ${data.backups.map(backup => `
                                         <div style="margin: 10px 0; padding: 10px; border: 1px solid #ddd; cursor: pointer;"
-                                             data-backup-path="${backup.path}">
+                                            data-backup-path="${backup.path}">
                                             ${backup.time} - ${backup.name}
                                         </div>
                                     `).join('')}
@@ -908,8 +908,40 @@
                         return;
                     }
 
-                    // 内部リンクの処理
+                    // ネットワークパライブの変換
+                    const networkDriveMap = {
+                        'X:': '//nas/work'
+                        // 他のネットワークドライブのマッピングをここに追加
+                    };
+
                     let path = element.link;
+                    // ネットワークドライブのマッピングを適用
+                    for (const [drive, networkPath] of Object.entries(networkDriveMap)) {
+                        if (path.startsWith(drive)) {
+                            path = path.replace(drive, networkPath);
+                            break;
+                        }
+                    }
+
+                    // ネットワークパスの処理
+                    if (path.startsWith('//') || path.startsWith('\\\\')) {
+                        fetch(`/network-image?path=${encodeURIComponent(path)}`)
+                            .then(response => response.json())
+                            .then(data => {
+                                if (data.success) {
+                                    console.log(data.message);
+                                } else {
+                                    alert('エラーが発生しました: ' + data.error);
+                                }
+                            })
+                            .catch(error => {
+                                console.error('Error:', error);
+                                alert('エラーが発生しました。');
+                            });
+                        return;
+                    }
+
+                    // 内部リンクの処理
                     if (path.startsWith(BASE_DIR)) {
                         path = path.substring(BASE_DIR.length);
                     }
