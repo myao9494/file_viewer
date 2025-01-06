@@ -314,9 +314,10 @@
         const currentPath = window.location.pathname;
         let currentDir = '';
 
-        // /view/からのパスを取得
-        if (currentPath.startsWith('/view/') || currentPath.startsWith('/excalidraw_server/')) {
-            const filePath = currentPath.startsWith('/view/') ? currentPath.substring(6) : currentPath.substring(18);
+        // /view/または/excalidraw-server/からのパスを取得
+        if (currentPath.startsWith('/view/') || currentPath.startsWith('/excalidraw-server/')) {
+            const prefix = currentPath.startsWith('/view/') ? '/view/' : '/excalidraw-server/';
+            const filePath = currentPath.substring(prefix.length);
             
             // ファイルかフォルダかを判断
             const isFile = filePath.split('/').pop().includes('.');
@@ -330,7 +331,7 @@
         }
 
         // ファイル名を入力するダイアログを表示
-        const fileName = prompt('新しい図の名前を入力してください（_excalidraw.svg は自動的に追加されます）:');
+        const fileName = prompt('新しい図の名前を入力してください（.excalidraw は自動的に追加されます）:');
         
         if (fileName) {
             // サーバーにファイル作成をリクエストせずに直接URLを構築
