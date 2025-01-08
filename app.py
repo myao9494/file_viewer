@@ -28,6 +28,7 @@ from datetime import datetime
 import time
 import glob
 from werkzeug.utils import secure_filename  # この行を追加
+import pyperclip  # 追加
 if platform.system() == "Windows":
     import win32clipboard
     import PySimpleGUI as sg
@@ -1247,9 +1248,9 @@ def excalidraw_server(file_path):
         
     current_item = f"Excalidraw Server - {os.path.basename(file_path)}"
     return render_template('excalidraw_server.html', 
-                         file_path=file_path, 
-                         full_path=full_path, 
-                         current_item=current_item)
+                        file_path=file_path, 
+                        full_path=full_path, 
+                        current_item=current_item)
 
 @app.route('/load-excalidraw-data/<path:file_path>')
 def load_excalidraw_data(file_path):
@@ -1458,9 +1459,9 @@ def save_selected_svg(file_path):
         if not svg_content or not filename:
             return jsonify({"success": False, "error": "必要なデータが不足しています"}), 400
             
-        # 保存先のパスを構築（excalidrawファイルと同じ階層に保存）
-        current_dir = os.path.dirname(file_path)  # 現在のファイルがあるディレクトリ
-        save_dir = os.path.join(BASE_DIR, current_dir)  # BASE_DIRと組み合わせて完全なパスを作成
+        # 保存先のパスを構築
+        current_dir = os.path.dirname(file_path)
+        save_dir = os.path.join(BASE_DIR, current_dir)
         os.makedirs(save_dir, exist_ok=True)
         
         # ファイル名を正規化
@@ -1472,11 +1473,36 @@ def save_selected_svg(file_path):
             f.write(svg_content)
             
         app.logger.info(f"Successfully saved SVG to {svg_path}")
-        return jsonify({"success": True})
+        
+        # �ルパスをクリップボードにコピー
+        try:
+            pyperclip.copy(svg_path)
+            app.logger.info(f"Copied path to clipboard: {svg_path}")
+        except Exception as e:
+            app.logger.error(f"Failed to copy path to clipboard: {str(e)}")
+        
+        # 一時的なURLを生成（static_urlを使用）
+        relative_path = os.path.relpath(svg_path, BASE_DIR)
+        temp_url = url_for('serve_file', file_path=relative_path)
+        
+        return jsonify({
+            "success": True,
+            "fileUrl": temp_url
+        })
         
     except Exception as e:
         app.logger.error(f"Error saving SVG: {str(e)}")
         return jsonify({"success": False, "error": str(e)}), 500
+
+# 新しいエンドポイントを追加
+@app.route('/serve-file/<path:file_path>')
+def serve_file(file_path):
+    try:
+        full_path = os.path.join(BASE_DIR, file_path)
+        return send_file(full_path)
+    except Exception as e:
+        app.logger.error(f"Error serving file: {str(e)}")
+        abort(404)
 
 if __name__ == '__main__':
     app.secret_key = 'your_secret_key_here'  # セッション用の秘密鍵

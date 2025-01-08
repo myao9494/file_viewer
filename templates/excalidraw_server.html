@@ -1033,6 +1033,10 @@
                     const result = await response.json();
                     if (result.success) {
                         alert('SVGを保存しました');
+                        // サーバーから提供されるURLを使用して新しいタブで開く
+                        if (result.fileUrl) {
+                            window.open(result.fileUrl, '_blank');
+                        }
                     } else {
                         throw new Error(result.error || '保存に失敗�した');
                     }
