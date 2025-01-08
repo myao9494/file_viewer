@@ -100,6 +100,10 @@ def load_files():
 def view_file(file_path):
     app.logger.info(f"view_file関数が呼び出されました。file_path: {repr(file_path)}")
 
+    # ダブルクォートで囲まれている場合、中身だけを取り出す
+    if file_path.startswith('"') and file_path.endswith('"'):
+        file_path = file_path[1:-1]
+
     # cmd コマンドの処理を追加
     if file_path.startswith('cmd '):
         try:
@@ -236,12 +240,12 @@ def view_file(file_path):
         # Excalidraw SVGかどうかを判定
         is_excalidraw = base_name.endswith('_excalidraw.svg')
         return render_template('svg_view.html', 
-                             svg_content=svg_content, 
-                             file_path=file_path, 
-                             full_path=full_path, 
-                             BASE_DIR=BASE_DIR, 
-                             current_item=current_item,
-                             is_excalidraw=is_excalidraw)
+                            svg_content=svg_content, 
+                            file_path=file_path, 
+                            full_path=full_path, 
+                            BASE_DIR=BASE_DIR, 
+                            current_item=current_item,
+                            is_excalidraw=is_excalidraw)
 
     # 画像ファイルの場合
     if mime_type and mime_type.startswith('image/'):

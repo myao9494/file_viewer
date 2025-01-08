@@ -908,13 +908,14 @@
                         return;
                     }
 
-                    // ネットワークパライブの変換
+                    // ネットワークパライブのマッピング
                     const networkDriveMap = {
                         'X:': '//nas/work'
                         // 他のネットワークドライブのマッピングをここに追加
                     };
 
                     let path = element.link;
+                    
                     // ネットワークドライブのマッピングを適用
                     for (const [drive, networkPath] of Object.entries(networkDriveMap)) {
                         if (path.startsWith(drive)) {
@@ -941,10 +942,16 @@
                         return;
                     }
 
-                    // 内部リンクの処理
+                    // パスの処理
                     if (path.startsWith(BASE_DIR)) {
+                        // BASE_DIRで始まる絶対パスの場合
                         path = path.substring(BASE_DIR.length);
+                    } else if (!path.startsWith('/')) {
+                        // 相対パスの場合
+                        const currentDir = "{{ file_path }}".split('/').slice(0, -1).join('/');
+                        path = `${currentDir}/${path}`.replace(/\/+/g, '/');
                     }
+
                     // /view/へのパスを構築
                     const viewPath = `/view/${path.replace(/^\/+/, '')}`;
                     window.open(viewPath, '_blank', 'noopener,noreferrer');
