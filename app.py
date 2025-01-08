@@ -27,6 +27,7 @@ from PIL import Image
 from datetime import datetime
 import time
 import glob
+from werkzeug.utils import secure_filename  # この行を追加
 if platform.system() == "Windows":
     import win32clipboard
     import PySimpleGUI as sg
@@ -1444,6 +1445,38 @@ def restore_excalidraw_backup():
         app.logger.error(f"バックアップの復元に失敗しました: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
+@app.route('/save-selected-svg/<path:file_path>', methods=['POST'])
+def save_selected_svg(file_path):
+    """
+    選択したオブジェクトをSVGとして保存（excalidrawファイルと同じ階層に保存）
+    """
+    try:
+        data = request.json
+        svg_content = data.get('svg')
+        filename = data.get('filename')
+        
+        if not svg_content or not filename:
+            return jsonify({"success": False, "error": "必要なデータが不足しています"}), 400
+            
+        # 保存先のパスを構築（excalidrawファイルと同じ階層に保存）
+        current_dir = os.path.dirname(file_path)  # 現在のファイルがあるディレクトリ
+        save_dir = os.path.join(BASE_DIR, current_dir)  # BASE_DIRと組み合わせて完全なパスを作成
+        os.makedirs(save_dir, exist_ok=True)
+        
+        # ファイル名を正規化
+        safe_filename = secure_filename(f"{filename}.svg")
+        svg_path = os.path.join(save_dir, safe_filename)
+        
+        # SVGファイルを保存
+        with open(svg_path, 'w', encoding='utf-8') as f:
+            f.write(svg_content)
+            
+        app.logger.info(f"Successfully saved SVG to {svg_path}")
+        return jsonify({"success": True})
+        
+    except Exception as e:
+        app.logger.error(f"Error saving SVG: {str(e)}")
+        return jsonify({"success": False, "error": str(e)}), 500
 
 if __name__ == '__main__':
     app.secret_key = 'your_secret_key_here'  # セッション用の秘密鍵

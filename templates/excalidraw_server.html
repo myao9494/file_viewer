@@ -47,7 +47,7 @@
 <div class="excalidraw-wrapper">
     <div style="position: fixed; top: 10px; right: 20px; z-index: 1000;">
         <button id="restore-backup" style="margin-right: 10px; padding: 8px;">バックアップから復元</button>
-        <button id="add-sticky-note" style="padding: 8px;">付箋を追加</button>
+        <button id="export-svg" style="padding: 8px;">選択項目をSVGで保存</button>
     </div>
     <div id="excalidraw-container"></div>
 </div>
@@ -957,6 +957,108 @@
                     window.open(viewPath, '_blank', 'noopener,noreferrer');
                 }
             }, [BASE_DIR]);
+
+            // SVG保存機能を追加
+            const exportSelectedAsSvg = React.useCallback(async () => {
+                if (!excalidrawAPI) {
+                    console.warn('Excalidraw API not ready');
+                    return;
+                }
+
+                try {
+                    const selectedElementIds = excalidrawAPI.getAppState().selectedElementIds;
+                    let selectedElements = excalidrawAPI.getSceneElements().filter(
+                        element => selectedElementIds[element.id]
+                    );
+
+                    // 選択された要素に関連するテキスト要素を追加
+                    const allElements = excalidrawAPI.getSceneElements();
+                    const boundElementIds = new Set();
+                    
+                    // 選択された要素に紐づくテキスト要素のIDを収集
+                    selectedElements.forEach(element => {
+                        if (element.boundElements) {
+                            element.boundElements.forEach(bound => {
+                                boundElementIds.add(bound.id);
+                            });
+                        }
+                    });
+
+                    // 紐づくテキスト要素を追加
+                    selectedElements = [
+                        ...selectedElements,
+                        ...allElements.filter(element => boundElementIds.has(element.id))
+                    ];
+
+                    if (selectedElements.length === 0) {
+                        alert('オブジェクトが選択されていません');
+                        return;
+                    }
+
+                    // ファイル名の入力を求める
+                    const filename = prompt('保存するファイル名を入力してください（.svg拡張子は自動で付加されます）:', 'export');
+                    if (!filename) return;
+
+                    // SVGをエクスポート
+                    const svgElement = await window.ExcalidrawLib.exportToSvg({
+                        elements: selectedElements,
+                        appState: {
+                            ...excalidrawAPI.getAppState(),
+                            exportWithDarkMode: false,
+                            exportBackground: true,
+                            viewBackgroundColor: "#ffffff",
+                            exportPadding: 10,
+                            exportScale: 1
+                        },
+                        files: excalidrawAPI.getFiles(),
+                        getDimensions: () => {
+                            const boundingBox = ExcalidrawLib.getBoundingBox(selectedElements);
+                            return {
+                                width: boundingBox.width + 20,
+                                height: boundingBox.height + 20
+                            };
+                        }
+                    });
+
+                    // サーバーにSVGを保存
+                    const response = await fetch("{{ url_for('save_selected_svg', file_path=file_path) }}", {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            svg: svgElement.outerHTML,
+                            filename: filename
+                        })
+                    });
+
+                    const result = await response.json();
+                    if (result.success) {
+                        alert('SVGを保存しました');
+                    } else {
+                        throw new Error(result.error || '保存に失敗�した');
+                    }
+
+                } catch (error) {
+                    console.error('SVG保存エラー:', error);
+                    alert('SVGの保存に失敗しました: ' + error.message);
+                }
+            }, [excalidrawAPI]);
+
+            // SVG保存ボタンのイベントリスナーを設定
+            React.useEffect(() => {
+                if (!excalidrawAPI) return;
+
+                const button = document.getElementById('export-svg');
+                if (button) {
+                    button.addEventListener('click', exportSelectedAsSvg);
+                }
+
+                return () => {
+                    const button = document.getElementById('export-svg');
+                    if (button) {
+                        button.removeEventListener('click', exportSelectedAsSvg);
+                    }
+                };
+            }, [excalidrawAPI, exportSelectedAsSvg]);
 
             if (!sceneData) {
                 return React.createElement('div', null, 'Loading...');
