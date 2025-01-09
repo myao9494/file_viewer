@@ -1,0 +1,1564 @@
+import os,re
+# import fnmatch
+import platform
+from flask import Flask, render_template, request, send_file, abort, url_for, Response, send_from_directory, jsonify, redirect, flash, session
+# import re
+import csv
+from utils.file_handler import get_file_content, get_file_list
+from utils.search import search_files
+from utils.file_utils import filter_files, should_ignore, load_view_ignore
+from utils.markdown_renderer import render_markdown
+from utils.csv_renderer import render_csv
+import mimetypes
+import subprocess
+from markdown import markdown
+import json
+import html
+# import os.path
+import webbrowser
+import pathlib
+import urllib.parse
+import zipfile
+import io
+import shutil
+from itertools import zip_longest  # この行を追加
+# import pyperclip
+from PIL import Image
+from datetime import datetime
+import time
+import glob
+from werkzeug.utils import secure_filename  # この行を追加
+import pyperclip  # 追加
+import email
+from email import policy
+from pathlib import Path
+if platform.system() == "Windows":
+    import win32clipboard
+    import PySimpleGUI as sg
+    import win32com.client
+
+
+app = Flask(__name__, static_folder='static')
+
+# 以下を追加
+app.config['STATIC_URL_PATH'] = '/static'
+
+# OSの種類を判別
+IS_WINDOWS = platform.system() == 'Windows'
+
+# パスの区切り文字を統一する関数を追加import urllib.parse
+
+def normalize_path(path):
+    # n_path = path.replace('\\', '/')
+    # n_path = os.path.normpath(path)
+    # n_path = path.replace("%5C","/")
+    n_path = pathlib.Path(path).as_posix()
+    return n_path
+
+# グローバル変数としてBASE_DIRを定義
+global BASE_DIR
+
+# ベースディレクトリの設定
+
+mac_BASE_DIR = r"/Users/sudoupousei/000_work"  # Windowsの場合
+win_BASE_DIR = r"C:\Users\kabu_server\000_work"
+net_work_drive = "network"
+BASE_DIR = normalize_path(mac_BASE_DIR if not IS_WINDOWS else win_BASE_DIR)
+
+# テンプレートフォルダの設定
+mac_TEMPLATE_FOLDER = r"/Users/sudoupousei/000_work/template_folder"
+win_TEMPLATE_FOLDER = r"F:\000_work\template_folder"
+TEMPLATE_FOLDER = normalize_path(mac_TEMPLATE_FOLDER if not IS_WINDOWS else win_TEMPLATE_FOLDER)
+
+app.jinja_env.globals['BASE_DIR'] = BASE_DIR
+# JupyterのベースURLを設定
+JUPYTER_BASE_URL =  'http://localhost:8888/lab/tree' 
+
+@app.route('/')
+def index():
+    """
+    シンプルなホームページを表示する関数
+
+    Returns:
+        str: レンダリングされたHTMLテンプレート
+    """
+    return render_template('home.html', base_dir=BASE_DIR)
+
+@app.route('/load_files')
+def load_files():
+    """
+    ファイルリストを読み込んで表示する関数
+
+    Returns:
+        str: レンダリングされたHTMLテンプレート
+    """
+    # すべてのファイルを取得
+    all_files = get_file_list(BASE_DIR)
+    # フィルタリングを適用
+    files = filter_files(all_files, BASE_DIR)
+    # index.htmlテンプレートをレンダリングし、ファイルリストを渡す
+    return render_template('index.html', files=files)
+
+@app.route('/view', defaults={'file_path': ''})
+@app.route('/view/', defaults={'file_path': ''})
+@app.route('/view/<path:file_path>')
+def view_file(file_path):
+    app.logger.info(f"view_file関数が呼び出されました。file_path: {repr(file_path)}")
+
+    # ダブルクォートで囲まれている場合、中身だけを取り出す
+    if file_path.startswith('"') and file_path.endswith('"'):
+        file_path = file_path[1:-1]
+
+    # cmd コマンドの処理を追加
+    if file_path.startswith('cmd '):
+        try:
+            command = file_path[4:]  # "cmd "の部分を除去
+            app.logger.info(f"実行するコマンド: {command}")
+            
+            # Windowsの場合の特別な処理
+            if platform.system() == 'Windows':
+                # エクスプローラーを開くコマンドの特別処理
+                if command.lower().startswith('explorer'):
+                    path = command[9:].strip('"').strip()  # "explorer "の後のパスを取得
+                    path = path.replace('/', '\\')  # パスの区切り文字を変換
+                    subprocess.Popen(['explorer', path])
+                    return render_template('view_file.html',
+                                        content="エクスプローラーでフォルダを開きました。",
+                                        file_path=f"Command: {command}",
+                                        full_path="",
+                                        current_item="Command Execution")
+                
+                # その他のWindowsコマンド用の設定
+                result = subprocess.run(
+                    command,
+                    shell=True,
+                    capture_output=True,
+                    text=True,
+                    encoding='cp932',  # Windows用のエンコーディング
+                    errors='replace'   # エンコーディングエラーを置換文字で対処
+                )
+            else:
+                # Unix系OSの場合は既存の処理
+                result = subprocess.run(
+                    command,
+                    shell=True,
+                    capture_output=True,
+                    text=True,
+                    encoding='utf-8'
+                )
+            
+            # 標準出力と標準エラー出力を結合
+            output = result.stdout + result.stderr
+            
+            # 結果をテキストとして表示
+            return render_template('view_file.html', 
+                                content=output, 
+                                file_path=f"Command: {command}", 
+                                full_path="", 
+                                current_item="Command Execution")
+        except Exception as e:
+            return render_template('view_file.html',
+                                content=f"Error executing command: {str(e)}",
+                                file_path=f"Command: {command}",
+                                full_path="",
+                                current_item="Command Execution Error")
+
+    # 既存のファイル処理コード
+    depth = int(request.args.get('depth', 0))
+
+    # 末尾のスラッシュを削除
+    if file_path.endswith('/'):
+        return redirect(url_for('view_file', file_path=file_path.rstrip('/')))
+
+    # file_pathが空の場合、ルートディレクトリを表示
+    if not file_path:
+        full_path = BASE_DIR
+        current_item = 'Root'
+    else:
+        file_path = file_path.lstrip('/')
+        full_path = normalize_path(os.path.join(BASE_DIR, file_path))
+        if full_path.find(net_work_drive) != -1:
+            full_path = full_path.split(net_work_drive)[1]
+            full_path = f"\\\\{net_work_drive}" + full_path
+            full_path = full_path.replace('/', '\\')
+        file_name = os.path.basename(file_path)
+        folder_name = os.path.basename(os.path.dirname(file_path))
+        current_item = f"{file_name} - {folder_name}" if folder_name else file_name
+
+    app.logger.info(f"full_path: {full_path}")
+
+    if not os.path.exists(full_path):
+        app.logger.error(f"ファイルが存在しません: {full_path}")
+        abort(404)
+
+    # .lnkファイルの場合
+    if full_path.lower().endswith('.lnk') and platform.system() == "Windows":
+        try:
+            shell = win32com.client.Dispatch("WScript.Shell")
+            shortcut = shell.CreateShortCut(full_path)
+            target_path = shortcut.Targetpath
+            
+            # リンク先が存在するか確認
+            if os.path.exists(target_path):
+                if os.path.isdir(target_path):
+                    # ディレクトリの場合はそのまま開く
+                    subprocess.Popen(['explorer', target_path])
+                else:
+                    # ファイルの場合はデフォルトアプリで開く
+                    os.startfile(target_path)
+                return jsonify({'success': True, 'message': 'ショートカットのリンク先を開きました'})
+            else:
+                return jsonify({'success': False, 'error': 'リンク先が見つかりません'})
+        except Exception as e:
+            app.logger.error(f"ショートカットを開く際にエラーが発生しました: {str(e)}")
+            return jsonify({'success': False, 'error': str(e)})
+
+    # ディレクトリの場合
+    if os.path.isdir(full_path):
+        app.logger.info(f"ディレクトリを表示します: {full_path}")
+        folders, files = get_items_with_depth(full_path, depth, file_path)
+        parent_path = os.path.dirname(file_path) if file_path != '' else None
+        return render_template('directory_view.html', folders=folders, files=files, current_path=file_path, parent_path=parent_path, full_path=full_path, depth=depth, current_item=current_item)
+
+    # ファイルの場合
+    file_extension = os.path.splitext(full_path)[1].lower()
+    base_name = os.path.basename(full_path).lower()
+    
+    # Excalidrawファイルの場合
+    # if (file_extension == '.excalidraw' or 
+    #     base_name.endswith('.excalidraw.svg') or 
+    #     base_name.endswith('.excalidraw.png')):
+    #     return excalidraw(file_path)
+    
+    # MIMEタイプを得
+    mime_type, _ = mimetypes.guess_type(full_path)
+
+    # .xdwファイルの場合
+    if file_extension == '.xdw':
+        return send_file(full_path, as_attachment=True)
+
+    # SVGファイルの場合
+    if file_extension == '.svg':
+        with open(full_path, 'r', encoding='utf-8') as f:
+            svg_content = f.read()
+        svg_content = svg_content.replace('<svg', '<svg id="svg-content"', 1)
+        # Excalidraw SVGかどうかを判定
+        is_excalidraw = base_name.endswith('_excalidraw.svg')
+        return render_template('svg_view.html', 
+                            svg_content=svg_content, 
+                            file_path=file_path, 
+                            full_path=full_path, 
+                            BASE_DIR=BASE_DIR, 
+                            current_item=current_item,
+                            is_excalidraw=is_excalidraw)
+
+    # 画像ファイルの場合
+    if mime_type and mime_type.startswith('image/'):
+        app.logger.info(f"Rendering image: {file_path}")
+        return render_template('image_view.html', file_path=file_path, full_path=full_path, current_item=current_item)
+
+    # PDFファイル場合
+    if file_extension == '.pdf':
+        return send_file(full_path, mimetype='application/pdf')
+
+    # Markdownァイルの場合
+    if file_extension == '.md':
+        content = render_markdown(full_path)
+        folder_path = os.path.dirname(full_path)
+        return render_template('markdown_view.html', content=content, file_path=file_path, full_path=full_path, folder_path=folder_path, BASE_DIR=BASE_DIR, current_item=current_item)
+
+    # CSVファイルの場合
+    # if file_extension == '.csv':
+    #     content = render_csv(full_path)
+    #     return render_template('data_table_view.html', content=content, file_path=file_path, full_path=full_path, BASE_DIR=BASE_DIR, current_item=current_item)
+    
+    # if file_extension == '.csv':
+    #     content = render_csv(full_path)
+    #     return render_template('ag_grid_view.html', content=content, file_path=file_path, full_path=full_path, BASE_DIR=BASE_DIR, current_item=current_item)
+    if file_extension == '.csv':
+        if full_path.endswith('_tabulator.csv'):
+            content = render_csv(full_path)
+            return render_template('data_table_view_tabulator.html', content=content, file_path=file_path, full_path=full_path, BASE_DIR=BASE_DIR, current_item=current_item)
+        else:
+            content = render_csv2(full_path)
+            return render_template('csv_view.html', content=content, file_path=file_path, full_path=full_path, BASE_DIR=BASE_DIR, current_item=current_item)
+    
+    # ipynbファイルの場合
+    if file_extension == '.ipynb':
+        # ファイルパスをベースディレクトリからの相対パスに変換
+        relative_path = urllib.parse.unquote(os.path.relpath(full_path, BASE_DIR))
+        # JupyterのURLを構築
+        jupyter_url = f"{JUPYTER_BASE_URL}/{relative_path}"
+        cleaned_path = urllib.parse.unquote(jupyter_url)
+        cleaned_path = jupyter_url.replace('/viewer/', '/').replace('/viewer-main/', '/').replace('/file_viewer/', '/',1).replace('file_viewer-main/', '')
+        app.logger.info(f"{jupyter_url},{cleaned_path}")
+        print(cleaned_path)
+        # ブラウザでJupyterのURLを開く
+        webbrowser.open(cleaned_path)
+        
+        # ユーザーに通知を返す
+        flash('Jupyter Notebookを開きました。', 'info')
+        return redirect(url_for('index'))
+
+    # テキストファイルまたは特定の拡張子の場合
+    if mime_type and mime_type.startswith('text/') or file_extension in ['.txt', '.py', '.js', '.css', '.json', '.license', '.yml', '.yaml', '.xml', '.ini', '.cfg', '.conf']:
+        content = get_file_content(full_path, 'text')
+        return render_template('view_file.html', content=content, file_path=file_path, full_path=full_path, current_item=current_item)
+
+    # MS Officeファイルの場合
+    if file_extension in ['.docx', '.xlsx', '.xlsm', '.pptx', '.doc', '.xls', '.ppt', '.msg']:
+        if open_with_default_app(full_path):
+            return jsonify({'success': True, 'message': 'ファイルを開きました'})
+        else:
+            return jsonify({'success': False, 'error': 'ファイルを開けませんでした'})
+
+    # BASEディレクトリにないファイルの場合
+    if not full_path.startswith(BASE_DIR):
+        if open_with_default_app(full_path):
+            return jsonify({'success': True, 'message': 'ファイルを開きました'})
+        else:
+            return jsonify({'success': False, 'error': 'ファイルを開けませんでした'})
+
+    # その他のファイルはダウンロード
+    return send_file(full_path, as_attachment=True)
+
+def open_with_default_app(file_path):
+    """ファイルをOSのデフォルトアプリケーションで開く"""
+    try:
+        if platform.system() == "Windows":
+            os.startfile(file_path)
+        elif platform.system() == "Darwin":  # macOS
+            subprocess.run(["open", file_path], check=True)
+        else:  # Linux
+            subprocess.run(["xdg-open", file_path], check=True)
+        return True
+    except Exception as e:
+        app.logger.error(f"ファイルを開く際にエラーが発生しました: {str(e)}")
+        return False
+
+@app.route('/search')
+def search():
+    """
+    ファイル検索関数
+
+    Returns:
+        str: 検索結果含むレンダリングされたHTMLテンプレート
+    """
+    # クエリパラメータから検索語を取得
+    query = request.args.get('q', '')
+    # ファイル検索を実行
+    results = search_files(BASE_DIR, query)
+    # 検索結果をフィルタリング
+    filtered_results = filter_files(results, BASE_DIR)
+    # 検索むindex.htmlテンプレートをレンダリング
+    return render_template('index.html', files=filtered_results, search_query=query)
+
+@app.route('/open-in-code', methods=['POST'])
+def open_in_code():
+    data = request.json
+    file_path = data.get('path')
+    if not file_path:
+        return jsonify({'success': False, 'error': 'ファイルパスが指定されていません。'})
+    
+    try:
+        if IS_WINDOWS:
+            vscode_path = r'C:\Users\kabu_server\AppData\Local\Programs\Microsoft VS Code\Code.exe'
+        else:
+            # vscode_path = '/Applications/Visual Studio Code.app/Contents/Resources/app/bin/code'
+            vscode_path = '/Applications/Cursor.app/Contents/MacOS/Cursor'
+
+        if os.path.exists(vscode_path):
+            # URLデコードを行う
+            decoded_path = urllib.parse.unquote(file_path)
+            normalized_path = normalize_path(file_path)
+            
+            # ファイルが存在するか確認し、存在しない場合は親ディレクトリを使用
+            if os.path.exists(normalized_path):
+                target_path = os.path.dirname(normalized_path) if os.path.isfile(normalized_path) else normalized_path
+            else:
+                # ファイルが見つからない場合は親ディレクトリを使用
+                target_path = os.path.dirname(normalized_path)
+            
+            if IS_WINDOWS:
+                # Windowsの場合
+                subprocess.Popen([vscode_path, target_path])
+                # PowerShellを使用してウィンドウをアクティブにする
+                # powershell_command = f'(New-Object -ComObject WScript.Shell).AppActivate("Visual Studio Code")'
+                # subprocess.Popen(["powershell", "-Command", powershell_command])
+            else:
+                # macOSの場合
+                subprocess.Popen([vscode_path, target_path])
+                # AppleScriptを使用してウィンドウをアクティブにしてフルスクリーンにする
+                apple_script = '''
+                tell application "Cursor"
+                    activate
+                end tell
+                
+                tell application "System Events"
+                    tell process "Cursor"
+                        set frontmost to true
+                        delay 1
+                        keystroke "f" using {command down, control down}
+                    end tell
+                end tell
+                '''
+                subprocess.run(["osascript", "-e", apple_script])
+            
+            return jsonify({'success': True})
+        else:
+            return jsonify({'success': False, 'error': 'Visual Studio Code/Cursorが見つかりません。'})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
+
+@app.route('/open-in-code2', methods=['POST'])
+def open_in_code2():
+    data = request.json
+    file_path = data.get('path')
+    app.logger.info(f"受信したfile_path: {repr(file_path)}")
+    
+    if not file_path:
+        return jsonify({'success': False, 'error': 'ファイルパスが指定されていません。'})
+    
+    try:
+        if platform.system() == 'Darwin':  # macOS
+            vscode_path = '/Applications/Visual Studio Code.app/Contents/Resources/app/bin/code'
+        elif platform.system() == 'Windows':
+            vscode_path = r'C:\Users\kabu_server\AppData\Local\Programs\Microsoft VS Code\Code.exe'
+        else:
+            return jsonify({'success': False, 'error': 'サポートされていないOSです。'})
+
+        if os.path.exists(vscode_path):
+            # URLデコードを行う
+            decoded_path = urllib.parse.unquote(file_path)
+            normalized_path = normalize_path(decoded_path)
+            cleaned_path = normalized_path.replace('/viewer/', '/').replace('/viewer-main/', '/').replace('/file_viewer/', '/',1).replace('file_view-main/', '')
+            
+            full_path = os.path.join(BASE_DIR, cleaned_path)
+            
+            # ファイルが存在するか確認し、存在しない場合は親ディレクトリを使用
+            if os.path.exists(normalized_path):
+                target_path = os.path.dirname(normalized_path) if os.path.isfile(normalized_path) else normalized_path
+            else:
+                # ファイルが見つからない場合は親ディレクトリを使用
+                target_path = os.path.dirname(normalized_path)
+            
+            app.logger.info(f"開こうとしているtarget_path: {repr(target_path)}")
+            
+            if IS_WINDOWS:
+                # Windowsの場合
+                subprocess.Popen([vscode_path, target_path])
+                # PowerShellを使用してウィンドウをアクティブにする
+                # powershell_command = f'(New-Object -ComObject WScript.Shell).AppActivate("Visual Studio Code")'
+                # subprocess.Popen(["powershell", "-Command", powershell_command])
+            else:
+                # macOSの場合
+                subprocess.Popen([vscode_path, target_path])
+                # AppleScriptを使用してウィンドウをアクティブにしてフルスクリーンにする
+                apple_script = '''
+                tell application "Visual Studio Code"
+                    activate
+                end tell
+
+                delay 1
+                
+                tell application "System Events"
+                    tell process "Code"
+                        set frontmost to true
+                        delay 1
+                        keystroke "f" using {command down, control down}
+                    end tell
+                end tell
+                '''
+                subprocess.run(["osascript", "-e", apple_script])
+            
+            return jsonify({'success': True})
+        else:
+            return jsonify({'success': False, 'error': 'Visual Studio Codeが見つかりません。'})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
+
+@app.route('/open-folder', methods=['POST'])
+def open_folder():
+    def is_file_path(file_path):
+        # パスがディレクトリっぽくなく、拡張子があるかどうかで判断
+        return not file_path.endswith(os.path.sep) and os.path.splitext(file_path)[1] != ""
+
+    data = request.json
+    file_path = data.get('path')
+    app.logger.info(f"受信したfile_path: {repr(file_path)}")
+    
+    if not file_path:
+        return jsonify({'success': False, 'error': 'ファイルパスが指定されていません。'})
+    
+    try:
+        # file_pathがファイルの場合は親ディレクトリを、ディレクトリの場合はそのまま使用
+        if is_file_path(file_path):
+            folder_path = os.path.dirname(file_path)
+        else:
+            folder_path = file_path
+
+        app.logger.info(f"開こうとしているfolder_path: {repr(folder_path)}")
+        
+        if os.path.exists(folder_path):
+            if platform.system() == "Windows":
+                # Windowsの場合、バックスラッシュを使用
+                folder_path = folder_path.replace('/', '\\')
+                subprocess.Popen(['explorer', folder_path])
+            elif platform.system() == "Darwin":  # macOS
+                subprocess.Popen(["open", folder_path])
+            else:  # Linux
+                subprocess.Popen(["xdg-open", folder_path])
+            return jsonify({'success': True})
+        else:
+            return jsonify({'success': False, 'error': f'フォルダが見つかりません: {folder_path}'})
+    except Exception as e:
+        app.logger.error(f"エラーが発生しました: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)})
+
+@app.route('/mindmap/<path:file_path>')
+def view_mindmap(file_path):
+    """
+    指定されたMarkdownファイルをマインドマップとして表示する関数
+
+    Args:
+        file_path (str): 処理するファイルのパス
+
+    Returns:
+        str: マインドマップを表示するHTMLページ
+    """
+    app.logger.info(f"view_mindmap関数が呼び出されました。元のfile_path: {repr(file_path)}")
+    
+    # ファイル名とディレクトリを分離
+    directory, file_name = os.path.split(file_path)
+    
+    # ディレクトリとファイル名を結合（スラッシュを確実に挿入）
+    file_path = os.path.join(directory, file_name)
+
+    app.logger.info(f"修正後のfile_path: {repr(file_path)}")
+    
+    full_path = os.path.join(BASE_DIR, file_path)
+    if not os.path.exists(full_path) or not full_path.endswith('.md'):
+        app.logger.error(f"ファイルが見つかりません: {full_path}")
+        abort(404)
+
+    with open(full_path, 'r', encoding='utf-8') as f:
+        content = f.read()
+
+    return render_template('mindmap_view.html', content=content, file_path=file_path)
+
+@app.route('/<path:invalid_path>')
+def handle_invalid_path(invalid_path):
+    app.logger.info(f"handle_invalid_path関数が呼び出されました。invalid_path: {repr(invalid_path)}")
+
+    # faviconリクエストの場合は何もしない
+    if invalid_path == 'favicon.ico':
+        abort(404)
+
+    # ネットワークパスの場合
+    if invalid_path.startswith('//') or invalid_path.startswith('\\\\'):
+        folder_path = os.path.dirname(invalid_path)
+    else:
+        # ローカルパスの場合
+        if os.path.isabs(invalid_path):
+            folder_path = os.path.dirname(invalid_path)
+        else:
+            # BASE_DIRを使用せず、ルートからのパスとして扱う
+            full_path = os.path.abspath(os.path.join('/', invalid_path))
+            folder_path = os.path.dirname(full_path)
+
+    app.logger.info(f"開こうとしているfolder_path: {repr(folder_path)}")
+
+    # ここでFinderを開く処理を削除または条件付きにする
+    # 例えば、特定の条件下でのみFinderを開くようにする
+    if folder_path != '/' and os.path.exists(folder_path):
+        try:
+            if platform.system() == 'Darwin':  # macOS
+                subprocess.Popen(['open', folder_path])
+            elif platform.system() == 'Windows':
+                subprocess.Popen(['explorer', folder_path])
+            else:
+                subprocess.Popen(['xdg-open', folder_path])
+            flash(f'フォルダを開きました: {folder_path}', 'success')
+        except Exception as e:
+            app.logger.error(f"エラーが発生しました: {str(e)}")
+            flash(f'エラーが発生しました: {str(e)}', 'error')
+    else:
+        flash(f'無効なパス: {invalid_path}', 'error')
+
+    # 元ページにリダイレクト
+    return redirect(request.referrer or url_for('index'))
+
+@app.route('/open-path', methods=['POST'])
+def open_path():
+    data = request.json
+    path = data.get('path')
+    app.logger.info(f"受信したpath: {repr(path)}")
+    
+    if not path:
+        app.logger.error("パスが指定されていません。")
+        return jsonify({'success': False, 'error': 'パスが指定されていません。'})
+    
+    try:
+        # ネットワークパスの場合は直接使用
+        if path.startswith('\\\\') or path.startswith('//'):
+            folder_path = os.path.dirname(path) if os.path.isfile(path) else path
+        else:
+            # ローカルパスの場合、BASE_DIRからの相対パスとして扱う
+            full_path = os.path.abspath(os.path.join(BASE_DIR, path))
+            folder_path = os.path.dirname(full_path) if os.path.isfile(full_path) else full_path
+
+        app.logger.info(f"開こうとしているfolder_path: {repr(folder_path)}")
+        
+        if os.path.exists(folder_path):
+            if platform.system() == 'Windows':
+                subprocess.Popen(['explorer', folder_path])
+            else:
+                subprocess.Popen(['open', folder_path])
+            return jsonify({'success': True, 'message': f'フォルダを開きました: {folder_path}'})
+        else:
+            return jsonify({'success': False, 'error': f'フォルダが見つかりません: {folder_path}'})
+    except PermissionError:
+        app.logger.error(f"アクセス拒否: {folder_path}")
+        return jsonify({'success': False, 'error': f'アクセス拒否: {folder_path}'})
+    except Exception as e:
+        app.logger.error(f"エラーが発生しました: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)})
+
+def get_items_with_depth(root_path, depth, current_path):
+    folders = []
+    files = []
+    for dirpath, dirnames, filenames in os.walk(root_path):
+        relative_path = os.path.relpath(dirpath, root_path)
+        if relative_path == '.':
+            current_depth = 0
+        else:
+            current_depth = len(relative_path.split(os.sep))
+
+        if current_depth > depth:
+            dirnames[:] = []  # これ以上深いディレクトリは探索しない
+            continue
+
+        if current_depth == depth:
+            for dirname in dirnames:
+                full_path = os.path.join(dirpath, dirname)
+                relative_to_current = os.path.relpath(full_path, root_path)
+                folders.append({
+                    'is_dir': True,
+                    'path': normalize_path(os.path.join(current_path, relative_to_current)),
+                    'relative_path': normalize_path(relative_to_current)
+                })
+            
+        if current_depth <= depth:
+            for filename in filenames:
+                full_path = os.path.join(dirpath, filename)
+                relative_to_current = os.path.relpath(full_path, root_path)
+                files.append({
+                    'is_dir': False,
+                    'path': normalize_path(os.path.join(current_path, relative_to_current)),
+                    'relative_path': normalize_path(relative_to_current)
+                })
+
+        if current_depth == 0 and depth == 0:
+            break  # 現在のフォルダのみ処理
+
+    folders.sort(key=lambda x: x['relative_path'].lower())
+    files.sort(key=lambda x: x['relative_path'].lower())
+    return folders, files
+
+@app.route('/get_filtered_items/<path:file_path>')
+def get_filtered_items(file_path):
+    full_path = normalize_path(os.path.join(BASE_DIR, file_path))
+    if not os.path.exists(full_path) or not os.path.isdir(full_path):
+        return jsonify({'error': '無効なパス'}), 400
+
+    all_folders, all_files = get_items_with_depth(full_path, depth=0, current_path=file_path)
+    
+    # フォルダとファイルの両方に対してフィルタリングを適用
+    filtered_folders = filter_files(all_folders, BASE_DIR)
+    filtered_files = filter_files(all_files, BASE_DIR)
+
+    return jsonify({
+        'folders': filtered_folders,
+        'files': filtered_files
+    })
+
+@app.route('/check_ignore')
+def check_ignore():
+    path = request.args.get('path', '')
+    ignored_patterns = load_view_ignore()
+    is_ignored = should_ignore(path, ignored_patterns)
+    return jsonify({'ignored': is_ignored})
+
+@app.route('/set_base_dir', methods=['POST'])
+def set_base_dir():
+    global BASE_DIR
+    new_base_dir = request.form.get('base_dir')
+    if os.path.isdir(new_base_dir):
+        BASE_DIR = normalize_path(new_base_dir)
+        # セッションにBASE_DIRを保存
+        session['BASE_DIR'] = BASE_DIR
+        return jsonify({'success': True, 'message': 'ベースディレクトリが更新されました。', 'base_dir': BASE_DIR})
+    else:
+        return jsonify({'success': False, 'message': '無効なディレクトリパスです。'})
+
+@app.before_request
+def before_request():
+    global BASE_DIR
+    # セッションからBASE_DIRを取得（存在しない場合はデフォルト値を使用）
+    BASE_DIR = session.get('BASE_DIR', BASE_DIR)
+
+@app.route('/open-jupyter', methods=['POST'])
+def open_jupyter():
+    data = request.json
+    file_path = data.get('path')
+    app.logger.info(f"Received file_path: {file_path}")
+    
+    if not file_path:
+        app.logger.warning("No file path specified")
+        return jsonify({'success': False, 'error': 'ファイルパスが指定されていません。'})
+    
+    try:
+        # ファイルパスをベースディレクトリからの相対パスに変換
+        relative_path = os.path.relpath(file_path, BASE_DIR)
+        app.logger.debug(f"Relative path: {relative_path}")
+
+        jupyter_url = f"{JUPYTER_BASE_URL}/{relative_path}"
+        jupyter_url = urllib.parse.unquote(jupyter_url)
+        jupyter_url = jupyter_url.replace("\\","/")
+
+        # 'file_viewer'を含まない相対パスを作成
+        cleaned_path = jupyter_url.replace('/viewer/', '/').replace('/viewer-main/', '/').replace('/file_viewer/', '/',1).replace('file_viewer-main/', '')
+        app.logger.debug(f"Cleaned path: {cleaned_path}")
+        
+        if cleaned_path.endswith('.ipynb'):
+            app.logger.debug(f"Opening .ipynb file: {cleaned_path}")
+        elif cleaned_path.startswith('http://') or cleaned_path.startswith('https://'):
+            # URLの場合、拡張子があるかチェック
+            parsed_url = urllib.parse.urlparse(cleaned_path)
+            path = parsed_url.path
+            if os.path.splitext(path)[1]:  # 拡張子がある場合
+                # ファイル名を除いたディレクトリパスを取得
+                cleaned_path = os.path.dirname(cleaned_path)
+                app.logger.debug(f"Opening folder for URL with file: {cleaned_path}")
+            else:
+                # 拡張子がない場合はそのまま開く
+                app.logger.debug(f"Opening URL directly: {cleaned_path}")
+        # elif os.path.isfile(os.path.join(BASE_DIR, cleaned_path)):
+        #     cleaned_path = os.path.dirname(cleaned_path)
+        #     app.logger.debug(f"Opening folder for non-.ipynb file: {cleaned_path}")
+        # else:
+        #     app.logger.debug(f"Opening folder: {cleaned_path}")
+        
+        # JupyterのURLを構築
+        # jupyter_url = f"{JUPYTER_BASE_URL}/{cleaned_path}"
+        app.logger.info(f"Opening Jupyter URL: {cleaned_path}")
+        
+        # ブラウザでJupyterのURLを開く
+        # URLをエンコード
+        encoded_url = urllib.parse.quote(cleaned_path, safe=':/')  # safeに':'と'/'を指定して、これらの文字はエンコードしない
+        # エンコードしたURLを開く
+        webbrowser.open(encoded_url)
+        # webbrowser.open(cleaned_path)
+        
+        return jsonify({'success': True})
+    except Exception as e:
+        app.logger.error(f"Error occurred while opening Jupyter: {str(e)}", exc_info=True)
+        return jsonify({'success': False, 'error': str(e)})
+
+@app.route('/network-image')
+def network_image():
+    path = request.args.get('path')
+    decoded_path = urllib.parse.unquote(path)
+    
+    if IS_WINDOWS:
+        decoded_path = decoded_path.replace("/", "\\")
+        try:
+            os.startfile(decoded_path)
+            return jsonify({'success': True, 'message': '画像を開きました'})
+        except Exception as e:
+            return jsonify({'success': False, 'error': str(e)})
+    else:
+        # Windowsでない場合
+        try:
+            if platform.system() == "Darwin":  # macOS
+                subprocess.run(["open", decoded_path], check=True)
+            else:  # Linux
+                subprocess.run(["xdg-open", decoded_path], check=True)
+            return jsonify({'success': True, 'message': '画像を開きました'})
+        except Exception as e:
+            return jsonify({'success': False, 'error': str(e)})
+
+@app.route('/open-local-file')
+def open_local_file():
+    path = request.args.get('path')
+    decoded_path = urllib.parse.unquote(path)
+    
+    app.logger.info(f"Opening file: {decoded_path}")
+    
+    if not os.path.exists(decoded_path):
+        app.logger.error(f"File not found: {decoded_path}")
+        return jsonify({'success': False, 'error': 'ファイルが見つかりません'}), 404
+
+    mime_type, _ = mimetypes.guess_type(decoded_path)
+    app.logger.info(f"MIME type: {mime_type}")
+
+    try:
+        if platform.system() == 'Darwin':  # macOS
+            subprocess.Popen(['open', decoded_path])
+        elif platform.system() == 'Windows':
+            os.startfile(decoded_path)
+        else:  # Linux
+            subprocess.Popen(['xdg-open', decoded_path])
+        return '', 204  # 成功を示すステータスコードを返しますが、コンテンツは返しません
+    except Exception as e:
+        app.logger.error(f"Error opening file: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+# @app.route('/check-path-type', methods=['POST'])
+# def check_path_type():
+#     data = request.json
+#     path = data.get('path')
+#     if os.path.isfile(path):
+#         return jsonify({'type': 'file'})
+#     elif os.path.isdir(path):
+#         return jsonify({'type': 'folder'})
+#     else:
+#         return jsonify({'type': 'invalid'})
+
+@app.route('/normalize-path', methods=['POST'])
+def normalize_path_endpoint():
+    data = request.json
+    path = data.get('path')
+    if not path:
+        return jsonify({'success': False, 'error': 'パスが指定されていません。'})
+    
+    try:
+        # パスの前後の引用符を削除
+        path = path.strip('"')
+        normalized_path = normalize_path(path)
+        return jsonify({'success': True, 'normalized_path': normalized_path})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
+
+@app.route('/download/<path:file_path>')
+def download_file(file_path):
+    full_path = normalize_path(os.path.join(BASE_DIR, file_path))
+    if os.path.isfile(full_path):
+        return send_file(full_path, as_attachment=True)
+    else:
+        abort(404)
+
+@app.route('/download-zip/<path:folder_path>')
+def download_zip(folder_path):
+    full_path = normalize_path(os.path.join(BASE_DIR, folder_path))
+    if not os.path.isdir(full_path):
+        abort(404)
+
+    memory_file = io.BytesIO()
+    with zipfile.ZipFile(memory_file, 'w', zipfile.ZIP_DEFLATED) as zf:
+        for root, _, files in os.walk(full_path):
+            for file in files:
+                file_path = os.path.join(root, file)
+                arcname = os.path.relpath(file_path, full_path)
+                zf.write(file_path, arcname)
+
+    memory_file.seek(0)
+    return send_file(
+        memory_file,
+        mimetype='application/zip',
+        as_attachment=True,
+        download_name=f'{os.path.basename(folder_path)}.zip'
+    )
+
+@app.route('/create-folder', methods=['POST'])
+def create_folder():
+    data = request.json
+    target_path = data.get('path')
+    folder_name = data.get('folderName')
+    if not target_path or not folder_name:
+        return jsonify({'success': False, 'error': 'パスまたはフォルダ名が指定されていません。'})
+    
+    try:
+        if not os.path.exists(TEMPLATE_FOLDER):
+            return jsonify({'success': False, 'error': 'テンプレートフォルが見つかりません'})
+        
+        new_folder_path = os.path.join(target_path, folder_name)
+        counter = 1
+        while os.path.exists(new_folder_path):
+            new_folder_name = f'{folder_name} ({counter})'
+            new_folder_path = os.path.join(target_path, new_folder_name)
+            counter += 1
+        
+        shutil.copytree(TEMPLATE_FOLDER, new_folder_path)
+        
+        # フォルダ作成後のアクション
+        perform_post_creation_actions(new_folder_path)
+        
+        return jsonify({'success': True, 'message': 'フォルダが作成されました。', 'path': new_folder_path})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
+
+def perform_post_creation_actions(folder_path):
+    # ここに作成後のアクションを記述
+    # 例: ログを記録する
+    app.logger.info(f"新しいフォルダが作成されました: {folder_path}")
+    
+    # 例: 特定のファイルを作成する
+    with open(os.path.join(folder_path, 'README.md'), 'w') as f:
+        f.write(f"# {os.path.basename(folder_path)}\n\nこのフォルダは自動生成されました。")
+    
+    # 例: 権限を設定する
+    # os.chmod(folder_path, 0o755)
+    
+    # その他必要なアクション...
+
+
+@app.route('/image-tools', methods=['POST'])
+def image_tools():
+    data = request.json
+    image_paths = data.get('paths', [])
+    
+    if not image_paths:
+        return jsonify({'success': False, 'error': '画像が選択されていません。'})
+    
+    # セッションに画像パスを保存
+    session['image_paths'] = image_paths
+    
+    return jsonify({'success': True, 'redirect': url_for('view_image_tools')})
+
+
+@app.route('/view-image-tools')
+def view_image_tools():
+    image_paths = session.get('image_paths', [])
+    if not image_paths:
+        return redirect(url_for('index'))
+    
+    full_paths = [normalize_path(os.path.join(BASE_DIR, path)) for path in image_paths]
+    encoded_paths = [urllib.parse.unquote(normalize_path(path.replace(BASE_DIR, '').lstrip('/'))) for path in full_paths]
+    app.logger.debug(encoded_paths)
+    
+    # 作成日時を取得（エラーハンドリングを追加）
+    file_dates = []
+    for path in full_paths:
+        try:
+            file_date = datetime.fromtimestamp(os.path.getctime(path)).isoformat()
+        except FileNotFoundError:
+            file_date = "N/A"  # ファイルが見つからない場合は "N/A" を使用
+        except Exception as e:
+            app.logger.error(f"Error getting file date for {path}: {str(e)}")
+            file_date = "Error"
+        file_dates.append(file_date)
+    
+    # zipオブジェクトを作成して渡す
+    zipped_paths = list(zip(full_paths, encoded_paths, file_dates))
+    
+    return render_template('image_tools.html', zipped_paths=zipped_paths, BASE_DIR=BASE_DIR)
+
+# @app.route('/raw/<path:file_path>')
+# def raw_file(file_path):
+#     full_path = os.path.join(BASE_DIR, file_path)
+#     return send_file(full_path)
+
+@app.route('/raw/<path:file_path>')
+def raw_file(file_path):
+    full_path = normalize_path(os.path.join(BASE_DIR, file_path))
+    if os.path.exists(full_path):
+        return send_file(full_path)
+    else:
+        abort(404)
+
+
+def render_csv(file_path):
+    with open(file_path, mode='r', encoding='utf-8') as file:
+        reader = csv.DictReader(file)
+        return [row for row in reader]
+
+
+def render_csv2(file_path):
+    with open(file_path, mode='r', encoding='utf-8') as file:
+        reader = csv.reader(file)
+        headers = next(reader, None)  # ヘッダー行を読み込む
+        
+        table_html = '<table class="csv-table">\n'
+        
+        # ヘッダー行を追加
+        if headers:
+            table_html += '<thead><tr>\n'
+            for header in headers:
+                table_html += f'<th>{html.escape(header)}</th>\n'
+            table_html += '</tr></thead>\n'
+        
+        # データ行を追加
+        table_html += '<tbody>\n'
+        for row in reader:
+            table_html += '<tr>\n'
+            for cell in row:
+                table_html += f'<td>{html.escape(cell)}</td>\n'
+            table_html += '</tr>\n'
+        table_html += '</tbody>\n'
+        
+        table_html += '</table>'
+        
+        return table_html
+
+@app.route('/copy-images-to-clipboard', methods=['POST'])
+def copy_images_to_clipboard():
+    data = request.json
+    image_paths = data.get('paths', [])
+    
+    if not image_paths:
+        return jsonify({'success': False, 'error': '画像が選択されていません。'})
+    
+    cancelled = False
+    processed_images = 0
+
+    try:
+        for encoded_path in image_paths:
+            if cancelled:
+                break
+
+            full_path = os.path.join(BASE_DIR, urllib.parse.unquote(encoded_path))
+            file_name = os.path.basename(full_path)
+            
+            # 画像をクリップボードにコピー
+            if platform.system() == 'Darwin':  # macOS
+                subprocess.run(['osascript', '-e', f'set the clipboard to (read (POSIX file "{full_path}") as JPEG picture)'])
+            elif platform.system() == 'Windows':
+                app.logger.info(full_path)
+                original_image = Image.open(full_path)
+                output = io.BytesIO()
+                original_image.convert("RGB").save(output, "BMP")
+                data = output.getvalue()[14:]
+                output.close()
+                # クリップボードを開く
+                win32clipboard.OpenClipboard()
+                # クリップボードに画像データを設定
+                win32clipboard.EmptyClipboard()
+                win32clipboard.SetClipboardData(win32clipboard.CF_DIB, data)
+                # クリップボードを閉じる
+                win32clipboard.CloseClipboard()
+
+            else:
+                return jsonify({'success': False, 'error': 'サポートされていないOSです。'})
+            
+            # ポップアップ表示
+            if platform.system() == 'Darwin':  # macOS
+                result = subprocess.run(['osascript', '-e', f'display dialog "{file_name} をクリップボードにコピーしました。続けますか？" buttons {{"キャンセル", "OK"}} default button "OK"'], capture_output=True, text=True)
+                app.logger.debug(f"macOS result.stdout: {result.stdout}")
+                app.logger.debug(f"macOS result.stderr: {result.stderr}")
+                if 'ユーザによってキャンセルされました' in result.stderr:
+                    cancelled = True
+            elif platform.system() == 'Windows':
+                result = sg.popup_yes_no("{file_name} をクリップボードにコピーしました。続けますか？" ,location=(None,None),keep_on_top =True)
+                if result == "No":
+                    cancelled = True
+
+            processed_images += 1
+
+        app.logger.debug(cancelled)
+        if cancelled:
+            return jsonify({'success': True, 'message': f'{processed_images}個の画像をコピーした後、処理を中断しました。'})
+        else:
+            return jsonify({'success': True, 'message': f'すべての画像（{processed_images}個）をクリップボードにコピーしました。'})
+    except Exception as e:
+        app.logger.exception("エラーが発生しました")
+        return jsonify({'success': False, 'error': str(e)})
+
+
+@app.template_filter('get_file_date')
+def get_file_date(file_path):
+    normalized_path = normalize_path(file_path)
+    try:
+        return datetime.fromtimestamp(os.path.getmtime(normalized_path)).isoformat()
+    except FileNotFoundError:
+        return "N/A"  # ファイルが見つからない場合は "N/A" を返す
+
+@app.template_filter('get_folder_path')
+def get_folder_path(file_path):
+    return normalize_path(os.path.dirname(file_path))
+
+@app.route('/html-to-markdown', methods=['POST'])
+def html_to_markdown():
+    html_content = request.json.get('html', '')
+    h = html2text.HTML2Text()
+    h.body_width = 0  # 行の折り返しを無効化
+    markdown_content = h.handle(html_content)
+    return markdown_content
+
+@app.route('/save-markdown', methods=['POST'])
+def save_markdown():
+    try:
+        content = request.json.get('content')
+        file_path = request.json.get('path')
+        
+        with open(file_path, 'w', encoding='utf-8') as f:
+            f.write(content)
+            
+        return jsonify({'success': True})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
+
+@app.route('/get-markdown-content', methods=['POST'])
+def get_markdown_content():
+    try:
+        file_path = request.json.get('path')
+        
+        # ファイルの内容を読み込む
+        with open(file_path, 'r', encoding='utf-8') as f:
+            content = f.read()
+            
+        return content
+    except Exception as e:
+        return str(e), 500
+
+@app.route('/excalidraw-local')
+def excalidraw_local():
+    return render_template('excalidraw_local.html')
+
+@app.route('/create-markdown', methods=['POST'])
+def create_markdown():
+    """
+    Markdownファイルを作成するエンドポイント
+    """
+    try:
+        data = request.json
+        directory = data.get('directory', '')
+        filename = data.get('filename', '')
+        
+        # ディレクトリパスを構築
+        dir_path = os.path.join(BASE_DIR, directory)
+        file_path = os.path.join(dir_path, filename)
+        
+        # ディレクトリが存在しない場合は作成
+        os.makedirs(dir_path, exist_ok=True)
+        
+        # ファイルが存在しない場合のみ作成
+        if not os.path.exists(file_path):
+            # 初期内容を設定
+            initial_content = f"""# {os.path.splitext(filename)[0]}
+
+                Created: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+
+                ## 概要
+
+                ここに概要を書きます。
+
+                ## 内容
+
+                ここに内容を書きます。
+                """
+            # ファイルを作成して初期内容を書き込む
+            with open(file_path, 'w', encoding='utf-8') as f:
+                f.write(initial_content)
+                
+        # 相対パスを返す
+        relative_path = os.path.relpath(file_path, BASE_DIR)
+        normalized_path = normalize_path(relative_path)
+        
+        return jsonify({
+            'success': True,
+            'file_path': normalized_path,
+            'full_path': normalize_path(file_path)
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+@app.route('/save_library', methods=['POST'])
+def save_library():
+    try:
+        library_data = request.get_json()
+        
+        # 保存先のディレクトリが存在することを確認
+        library_dir = os.path.join(app.static_folder, 'excalidraw_lib')
+        os.makedirs(library_dir, exist_ok=True)
+        
+        # ライブラリファイルに保存
+        library_path = os.path.join(library_dir, 'my_lib.excalidrawlib')
+        with open(library_path, 'w', encoding='utf-8') as f:
+            json.dump(library_data, f, ensure_ascii=False, indent=2)
+        
+        return jsonify({'success': True, 'message': 'ライブラリを保存しました'})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/save-excalidraw-data/<path:file_path>', methods=['POST'])
+def save_excalidraw_data(file_path):
+    """
+    Excalidrawデータを保存
+    """
+    try:
+        data = request.json
+        full_path = normalize_path(os.path.join(BASE_DIR, file_path))
+        excalidraw_dir = os.path.join(os.path.dirname(full_path), 'excalidraw')
+        os.makedirs(excalidraw_dir, exist_ok=True)
+        
+        base_name = os.path.splitext(os.path.basename(full_path))[0]
+        if base_name.endswith('.excalidraw'):
+            base_name = base_name[:-11]
+            
+        # excalidrawファイルとして保存
+        excalidraw_path = os.path.join(excalidraw_dir, f"{base_name}.excalidraw")
+        
+        app.logger.info(f"Saving to: {excalidraw_path}")
+        app.logger.info(f"Saving {len(data.get('elements', []))} elements")
+        
+        scene_data = {
+            "type": "excalidraw",
+            "version": 2,
+            "source": request.host_url,
+            "elements": data.get("elements", []),
+            "appState": data.get("appState", {
+                "viewBackgroundColor": "#ffffff",
+                "currentItemFontFamily": 1,
+                "gridSize": None,
+                "theme": "light"
+            }),
+            "files": data.get("files", {})
+        }
+        
+        # excalidrawファイルを保存
+        with open(excalidraw_path, 'w', encoding='utf-8') as f:
+            json.dump(scene_data, f, ensure_ascii=False, indent=2)
+            
+        # バックアップを作成
+        create_backup(excalidraw_path, scene_data)
+            
+        # SVGファイルを保存
+        if data.get('svg'):
+            svg_path = os.path.join(os.path.dirname(full_path), f"{base_name}_excalidraw.svg")
+            with open(svg_path, 'w', encoding='utf-8') as f:
+                f.write(data['svg'])
+            app.logger.info(f"Successfully saved SVG to {svg_path}")
+            
+        app.logger.info("Data saved successfully")
+        return jsonify({"success": True})
+    except Exception as e:
+        app.logger.error(f"Error saving excalidraw data: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/excalidraw-server/<path:file_path>')
+def excalidraw_server(file_path):
+    """
+    サーバー側で状態を管理するExcalidrawエディタを表示
+    """
+    full_path = normalize_path(os.path.join(BASE_DIR, file_path))
+    if not os.path.exists(os.path.dirname(full_path)):
+        abort(404)
+        
+    current_item = f"Excalidraw Server - {os.path.basename(file_path)}"
+    return render_template('excalidraw_server.html', 
+                        file_path=file_path, 
+                        full_path=full_path, 
+                        current_item=current_item)
+
+@app.route('/load-excalidraw-data/<path:file_path>')
+def load_excalidraw_data(file_path):
+    """
+    Excalidrawデータをロード
+    """
+    try:
+        full_path = normalize_path(os.path.join(BASE_DIR, file_path))
+        excalidraw_dir = os.path.join(os.path.dirname(full_path), 'excalidraw')
+        base_name = os.path.splitext(os.path.basename(full_path))[0]
+        if base_name.endswith('.excalidraw'):
+            base_name = base_name[:-11]
+            
+        excalidraw_path = os.path.join(excalidraw_dir, f"{base_name}.excalidraw")
+        
+        app.logger.info(f"Loading from: {excalidraw_path}")
+        
+        initial_data = {
+            "type": "excalidraw",
+            "version": 2,
+            "source": request.host_url,
+            "elements": [],
+            "appState": {
+                "viewBackgroundColor": "#ffffff",
+                "currentItemFontFamily": 1,
+                "gridSize": None,
+                "theme": "light",
+                "name": "Excalidraw"
+            },
+            "files": {}
+        }
+        
+        if os.path.exists(excalidraw_path):
+            with open(excalidraw_path, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+                # データの整合性チェックと正規化
+                if not isinstance(data.get('elements'), list):
+                    data['elements'] = []
+                if not isinstance(data.get('files'), dict):
+                    data['files'] = {}
+                if not isinstance(data.get('appState'), dict):
+                    data['appState'] = initial_data['appState']
+                    
+                app.logger.info(f"Loaded {len(data['elements'])} elements")
+                return jsonify(data)
+        else:
+            app.logger.info("No existing file found, returning initial data")
+            return jsonify(initial_data)
+            
+    except Exception as e:
+        app.logger.error(f"Error loading excalidraw data: {str(e)}")
+        return jsonify(initial_data), 200  # エラー時も初期データを返す
+
+def create_backup(file_path, data):
+    """バックアップを作成する関数"""
+    
+    try:
+        # 元のexcalidrawファイルと同じディレクトリにバックアップディレクトリを作成
+        parent_dir = os.path.dirname(os.path.dirname(file_path))  # excalidrawフォルダの親ディレクトリ
+        backup_dir = os.path.join(parent_dir, 'excalidraw_bkk')
+        os.makedirs(backup_dir, exist_ok=True)
+        
+        # 最新のバックアップを確認
+        base_name = os.path.splitext(os.path.basename(file_path))[0]
+        pattern = os.path.join(backup_dir, f"{base_name}_*.excalidraw")
+        existing_backups = glob.glob(pattern)
+        
+        current_time = time.time()
+        
+        # 既存のバックアップがある場合、最新のものとの時間差をチェック
+        if existing_backups:
+            latest_backup = max(existing_backups, key=os.path.getctime)
+            last_backup_time = os.path.getctime(latest_backup)
+            
+            # 最後のバックアップから1分以内の場合はスキップ
+            if current_time - last_backup_time < 60:  # 60秒 = 1分
+                app.logger.info("前回のバックアップから1分経過していないため、バックアップをスキップします")
+                return
+        
+        # タイムスタンプを含むバックアップファイル名を生成
+        timestamp = time.strftime('%Y%m%d_%H%M%S')
+        backup_filename = f"{base_name}_{timestamp}.excalidraw"
+        backup_path = os.path.join(backup_dir, backup_filename)
+        
+        # バックアップを保存
+        with open(backup_path, 'w', encoding='utf-8') as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+            
+        # 古いバックアップを削除
+        cleanup_old_backups(file_path, backup_dir)
+        
+        app.logger.info(f"バックアップを作成しました: {backup_path}")
+        
+    except Exception as e:
+        app.logger.error(f"バックアップの作成に失敗しました: {str(e)}")
+
+def cleanup_old_backups(file_path, backup_dir):
+    """古いバックアップを削除する関数"""
+    MAX_BACKUPS = 20  # バックアップの最大保持数を定義
+    
+    try:
+        base_name = os.path.splitext(os.path.basename(file_path))[0]
+        pattern = os.path.join(backup_dir, f"{base_name}_*.excalidraw")
+        backup_files = sorted(glob.glob(pattern), key=os.path.getctime, reverse=True)
+        
+        # MAX_BACKUPS以上のバックアップがある場合、古いものを削除
+        for old_backup in backup_files[MAX_BACKUPS:]:
+            os.remove(old_backup)
+            app.logger.info(f"古いバックアップを削除しました: {old_backup}")
+            
+    except Exception as e:
+        app.logger.error(f"バックアップのクリーンアップに失敗しました: {str(e)}")
+
+@app.route('/get-excalidraw-backups/<path:file_path>')
+def get_excalidraw_backups(file_path):
+    try:
+        full_path = normalize_path(os.path.join(BASE_DIR, file_path))
+        # excalidrawフォルダの親ディレクトリを取得
+        parent_dir = os.path.dirname(full_path)  # 修正: os.path.dirname(os.path.dirname(full_path))を変更
+        backup_dir = os.path.join(parent_dir, 'excalidraw_bkk')
+        
+        app.logger.info(f"Looking for backups in: {backup_dir}")  # ログ追加
+        
+        if not os.path.exists(backup_dir):
+            app.logger.info(f"Backup directory does not exist: {backup_dir}")  # ログ追加
+            return jsonify({'backups': []})
+            
+        base_name = os.path.splitext(os.path.basename(full_path))[0]
+        if base_name.endswith('.excalidraw'):
+            base_name = base_name[:-11]
+            
+        pattern = os.path.join(backup_dir, f"{base_name}_*.excalidraw")
+        backup_files = glob.glob(pattern)
+        
+        app.logger.info(f"Found {len(backup_files)} backup files")  # ログ追加
+        app.logger.info(f"Pattern used: {pattern}")  # ログ追加
+        
+        # バックアップファイルの情報を取得
+        backups = []
+        for backup_file in backup_files:
+            backup_name = os.path.basename(backup_file)
+            backup_time = datetime.fromtimestamp(os.path.getmtime(backup_file))
+            backups.append({
+                'name': backup_name,
+                'time': backup_time.strftime('%Y-%m-%d %H:%M:%S'),
+                'path': backup_file
+            })
+            
+        # 時間順に並び替え（新しい順）
+        backups.sort(key=lambda x: x['time'], reverse=True)
+        
+        app.logger.info(f"Returning {len(backups)} backups")  # ログ追加
+        return jsonify({'backups': backups})
+    except Exception as e:
+        app.logger.error(f"Error in get_excalidraw_backups: {str(e)}")  # ログ追加
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/restore-excalidraw-backup', methods=['POST'])
+def restore_excalidraw_backup():
+    try:
+        data = request.json
+        backup_path = data.get('backup_path')
+        current_path = data.get('current_path')
+        
+        app.logger.debug(f"backup path: {backup_path}")
+        app.logger.debug(f"original current path: {current_path}")
+        
+        # current_pathをexcalidrawフォルダ内のパスに修正
+        excalidraw_dir = os.path.join(os.path.dirname(current_path), 'excalidraw')
+        current_path = os.path.join(excalidraw_dir, os.path.basename(current_path))
+        
+        app.logger.debug(f"modified current path: {current_path}")
+        
+        if not backup_path or not current_path:
+            return jsonify({'error': '必要なパラメータが不足しています'}), 400
+            
+        # バックアップファイルを読み込む
+        with open(backup_path, 'r', encoding='utf-8') as f:
+            backup_data = json.load(f)
+            
+        # 現在のファイルが存在する場合は削除
+        if os.path.exists(current_path):
+            os.remove(current_path)
+            app.logger.info(f"既存のファイルを削除しました: {current_path}")
+            
+        # 新しいファイルとして保存
+        with open(current_path, 'w', encoding='utf-8') as f:
+            json.dump(backup_data, f, ensure_ascii=False, indent=2)
+            
+        app.logger.info(f"バックアップを復元しました: {current_path}")
+        return jsonify({'success': True, 'message': 'バックアップを復元しました'})
+    except Exception as e:
+        app.logger.error(f"バックアップの復元に失敗しました: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/save-selected-svg/<path:file_path>', methods=['POST'])
+def save_selected_svg(file_path):
+    """
+    選択したオブジェクトをSVGとして保存（excalidrawファイルと同じ階層に保存）
+    """
+    try:
+        data = request.json
+        svg_content = data.get('svg')
+        filename = data.get('filename')
+        
+        if not svg_content or not filename:
+            return jsonify({"success": False, "error": "必要なデータが不足しています"}), 400
+            
+        # 保存先のパスを構築
+        current_dir = os.path.dirname(file_path)
+        save_dir = os.path.join(BASE_DIR, current_dir)
+        os.makedirs(save_dir, exist_ok=True)
+        
+        # ファイル名を正規化
+        safe_filename = secure_filename(f"{filename}.svg")
+        svg_path = os.path.join(save_dir, safe_filename)
+        
+        # SVGファイルを保存
+        with open(svg_path, 'w', encoding='utf-8') as f:
+            f.write(svg_content)
+            
+        app.logger.info(f"Successfully saved SVG to {svg_path}")
+        
+        # ルパスをクリップボードにコピー
+        try:
+            pyperclip.copy(svg_path)
+            app.logger.info(f"Copied path to clipboard: {svg_path}")
+        except Exception as e:
+            app.logger.error(f"Failed to copy path to clipboard: {str(e)}")
+        
+        # 一時的なURLを生成（static_urlを使用）
+        relative_path = os.path.relpath(svg_path, BASE_DIR)
+        temp_url = url_for('serve_file', file_path=relative_path)
+        
+        return jsonify({
+            "success": True,
+            "fileUrl": temp_url
+        })
+        
+    except Exception as e:
+        app.logger.error(f"Error saving SVG: {str(e)}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+# 新しいエンドポイントを追加
+@app.route('/serve-file/<path:file_path>')
+def serve_file(file_path):
+    try:
+        full_path = os.path.join(BASE_DIR, file_path)
+        return send_file(full_path)
+    except Exception as e:
+        app.logger.error(f"Error serving file: {str(e)}")
+        abort(404)
+
+@app.route('/save-outlook-email', methods=['POST'])
+def save_outlook_email():
+    try:
+        if 'email' not in request.files:
+            return jsonify({'success': False, 'error': 'メールファイルが見つかりません'}), 400
+
+        email_file = request.files['email']
+        
+        # メールを解析
+        msg = email.message_from_bytes(
+            email_file.read(),
+            policy=policy.default
+        )
+        
+        # 件名を取得（日本語対応）
+        subject = msg.get('subject', 'No Subject')
+        if subject.startswith('=?'):
+            subject = email.header.decode_header(subject)[0][0]
+            if isinstance(subject, bytes):
+                subject = subject.decode('utf-8')
+        
+        # 保存用のディレクトリを作成
+        email_dir = os.path.join(BASE_DIR, 'emails')
+        os.makedirs(email_dir, exist_ok=True)
+        
+        # ファイル名を生成（タイムスタンプと件名を使用）
+        safe_subject = secure_filename(subject)
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        email_filename = f"{timestamp}_{safe_subject}.eml"
+        email_path = os.path.join(email_dir, email_filename)
+        
+        # メールを保存
+        email_file.seek(0)
+        email_file.save(email_path)
+        
+        # 相対パスを返す
+        relative_path = os.path.relpath(email_path, BASE_DIR)
+        
+        return jsonify({
+            'success': True,
+            'emailPath': relative_path,
+            'subject': subject
+        })
+        
+    except Exception as e:
+        app.logger.error(f"メールの保存中にエラーが発生しました: {str(e)}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+if __name__ == '__main__':
+    app.secret_key = 'your_secret_key_here'  # セッション用の秘密鍵
+    # デバッグモードでアプリケーションを実行
+    app.run(debug=True, host='0.0.0.0', port=5001)

@@ -1,0 +1,1256 @@
+{% extends "base.html" %}
+
+{% block head %}
+<script src="{{ url_for('static', filename='js/lodash.min.js') }}"></script>
+<script src="{{ url_for('static', filename='js/react.production.min.js') }}"></script>
+<script src="{{ url_for('static', filename='js/react-dom.production.min.js') }}"></script>
+<script src="{{ url_for('static', filename='js/excalidraw.production.min.js') }}"></script>
+<script src="{{ url_for('static', filename='js/excalidraw-assets/vendor-677e88ca78c86bddf13d.js') }}"></script>
+
+<link rel="preload" href="{{ url_for('static', filename='fonts/Virgil.woff2') }}" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="{{ url_for('static', filename='fonts/Cascadia.woff2') }}" as="font" type="font/woff2" crossorigin>
+
+<style>
+    .excalidraw-wrapper {
+        height: calc(100vh - 50px);
+        margin-top: 10px;
+    }
+    #excalidraw-container {
+        height: 100%;
+    }
+    @font-face {
+        font-family: "Virgil";
+        src: url("{{ url_for('static', filename='fonts/Virgil.woff2') }}") format("woff2");
+        font-display: swap;
+    }
+    @font-face {
+        font-family: "Cascadia";
+        src: url("{{ url_for('static', filename='fonts/Cascadia.woff2') }}") format("woff2");
+        font-display: swap;
+    }
+</style>
+
+<script>
+    // 画像の遅延読み込みを有効化
+    window.EXCALIDRAW_ASSET_PATH = "{{ url_for('static', filename='js/excalidraw-assets/') }}";
+    window.EXCALIDRAW_THROTTLE_RENDER = true;  // レンダリングの制御を有効化
+</script>
+{% endblock %}
+
+{% block folder_path %}
+<div class="folder-path">
+    <span title="{{ full_path }}">{{ full_path }}</span>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="excalidraw-wrapper">
+    <div style="position: fixed; top: 10px; right: 20px; z-index: 1000;">
+        <button id="restore-backup" style="margin-right: 10px; padding: 8px;">バックアップから復元</button>
+        <button id="export-svg" style="padding: 8px;">選択項目をSVGで保存</button>
+    </div>
+    <div id="excalidraw-container"></div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', async () => {
+        // ライブラリファイルを読み込む関数を追加
+        async function loadExcalidrawLibrary() {
+            try {
+                const response = await fetch("{{ url_for('static', filename='excalidraw_lib/my_lib.excalidrawlib') }}");
+                console.log("aaaaaaaa",response);
+                if (!response.ok) {
+                    throw new Error('ライブラリの読み込みに失敗しました');
+                }
+                return await response.json();
+            } catch (error) {
+                console.error('ライブラリの読み込みエラー:', error);
+                return null;
+            }
+        }
+
+        // クリップボードの処理を修正
+        // setTimeout(async () => {
+        //     try {
+        //         const originalPath = '{{ full_path }}';
+        //         const isWindows = navigator.platform.toLowerCase().includes('win');
+        //         const pathToCopy = isWindows 
+        //             ? originalPath.replace(/\//g, '\\')
+        //             : originalPath;
+                
+        //         // クリップボード処理を Promise で適切に処理
+        //         await new Promise((resolve, reject) => {
+        //             navigator.clipboard.writeText(pathToCopy)
+        //                 .then(() => {
+        //                     console.log('パスをクリップボードにコピーしました:', pathToCopy);
+        //                     resolve();
+        //                 })
+        //                 .catch(err => {
+        //                     console.error('クリップボードへのコピーに失敗しました:', err);
+        //                     reject(err);
+        //                 });
+        //         });
+        //     } catch (err) {
+        //         console.error('クリップボード処理中にエラーが発生しました:', err);
+        //     }
+        // }, 500);
+
+        const App = () => {
+            const [excalidrawAPI, setExcalidrawAPI] = React.useState(null);
+            const [sceneData, setSceneData] = React.useState(null);
+            const previousElementsRef = React.useRef(null);
+            const excalidrawRef = React.useRef(null);
+            
+            // BASE_DIRをFlaskから受け取る
+            const BASE_DIR = "{{ BASE_DIR }}";
+
+            // 画像の最適化関数を追加
+            const optimizeElements = React.useCallback((elements) => {
+                return elements.map(element => {
+                    if (element.type === 'image') {
+                        // 画像要素の場合、必要最小限のプロパティのみを保持
+                        return {
+                            ...element,
+                            cached: true,
+                            scale: element.scale || [1, 1]
+                        };
+                    }
+                    return element;
+                });
+            }, []);
+
+            // 変更検知の最適化
+            const debouncedSave = React.useCallback(
+                _.debounce((elements, state, files) => {
+                    saveDrawing(optimizeElements(elements), state, files);
+                }, 1000),
+                []
+            );
+
+            // onChange関数を更新
+            const handleChange = React.useCallback((elements, state, files) => {
+                if (!previousElementsRef.current || hasElementsChanged(elements, previousElementsRef.current)) {
+                    debouncedSave(elements, state, files);
+                    previousElementsRef.current = JSON.parse(JSON.stringify(elements));
+                }
+            }, [debouncedSave]);
+
+            // 付箋を追加する関数
+            const addStickyNote = React.useCallback(() => {
+                if (!excalidrawAPI) {
+                    console.warn('Excalidraw API not ready');
+                    return;
+                }
+                
+                try {
+                    const viewportPosition = {
+                        x: excalidrawAPI.getAppState().scrollX + window.innerWidth / 2,
+                        y: excalidrawAPI.getAppState().scrollY + window.innerHeight / 2
+                    };
+
+                    const newElement = {
+                        id: Math.random().toString(36).substr(2, 9),
+                        type: 'rectangle',
+                        x: viewportPosition.x - 100,
+                        y: viewportPosition.y - 50,
+                        width: 200,
+                        height: 100,
+                        angle: 0,
+                        strokeColor: '#000000',
+                        backgroundColor: '#fef3bd',
+                        fillStyle: 'solid',
+                        strokeWidth: 1,
+                        strokeStyle: 'solid',
+                        roughness: 0,
+                        opacity: 100,
+                        groupIds: [],
+                        seed: Math.random(),
+                        version: 1,
+                        versionNonce: 0,
+                        isDeleted: false,
+                        boundElements: null,
+                        updated: Date.now(),
+                        link: null,
+                        locked: false,
+                    };
+                    
+                    excalidrawAPI.updateScene({
+                        elements: [...excalidrawAPI.getSceneElements(), newElement]
+                    });
+                    console.log('付箋を追加しました:', newElement);
+                } catch (error) {
+                    console.error('付箋の追加に失敗しました:', error);
+                }
+            }, [excalidrawAPI]);
+
+            // ボタンのイベントリスナーを設定
+            React.useEffect(() => {
+                if (!excalidrawAPI) return;
+
+                const button = document.getElementById('add-sticky-note');
+                if (button) {
+                    button.addEventListener('click', addStickyNote);
+                    console.log('ボタンのイベントリスナーを設定しました');
+                }
+
+                return () => {
+                    const button = document.getElementById('add-sticky-note');
+                    if (button) {
+                        button.removeEventListener('click', addStickyNote);
+                    }
+                };
+            }, [excalidrawAPI, addStickyNote]);
+
+            // キーボードショートカットとマウス位置の処理
+            React.useEffect(() => {
+                if (!excalidrawAPI) return;
+
+                let mouseX = 0;
+                let mouseY = 0;
+
+                const handleMouseMove = (event) => {
+                    mouseX = event.clientX;
+                    mouseY = event.clientY;
+                };
+
+                const handleKeyPress = (event) => {
+                    // Command/Ctrl + B の処理（最前面）
+                    // if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'b') {
+                    // if ((event.metaKey || event.ctrlKey) && event.shiftKey && event.key.toLowerCase() === 'b') 
+                    if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'm') {
+                        console.log('最前面処理を実行します');
+                        event.preventDefault();
+                        
+                        try {
+                            const allElements = excalidrawAPI.getSceneElements();
+                            const selectedElementIds = excalidrawAPI.getAppState().selectedElementIds;
+                            
+                            console.log('全要素数:', allElements.length);
+                            console.log('選択された要素IDs:', selectedElementIds);
+                            
+                            // 選択された要素とそれに紐づくテキスト要素を特定
+                            let selectedElements = allElements.filter(element => 
+                                selectedElementIds[element.id]
+                            );
+                            
+                            console.log('選択された要素数:', selectedElements.length);
+                            
+                            // 選択された要素に紐づくテキスト要素も含める
+                            const boundElementIds = new Set();
+                            selectedElements.forEach(element => {
+                                if (element.boundElements) {
+                                    element.boundElements.forEach(bound => {
+                                        boundElementIds.add(bound.id);
+                                    });
+                                }
+                            });
+                            
+                            // 紐づくテキスト要素を追加
+                            selectedElements = [
+                                ...selectedElements,
+                                ...allElements.filter(element => boundElementIds.has(element.id))
+                            ];
+                            
+                            if (selectedElements.length === 0) {
+                                console.log('選択された要素がありません');
+                                return;
+                            }
+
+                            // 選択されていない要素を取得
+                            const nonSelectedElements = allElements.filter(
+                                element => !selectedElements.some(selected => selected.id === element.id)
+                            );
+                            
+                            // 選択された要素を最前面に配置（配列の末尾に置く）
+                            const newElements = [...nonSelectedElements, ...selectedElements];
+                            
+                            console.log('並び替え後の要素数:', newElements.length);
+                            
+                            excalidrawAPI.updateScene({
+                                elements: newElements,
+                                appState: {
+                                    ...excalidrawAPI.getAppState(),
+                                    selectedElementIds: selectedElementIds
+                                }
+                            });
+
+                            console.log('最前面移動が完了しました');
+
+                        } catch (error) {
+                            console.error('オブジェクトの最前面移動に失敗しました:', error);
+                            console.error('エラーの詳細:', error.stack);
+                        }
+                        return;
+                    }
+                    //  B の処理（最背面）
+                    // if (event.key.toLowerCase() === 'b') {
+                    if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'b') {
+                    // else if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'b') {
+                        console.log('条件に一致しました！');
+                        event.preventDefault();
+                        
+                        console.log('Command/Ctrl + B が押されました');
+                        console.log('metaKey:', event.metaKey);
+                        console.log('ctrlKey:', event.ctrlKey);
+                        console.log('key:', event.key);
+                        
+                        try {
+                            const allElements = excalidrawAPI.getSceneElements();
+                            const selectedElementIds = excalidrawAPI.getAppState().selectedElementIds;
+                            
+                            // 選択された要素とそれに紐づくテキスト要素を特定
+                            let selectedElements = allElements.filter(element => 
+                                selectedElementIds[element.id]
+                            );
+                            
+                            // 選択された要素に紐づくテキスト要素も含める
+                            const boundElementIds = new Set();
+                            selectedElements.forEach(element => {
+                                if (element.boundElements) {
+                                    element.boundElements.forEach(bound => {
+                                        boundElementIds.add(bound.id);
+                                    });
+                                }
+                            });
+                            
+                            // 紐づくテキスト要素を追加
+                            selectedElements = [
+                                ...selectedElements,
+                                ...allElements.filter(element => boundElementIds.has(element.id))
+                            ];
+                            
+                            console.log('選択された要素（テキスト含む）:', selectedElements);
+                            
+                            if (selectedElements.length === 0) {
+                                console.log('選択された要素がありません');
+                                return;
+                            }
+
+                            // 選択されていない要素を取得
+                            const nonSelectedElements = allElements.filter(
+                                element => !selectedElements.some(selected => selected.id === element.id)
+                            );
+                            
+                            // 選択された要素とテキストを最背面に配置
+                            const newElements = [...selectedElements, ...nonSelectedElements];
+                            
+                            console.log('並び替え後の要素数:', newElements.length);
+                            
+                            excalidrawAPI.updateScene({
+                                elements: newElements,
+                                appState: {
+                                    ...excalidrawAPI.getAppState(),
+                                    selectedElementIds: selectedElementIds
+                                }
+                            });
+
+                        } catch (error) {
+                            console.error('オブジェクトの最背面移動に失敗しました:', error);
+                        }
+                        return;
+                    }
+
+                    // cmd/ctrlキーが押されている場合は、デフォルトの動作を許可
+                    if (event.metaKey || event.ctrlKey) {
+                        return;
+                    }
+
+                    // Cキーの処理
+                    if (event.key.toLowerCase() === 'c' && 
+                        !event.target.matches('input, textarea, [contenteditable]')) {
+                        event.preventDefault();
+                        
+                        try {
+                            // 現在のシーン要素の数を記録
+                            const currentElementsCount = excalidrawAPI.getSceneElements().length;
+                            
+                            excalidrawAPI.setActiveTool({
+                                type: "arrow",
+                                customType: null,
+                                locked: false,
+                                strokeColor: "#000000",
+                                backgroundColor: "transparent",
+                                fillStyle: "solid",
+                                strokeWidth: 1,
+                                roughness: 0
+                            });
+
+                            // 新しい要素が追加されたときのイベントリスナー
+                            const checkNewElement = () => {
+                                const elements = excalidrawAPI.getSceneElements();
+                                if (elements.length > currentElementsCount) {
+                                    // 最後に追加された要素を取得
+                                    const newElement = elements[elements.length - 1];
+                                    if (newElement.type === "arrow") {
+                                        // 矢印をnullに設定
+                                        newElement.startArrowhead = null;
+                                        newElement.endArrowhead = null;
+                                        // シーンを更新
+                                        excalidrawAPI.updateScene({
+                                            elements: elements
+                                        });
+                                    }
+                                    // リスナーを削除
+                                    document.removeEventListener("pointerup", checkNewElement);
+                                }
+                            };
+
+                            // pointerupイベントでチェック
+                            document.addEventListener("pointerup", checkNewElement);
+
+                        } catch (error) {
+                            console.error('線ツールの設定に失敗しました:', error);
+                        }
+                        return;
+                    }
+
+                    // Nキーの処理
+                    if (event.key.toLowerCase() === 'n' && 
+                        !event.target.matches('input, textarea, [contenteditable]')) {
+                        event.preventDefault();
+                        // ズーム倍率を考慮した位置計算
+                        const zoom = excalidrawAPI.getAppState().zoom.value;
+                        const viewportPosition = {
+                            x: (excalidrawAPI.getAppState().scrollX * -1) + mouseX / zoom,
+                            y: (excalidrawAPI.getAppState().scrollY * -1) + mouseY / zoom
+                        };
+                        
+                        // console.log('マウスの位置:', {
+                        //     viewport: viewportPosition,
+                        //     mouse: { x: mouseX, y: mouseY },
+                        //     scroll: {
+                        //         x: excalidrawAPI.getAppState().scrollX,
+                        //         y: excalidrawAPI.getAppState().scrollY
+                        //     }
+                        // });
+                        
+                        // 付箋（rectangle）を作成
+                        const rectangleElement = {
+                            id: Math.random().toString(36).substr(2, 9),
+                            type: 'rectangle',
+                            x: viewportPosition.x - 100,
+                            y: viewportPosition.y - 80,
+                            width: 200,
+                            height: 50,
+                            angle: 0,
+                            strokeColor: '#000000',
+                            backgroundColor: '#fef3bd',
+                            fillStyle: 'solid',
+                            strokeWidth: 1,
+                            strokeStyle: 'solid',
+                            roughness: 0,
+                            opacity: 100,
+                            groupIds: [],
+                            seed: Math.random(),
+                            version: 1,
+                            versionNonce: 0,
+                            isDeleted: false,
+                            boundElements: [{ type: "text", id: "text-" + Math.random().toString(36).substr(2, 9) }],
+                            updated: Date.now(),
+                            link: null,
+                            locked: false,
+                        };
+
+                        // テキスト要素を作成
+                        const textElement = {
+                            id: rectangleElement.boundElements[0].id,
+                            type: 'text',
+                            x: rectangleElement.x + 10,
+                            y: rectangleElement.y + 10,
+                            width: rectangleElement.width - 20,
+                            height: rectangleElement.height - 20,
+                            angle: 0,
+                            strokeColor: '#000000',
+                            backgroundColor: 'transparent',
+                            fillStyle: 'solid',
+                            strokeWidth: 1,
+                            strokeStyle: 'solid',
+                            roughness: 0,
+                            opacity: 100,
+                            groupIds: [],
+                            seed: Math.random(),
+                            version: 1,
+                            versionNonce: 0,
+                            isDeleted: false,
+                            text: "メモを入力",
+                            fontSize: 17,
+                            fontFamily: 1,
+                            textAlign: "left",
+                            verticalAlign: "top",
+                            baseline: 12,
+                            containerId: rectangleElement.id,
+                            originalText: "メモを入力",
+                            lineHeight: 1.1,
+                        };
+
+                        excalidrawAPI.updateScene({
+                            elements: [...excalidrawAPI.getSceneElements(), rectangleElement, textElement],
+                            appState: {
+                                ...excalidrawAPI.getAppState(),
+                                selectedElementIds: { [textElement.id]: true }
+                            }
+                        });
+                        return;
+                    }
+
+                    // Wキーの処理
+                    if (event.key.toLowerCase() === 'w' && 
+                        !event.target.matches('input, textarea, [contenteditable]')) {
+                        event.preventDefault();
+                        
+                        const zoom = excalidrawAPI.getAppState().zoom.value;
+                        const viewportPosition = {
+                            x: (excalidrawAPI.getAppState().scrollX * -1) + mouseX / zoom,
+                            y: (excalidrawAPI.getAppState().scrollY * -1) + mouseY / zoom
+                        };
+
+                        navigator.clipboard.readText().then(async clipboardText => {
+                            let PYTHON_EXECUTABLE = "python"
+                            let linkText = clipboardText;
+                            let displayText = decodeURIComponent(clipboardText.split(/[\/\\]/).pop());
+
+                            // .py ファイルの場合、cmd pythonコマンドを追加
+                            if (clipboardText.toLowerCase().endsWith('.py')) {
+                                linkText = `cmd ${PYTHON_EXECUTABLE} ${clipboardText}`;
+                            }
+                            // .sh または .bat ファイルの場合、cmdコマンドを追加
+                            else if (clipboardText.toLowerCase().endsWith('.sh') || clipboardText.toLowerCase().endsWith('.bat')) {
+                                linkText = `cmd ${clipboardText}`;
+                            }
+                            
+                            try {
+                                // await navigator.clipboard.writeText(displayText);
+                                
+                                // 付箋（rectangle）を作成
+                                const rectangleElement = {
+                                    id: Math.random().toString(36).substr(2, 9),
+                                    type: 'rectangle',
+                                    x: viewportPosition.x - 100,
+                                    y: viewportPosition.y - 80,
+                                    width: 200,
+                                    height: 50,
+                                    angle: 0,
+                                    strokeColor: '#000000',
+                                    backgroundColor: '#fef3bd',
+                                    fillStyle: 'solid',
+                                    strokeWidth: 1,
+                                    strokeStyle: 'solid',
+                                    roughness: 0,
+                                    opacity: 100,
+                                    groupIds: [],
+                                    seed: Math.random(),
+                                    version: 1,
+                                    versionNonce: 0,
+                                    isDeleted: false,
+                                    boundElements: [{ type: "text", id: "text-" + Math.random().toString(36).substr(2, 9) }],
+                                    updated: Date.now(),
+                                    link: linkText,  // 修正したリンクを設定
+                                    locked: false,
+                                };
+
+                                // テキスト要素を作成
+                                const textElement = {
+                                    id: rectangleElement.boundElements[0].id,
+                                    type: 'text',
+                                    x: rectangleElement.x + 10,
+                                    y: rectangleElement.y + 10,
+                                    width: rectangleElement.width - 20,
+                                    height: rectangleElement.height - 20,
+                                    angle: 0,
+                                    strokeColor: '#000000',
+                                    backgroundColor: 'transparent',
+                                    fillStyle: 'solid',
+                                    strokeWidth: 1,
+                                    strokeStyle: 'solid',
+                                    roughness: 0,
+                                    opacity: 100,
+                                    groupIds: [],
+                                    seed: Math.random(),
+                                    version: 1,
+                                    versionNonce: 0,
+                                    isDeleted: false,
+                                    text: displayText,
+                                    fontSize: 17,
+                                    fontFamily: 1,
+                                    textAlign: "left",
+                                    verticalAlign: "top",
+                                    baseline: 12,
+                                    containerId: rectangleElement.id,
+                                    originalText: displayText,
+                                    lineHeight: 1.1,
+                                };
+
+                                excalidrawAPI.updateScene({
+                                    elements: [...excalidrawAPI.getSceneElements(), rectangleElement, textElement],
+                                    appState: {
+                                        ...excalidrawAPI.getAppState(),
+                                        selectedElementIds: { [textElement.id]: true }
+                                    }
+                                });
+
+                                // 追加：シーンの更新後に保存を実行
+                                const updatedElements = excalidrawAPI.getSceneElements();
+                                const updatedAppState = excalidrawAPI.getAppState();
+                                const updatedFiles = excalidrawAPI.getFiles();
+                                saveDrawing(updatedElements, updatedAppState, updatedFiles);
+                            } catch (error) {
+                                console.error('付箋の追加に失敗しました:', error);
+                            }
+                        });
+                    }
+                    return;
+                };
+
+                document.addEventListener('mousemove', handleMouseMove);
+                document.addEventListener('keydown', handleKeyPress);
+                
+                return () => {
+                    document.removeEventListener('mousemove', handleMouseMove);
+                    document.removeEventListener('keydown', handleKeyPress);
+                };
+            }, [excalidrawAPI]);
+
+            // ページを離れる前の保存処理
+            const handleBeforeUnload = async (event) => {
+                if (!excalidrawAPI) return;
+
+                // パフォーマンスAPI を使用してリロードかどうかを判断
+                const navigationEntry = performance.getEntriesByType("navigation")[0];
+                if (navigationEntry && navigationEntry.type === "reload") {
+                    // リロードの場合は保存をスキップ
+                    return;
+                }
+
+                // リロード以外（タブを閉じる、ブラウザを閉じる）の場合は保存を実行
+                event.preventDefault();
+                event.returnValue = '';
+
+                try {
+                    const elements = excalidrawAPI.getSceneElements();
+                    const appState = excalidrawAPI.getAppState();
+                    const files = excalidrawAPI.getFiles();
+                    
+                    await fetch("{{ url_for('save_excalidraw_data', file_path=file_path) }}", {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            elements: elements,
+                            appState: appState,
+                            files: files
+                        })
+                    });
+                } catch (error) {
+                    console.error('保存エラー:', error);
+                }
+            };
+
+            // タブの表示状態が変更された時の保存処理
+            const handleVisibilityChange = () => {
+                if (document.visibilityState === 'hidden') {
+                    handleBeforeUnload({ preventDefault: () => {}, returnValue: '' });
+                }
+            };
+
+            React.useEffect(() => {
+                if (!excalidrawAPI) return;
+
+                window.addEventListener('beforeunload', handleBeforeUnload);
+                document.addEventListener('visibilitychange', handleVisibilityChange);
+
+                return () => {
+                    window.removeEventListener('beforeunload', handleBeforeUnload);
+                    document.removeEventListener('visibilitychange', handleVisibilityChange);
+                };
+            }, [excalidrawAPI]);
+
+            // データの読み込み
+            React.useEffect(() => {
+                const loadData = async () => {
+                    try {
+                        console.log("Loading data...");
+                        const response = await fetch("{{ url_for('load_excalidraw_data', file_path=file_path) }}", {
+                            // キャッシュを無効化するオプションを追加
+                            cache: 'no-store',
+                            headers: {
+                                'Cache-Control': 'no-cache',
+                                'Pragma': 'no-cache'
+                            }
+                        });
+                        if (!response.ok) throw new Error('データの読み込みに失敗しました');
+                        const data = await response.json();
+                        console.log("Loaded data:", data);
+                        
+                        // データ構造を正規化
+                        const normalizedData = {
+                            elements: Array.isArray(data.elements) ? data.elements : [],
+                            appState: {
+                                viewBackgroundColor: data.appState?.viewBackgroundColor || "#ffffff",
+                                currentItemFontFamily: data.appState?.currentItemFontFamily || 1,
+                                gridSize: data.appState?.gridSize || null,
+                                theme: data.appState?.theme || "light",
+                                name: "Excalidraw"
+                            },
+                            files: data.files || {}
+                        };
+                        
+                        console.log("Normalized data:", normalizedData);
+                        setSceneData(normalizedData);
+                    } catch (error) {
+                        console.error('データ読み込みエラー:', error);
+                        // エラー時のフォールバックデータ
+                        setSceneData({
+                            elements: [],
+                            appState: {
+                                viewBackgroundColor: "#ffffff",
+                                currentItemFontFamily: 1,
+                                gridSize: null,
+                                theme: "light",
+                                name: "Excalidraw"
+                            },
+                            files: {}
+                        });
+                    }
+                };
+                loadData();
+            }, []);
+
+            // 変更の保存
+            const saveDrawing = async (elements, appState, files) => {
+                try {
+                    console.log("Saving data...", elements.length, "elements");
+                    
+                    // SVGをエクスポート
+                    const svgString = await ExcalidrawLib.exportToSvg({
+                        elements: elements,
+                        appState: {
+                            ...appState,
+                            exportWithDarkMode: false,
+                            exportBackground: true,
+                            viewBackgroundColor: "#ffffff"
+                        },
+                        files: files
+                    });
+
+                    const response = await fetch("{{ url_for('save_excalidraw_data', file_path=file_path) }}", {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            elements: elements,
+                            appState: appState,
+                            files: files,
+                            svg: svgString.outerHTML  // SVGデータを追加
+                        })
+                    });
+                    if (!response.ok) throw new Error('保存に失敗しました');
+                    console.log("Data saved successfully");
+                } catch (error) {
+                    console.error('保存エラー:', error);
+                }
+            };
+
+            // ライブラリの変更を監視して保存する関数を追加
+            const onLibraryChange = React.useCallback(async (libraryItems) => {
+                try {
+                    const libraryData = {
+                        type: "excalidrawlib",
+                        version: 2,
+                        libraryItems
+                    };
+
+                    const response = await fetch("{{ url_for('save_library') }}", {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify(libraryData)
+                    });
+
+                    if (!response.ok) {
+                        throw new Error('ライブラリの保存に失敗しました');
+                    }
+                    console.log('ライブラリを保存しました');
+                } catch (error) {
+                    console.error('ライブラリの保存エラー:', error);
+                }
+            }, []);
+
+            // 要素の変更を検出する関数を追加
+            const hasElementsChanged = (newElements, oldElements) => {
+                if (!oldElements) return true;
+                if (newElements.length !== oldElements.length) return true;
+                
+                return newElements.some((element, index) => {
+                    const oldElement = oldElements[index];
+                    return (
+                        element.id !== oldElement.id ||
+                        element.version !== oldElement.version ||
+                        element.versionNonce !== oldElement.versionNonce ||
+                        element.updated !== oldElement.updated
+                    );
+                });
+            };
+
+            // バックアップ復元ボタンのイベントハンドラを設定
+            React.useEffect(() => {
+                const restoreButton = document.getElementById('restore-backup');
+                if (restoreButton) {
+                    restoreButton.addEventListener('click', async () => {
+                        try {
+                            // バックアップリストを取得
+                            const response = await fetch(`{{ url_for('get_excalidraw_backups', file_path=file_path) }}`);
+                            const data = await response.json();
+                            
+                            if (!data.backups || data.backups.length === 0) {
+                                alert('利用可能なバックアップがありません。');
+                                return;
+                            }
+                            
+                            // バックアップ選択ダイアログを作成
+                            const dialog = document.createElement('div');
+                            dialog.style.cssText = `
+                                position: fixed;
+                                top: 50%;
+                                left: 50%;
+                                transform: translate(-50%, -50%);
+                                background: white;
+                                padding: 20px;
+                                border-radius: 8px;
+                                box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+                                z-index: 2000;
+                                max-height: 80vh;
+                                overflow-y: auto;
+                            `;
+                            
+                            dialog.innerHTML = `
+                                <h3>バックアップを選択</h3>
+                                <div style="margin: 10px 0;">
+                                    ${data.backups.map(backup => `
+                                        <div style="margin: 10px 0; padding: 10px; border: 1px solid #ddd; cursor: pointer;"
+                                            data-backup-path="${backup.path}">
+                                            ${backup.time} - ${backup.name}
+                                        </div>
+                                    `).join('')}
+                                </div>
+                                <button id="cancel-restore" style="margin-top: 10px;">キャンセル</button>
+                            `;
+                            
+                            document.body.appendChild(dialog);
+                            
+                            // オーバーレイを追加
+                            const overlay = document.createElement('div');
+                            overlay.style.cssText = `
+                                position: fixed;
+                                top: 0;
+                                left: 0;
+                                right: 0;
+                                bottom: 0;
+                                background: rgba(0,0,0,0.5);
+                                z-index: 1999;
+                            `;
+                            document.body.appendChild(overlay);
+                            
+                            // キャンセルボタンのイベントハンドラ
+                            document.getElementById('cancel-restore').addEventListener('click', () => {
+                                dialog.remove();
+                                overlay.remove();
+                            });
+                            
+                            // バックアップ選択のイベントハンドラ
+                            dialog.addEventListener('click', async (e) => {
+                                const backupPath = e.target.dataset.backupPath;
+                                if (backupPath) {
+                                    if (confirm('選択したバックアップを復元しますか？\n現在の内容は上書きされます。')) {
+                                        try {
+                                            const restoreResponse = await fetch("{{ url_for('restore_excalidraw_backup') }}", {
+                                                method: 'POST',
+                                                headers: {
+                                                    'Content-Type': 'application/json'
+                                                },
+                                                body: JSON.stringify({
+                                                    backup_path: backupPath,
+                                                    current_path: "{{ full_path }}"
+                                                })
+                                            });
+                                            
+                                            const result = await restoreResponse.json();
+                                            if (result.success) {
+                                                alert('バックアップを復元しました。ページをリロードします。');
+                                                window.location.reload();
+                                            } else {
+                                                throw new Error(result.error);
+                                            }
+                                        } catch (error) {
+                                            alert(`バックアップの復元に失敗しました: ${error.message}`);
+                                        }
+                                    }
+                                    dialog.remove();
+                                    overlay.remove();
+                                }
+                            });
+                            
+                        } catch (error) {
+                            console.error('バックアップの取得に失敗しました:', error);
+                            alert('バックアップの取得に失敗しました。');
+                        }
+                    });
+                }
+            }, []);
+
+            // リンククリックのハンドラを修正
+            const onLinkOpen = React.useCallback((element, event) => {
+                event.preventDefault();
+                if (element.link) {
+                    // HTTPで始まるリンクは直接開く
+                    if (element.link.toLowerCase().startsWith('http')) {
+                        window.open(element.link, '_blank', 'noopener,noreferrer');
+                        return;
+                    }
+
+                    // ネットワークパライブのマッピング
+                    const networkDriveMap = {
+                        'X:': '//nas/work'
+                        // 他のネットワークドライブのマッピングをここに追加
+                    };
+
+                    let path = element.link;
+                    
+                    // ネットワークドライブのマッピングを適用
+                    for (const [drive, networkPath] of Object.entries(networkDriveMap)) {
+                        if (path.startsWith(drive)) {
+                            path = path.replace(drive, networkPath);
+                            break;
+                        }
+                    }
+
+                    // ネットワークパスの処理
+                    if (path.startsWith('//') || path.startsWith('\\\\')) {
+                        fetch(`/network-image?path=${encodeURIComponent(path)}`)
+                            .then(response => response.json())
+                            .then(data => {
+                                if (data.success) {
+                                    console.log(data.message);
+                                } else {
+                                    alert('エラーが発生しました: ' + data.error);
+                                }
+                            })
+                            .catch(error => {
+                                console.error('Error:', error);
+                                alert('エラーが発生しました。');
+                            });
+                        return;
+                    }
+
+                    // パスの処理
+                    if (path.startsWith(BASE_DIR)) {
+                        // BASE_DIRで始まる絶対パスの場合
+                        path = path.substring(BASE_DIR.length);
+                    } else if (!path.startsWith('/')) {
+                        // 相対パスの場合
+                        const currentDir = "{{ file_path }}".split('/').slice(0, -1).join('/');
+                        path = `${currentDir}/${path}`.replace(/\/+/g, '/');
+                    }
+
+                    // /view/へのパスを構築
+                    const viewPath = `/view/${path.replace(/^\/+/, '')}`;
+                    window.open(viewPath, '_blank', 'noopener,noreferrer');
+                }
+            }, [BASE_DIR]);
+
+            // SVG保存機能を追加
+            const exportSelectedAsSvg = React.useCallback(async () => {
+                if (!excalidrawAPI) {
+                    console.warn('Excalidraw API not ready');
+                    return;
+                }
+
+                try {
+                    const selectedElementIds = excalidrawAPI.getAppState().selectedElementIds;
+                    let selectedElements = excalidrawAPI.getSceneElements().filter(
+                        element => selectedElementIds[element.id]
+                    );
+
+                    // 選択された要素に関連するテキスト要素を追加
+                    const allElements = excalidrawAPI.getSceneElements();
+                    const boundElementIds = new Set();
+                    
+                    // 選択された要素に紐づくテキスト要素のIDを収集
+                    selectedElements.forEach(element => {
+                        if (element.boundElements) {
+                            element.boundElements.forEach(bound => {
+                                boundElementIds.add(bound.id);
+                            });
+                        }
+                    });
+
+                    // 紐づくテキスト要素を追加
+                    selectedElements = [
+                        ...selectedElements,
+                        ...allElements.filter(element => boundElementIds.has(element.id))
+                    ];
+
+                    if (selectedElements.length === 0) {
+                        alert('オブジェクトが選択されていません');
+                        return;
+                    }
+
+                    // ファイル名の入力を求める
+                    const filename = prompt('保存するファイル名を入力してください（.svg拡張子は自動で付加されます）:', 'export');
+                    if (!filename) return;
+
+                    // SVGをエクスポート
+                    const svgElement = await window.ExcalidrawLib.exportToSvg({
+                        elements: selectedElements,
+                        appState: {
+                            ...excalidrawAPI.getAppState(),
+                            exportWithDarkMode: false,
+                            exportBackground: true,
+                            viewBackgroundColor: "#ffffff",
+                            exportPadding: 10,
+                            exportScale: 1
+                        },
+                        files: excalidrawAPI.getFiles(),
+                        getDimensions: () => {
+                            const boundingBox = ExcalidrawLib.getBoundingBox(selectedElements);
+                            return {
+                                width: boundingBox.width + 20,
+                                height: boundingBox.height + 20
+                            };
+                        }
+                    });
+
+                    // サーバーにSVGを保存
+                    const response = await fetch("{{ url_for('save_selected_svg', file_path=file_path) }}", {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            svg: svgElement.outerHTML,
+                            filename: filename
+                        })
+                    });
+
+                    const result = await response.json();
+                    if (result.success) {
+                        alert('SVGを保存しました');
+                        // サーバーから提供されるURLを使用して新しいタブで開く
+                        if (result.fileUrl) {
+                            window.open(result.fileUrl, '_blank');
+                        }
+                    } else {
+                        throw new Error(result.error || '保存に失敗しました');
+                    }
+
+                } catch (error) {
+                    console.error('SVG保存エラー:', error);
+                    alert('SVGの保存に失敗しました: ' + error.message);
+                }
+            }, [excalidrawAPI]);
+
+            // SVG保存ボタンのイベントリスナーを設定
+            React.useEffect(() => {
+                if (!excalidrawAPI) return;
+
+                const button = document.getElementById('export-svg');
+                if (button) {
+                    button.addEventListener('click', exportSelectedAsSvg);
+                }
+
+                return () => {
+                    const button = document.getElementById('export-svg');
+                    if (button) {
+                        button.removeEventListener('click', exportSelectedAsSvg);
+                    }
+                };
+            }, [excalidrawAPI, exportSelectedAsSvg]);
+
+            React.useEffect(() => {
+                if (!excalidrawAPI) return;
+
+                const handleDrop = async (event) => {
+                    event.preventDefault();
+                    
+                    // ドロップされたファイルを取得
+                    const items = event.dataTransfer.items;
+                    for (let i = 0; i < items.length; i++) {
+                        const item = items[i];
+                        
+                        // Outlookのメールの場合
+                        if (item.type === 'message/rfc822' || item.type.includes('outlook')) {
+                            const file = item.getAsFile();
+                            if (file) {
+                                // FormDataを作成
+                                const formData = new FormData();
+                                formData.append('email', file);
+                                
+                                try {
+                                    // サーバーにメールを送信
+                                    const response = await fetch('/save-outlook-email', {
+                                        method: 'POST',
+                                        body: formData
+                                    });
+                                    
+                                    const result = await response.json();
+                                    if (result.success) {
+                                        // マウス位置を取得
+                                        const zoom = excalidrawAPI.getAppState().zoom.value;
+                                        const viewportPosition = {
+                                            x: (excalidrawAPI.getAppState().scrollX * -1) + event.clientX / zoom,
+                                            y: (excalidrawAPI.getAppState().scrollY * -1) + event.clientY / zoom
+                                        };
+                                        
+                                        // 付箋を作成
+                                        const rectangleElement = {
+                                            id: Math.random().toString(36).substr(2, 9),
+                                            type: 'rectangle',
+                                            x: viewportPosition.x - 100,
+                                            y: viewportPosition.y - 80,
+                                            width: 200,
+                                            height: 50,
+                                            angle: 0,
+                                            strokeColor: '#000000',
+                                            backgroundColor: '#fef3bd',
+                                            fillStyle: 'solid',
+                                            strokeWidth: 1,
+                                            strokeStyle: 'solid',
+                                            roughness: 0,
+                                            opacity: 100,
+                                            groupIds: [],
+                                            seed: Math.random(),
+                                            version: 1,
+                                            versionNonce: 0,
+                                            isDeleted: false,
+                                            boundElements: [{ type: "text", id: "text-" + Math.random().toString(36).substr(2, 9) }],
+                                            updated: Date.now(),
+                                            link: result.emailPath,
+                                            locked: false,
+                                        };
+
+                                        // テキスト要素を作成
+                                        const textElement = {
+                                            id: rectangleElement.boundElements[0].id,
+                                            type: 'text',
+                                            x: rectangleElement.x + 10,
+                                            y: rectangleElement.y + 10,
+                                            width: rectangleElement.width - 20,
+                                            height: rectangleElement.height - 20,
+                                            angle: 0,
+                                            strokeColor: '#000000',
+                                            backgroundColor: 'transparent',
+                                            fillStyle: 'solid',
+                                            strokeWidth: 1,
+                                            strokeStyle: 'solid',
+                                            roughness: 0,
+                                            opacity: 100,
+                                            groupIds: [],
+                                            seed: Math.random(),
+                                            version: 1,
+                                            versionNonce: 0,
+                                            isDeleted: false,
+                                            text: result.subject || "メール",
+                                            fontSize: 17,
+                                            fontFamily: 1,
+                                            textAlign: "left",
+                                            verticalAlign: "top",
+                                            baseline: 12,
+                                            containerId: rectangleElement.id,
+                                            originalText: result.subject || "メール",
+                                            lineHeight: 1.1,
+                                        };
+
+                                        // シーンを更新
+                                        excalidrawAPI.updateScene({
+                                            elements: [...excalidrawAPI.getSceneElements(), rectangleElement, textElement],
+                                            appState: {
+                                                ...excalidrawAPI.getAppState(),
+                                                selectedElementIds: { [textElement.id]: true }
+                                            }
+                                        });
+                                    }
+                                } catch (error) {
+                                    console.error('メールの保存に失敗しました:', error);
+                                }
+                            }
+                        }
+                    }
+                };
+
+                // ドラッグオーバー時のデフォルト動作を防止
+                const handleDragOver = (event) => {
+                    event.preventDefault();
+                };
+
+                const excalidrawWrapper = document.querySelector('.excalidraw-wrapper');
+                if (excalidrawWrapper) {
+                    excalidrawWrapper.addEventListener('drop', handleDrop);
+                    excalidrawWrapper.addEventListener('dragover', handleDragOver);
+                }
+
+                return () => {
+                    if (excalidrawWrapper) {
+                        excalidrawWrapper.removeEventListener('drop', handleDrop);
+                        excalidrawWrapper.removeEventListener('dragover', handleDragOver);
+                    }
+                };
+            }, [excalidrawAPI]);
+
+            if (!sceneData) {
+                return React.createElement('div', null, 'Loading...');
+            }
+
+            console.log("Rendering with data:", sceneData);
+            
+            // Excalidrawコンポーネントを直接レンダリング
+            const ExcalidrawComponent = ExcalidrawLib.Excalidraw;
+            return React.createElement(ExcalidrawComponent, {
+                excalidrawAPI: (api) => {
+                    console.log("Excalidraw API being initialized with api:", api);
+                    setExcalidrawAPI(api);
+                    excalidrawRef.current = api;
+                    
+                    // APIが初期化された直後にライブラリを読み込む
+                    loadExcalidrawLibrary().then(libraryItems => {
+                        console.log("Library items loaded:", libraryItems);
+                        if (libraryItems && api) {
+                            api.updateLibrary({
+                                libraryItems: libraryItems.libraryItems || []
+                            });
+                            console.log('ライブラリを読み込みました');
+                        }
+                    });
+                },
+                initialData: sceneData,
+                onChange: handleChange,
+                onPointerUp: () => {
+                    if (excalidrawRef.current) {
+                        const elements = excalidrawRef.current.getSceneElements();
+                        const appState = excalidrawRef.current.getAppState();
+                        const files = excalidrawRef.current.getFiles();
+                        console.log("Saving on pointer up:", elements);
+                        saveDrawing(elements, appState, files);
+                    }
+                },
+                onLibraryChange: onLibraryChange,  // ライブラリ変更ハンドラを追加
+                langCode: "ja-JP",
+                renderConfig: {
+                    canvasBackgroundColor: "#ffffff",
+                    shouldCacheText: true,  // テキストのキャッシュを有効化
+                    imageCache: true,       // 画像のキャッシュを有効化
+                    throttleRedraw: true    // 再描画の制御
+                },
+                UIOptions: {
+                    canvasActions: {
+                        export: false,      // 不要な機能を無効化
+                        loadScene: false,
+                        saveAsImage: false
+                    }
+                },
+                onLinkOpen: onLinkOpen,  // この行を追加
+            });
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('excalidraw-container'));
+        root.render(React.createElement(App));
+    });
+</script>
+{% endblock %}
