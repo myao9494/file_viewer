@@ -71,6 +71,22 @@ app.jinja_env.globals['BASE_DIR'] = BASE_DIR
 # JupyterのベースURLを設定
 JUPYTER_BASE_URL =  'http://localhost:8888/lab/tree' 
 
+# ファイルアップロード用の設定を追加
+UPLOAD_FOLDERS = {
+    'images': os.path.join(BASE_DIR, 'uploads', 'images'),
+    'documents': os.path.join(BASE_DIR, 'uploads', 'documents'),
+    'emails': os.path.join(BASE_DIR, 'uploads', 'emails'),  # メール用フォルダを追加
+    'others': os.path.join(BASE_DIR, 'uploads', 'others')
+}
+
+# 許可する拡張子を定義
+ALLOWED_EXTENSIONS = {
+    'images': {'png', 'jpg', 'jpeg', 'gif', 'svg'},
+    'documents': {'pdf', 'doc', 'docx', 'txt', 'md'},
+    'emails': {'eml', 'msg'},  # Outlook (.msg) と標準メール (.eml) の拡張子を追加
+    'others': {'zip', 'rar', 'csv', 'xlsx'}
+}
+
 @app.route('/')
 def index():
     """
@@ -811,17 +827,6 @@ def open_local_file():
         app.logger.error(f"Error opening file: {str(e)}")
         return jsonify({'success': False, 'error': str(e)}), 500
 
-# @app.route('/check-path-type', methods=['POST'])
-# def check_path_type():
-#     data = request.json
-#     path = data.get('path')
-#     if os.path.isfile(path):
-#         return jsonify({'type': 'file'})
-#     elif os.path.isdir(path):
-#         return jsonify({'type': 'folder'})
-#     else:
-#         return jsonify({'type': 'invalid'})
-
 @app.route('/normalize-path', methods=['POST'])
 def normalize_path_endpoint():
     data = request.json
@@ -950,11 +955,6 @@ def view_image_tools():
     zipped_paths = list(zip(full_paths, encoded_paths, file_dates))
     
     return render_template('image_tools.html', zipped_paths=zipped_paths, BASE_DIR=BASE_DIR)
-
-# @app.route('/raw/<path:file_path>')
-# def raw_file(file_path):
-#     full_path = os.path.join(BASE_DIR, file_path)
-#     return send_file(full_path)
 
 @app.route('/raw/<path:file_path>')
 def raw_file(file_path):
@@ -1474,7 +1474,7 @@ def save_selected_svg(file_path):
             
         app.logger.info(f"Successfully saved SVG to {svg_path}")
         
-        # �ルパスをクリップボードにコピー
+        # ルパスをクリップボードにコピー
         try:
             pyperclip.copy(svg_path)
             app.logger.info(f"Copied path to clipboard: {svg_path}")
@@ -1503,6 +1503,68 @@ def serve_file(file_path):
     except Exception as e:
         app.logger.error(f"Error serving file: {str(e)}")
         abort(404)
+
+@app.route('/upload')
+def upload_page():
+    """アップロードページを表示"""
+    return render_template('upload.html')
+
+@app.route('/upload-files', methods=['POST'])
+def upload_files():
+    """ファイルをアップロード"""
+    try:
+        if 'files[]' not in request.files:
+            return jsonify({'error': 'ファイルがありません'}), 400
+
+        files = request.files.getlist('files[]')
+        results = []
+
+        for file in files:
+            if file.filename == '':
+                continue
+
+            extension = file.filename.rsplit('.', 1)[1].lower() if '.' in file.filename else ''
+            
+            # 拡張子に基づいてアップロードフォルダを決定
+            upload_folder = None
+            for category, extensions in ALLOWED_EXTENSIONS.items():
+                if extension in extensions:
+                    upload_folder = UPLOAD_FOLDERS[category]
+                    break
+            
+            if upload_folder is None:
+                upload_folder = UPLOAD_FOLDERS['others']
+
+            # アップロードフォルダが存在しない場合は作成
+            os.makedirs(upload_folder, exist_ok=True)
+
+            # ファイル名を安全に変換
+            filename = secure_filename(file.filename)
+            
+            # 既に同じ名前のファイルが存在する場合は、番号を付加
+            base, ext = os.path.splitext(filename)
+            counter = 1
+            while os.path.exists(os.path.join(upload_folder, filename)):
+                filename = f"{base}_{counter}{ext}"
+                counter += 1
+
+            file_path = os.path.join(upload_folder, filename)
+            file.save(file_path)
+
+            results.append({
+                'filename': filename,
+                'path': normalize_path(os.path.relpath(file_path, BASE_DIR)),
+                'size': os.path.getsize(file_path)
+            })
+
+        return jsonify({
+            'success': True,
+            'files': results
+        })
+
+    except Exception as e:
+        app.logger.error(f"アップロードエラー: {str(e)}")
+        return jsonify({'error': str(e)}), 500
 
 if __name__ == '__main__':
     app.secret_key = 'your_secret_key_here'  # セッション用の秘密鍵

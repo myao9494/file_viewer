@@ -49,7 +49,8 @@
         <button id="restore-backup" style="margin-right: 10px; padding: 8px;">バックアップから復元</button>
         <button id="export-svg" style="padding: 8px;">選択項目をSVGで保存</button>
     </div>
-    <div id="excalidraw-container"></div>
+    <div id="excalidraw-container">
+    </div>
 </div>
 {% endblock %}
 
@@ -1038,7 +1039,7 @@
                             window.open(result.fileUrl, '_blank');
                         }
                     } else {
-                        throw new Error(result.error || '保存に失敗�した');
+                        throw new Error(result.error || '保存に失敗しました');
                     }
 
                 } catch (error) {
@@ -1064,6 +1065,155 @@
                 };
             }, [excalidrawAPI, exportSelectedAsSvg]);
 
+            // ドラッグ&ドロップ関連の関数を修正
+            function handleDragOver(event) {
+                event.preventDefault();
+                event.dataTransfer.dropEffect = 'copy';
+            }
+
+            function handleDragLeave(event) {
+                event.preventDefault();
+            }
+
+            async function handleDrop(event) {
+                event.preventDefault();
+                console.log('Drop event triggered'); // デバッグログ
+
+                const files = event.dataTransfer.files;
+                if (files.length === 0) {
+                    console.log('No files dropped'); // デバッグログ
+                    return;
+                }
+
+                console.log('Files detected:', files.length); // デバッグログ
+
+                // マウス位置を取得（Excalidrawのキャンバス座標に変換）
+                const rect = event.target.getBoundingClientRect();
+                const x = event.clientX - rect.left;
+                const y = event.clientY - rect.top;
+
+                // ファイルをアップロード
+                for (const file of files) {
+                    console.log('Processing file:', file.name); // デバッグログ
+                    const formData = new FormData();
+                    formData.append('files[]', file);
+
+                    try {
+                        const response = await fetch('/upload-files', {
+                            method: 'POST',
+                            body: formData
+                        });
+
+                        const data = await response.json();
+                        console.log('Upload response:', data); // デバッグログ
+
+                        if (data.success) {
+                            // アップロードが成功したら、その場所に付箋を作成
+                            const excalidrawAPI = excalidrawRef.current;
+                            if (!excalidrawAPI) {
+                                console.log('Excalidraw API not available'); // デバッグログ
+                                return;
+                            }
+
+                            // ビューポートの位置を考慮した座標計算
+                            const zoom = excalidrawAPI.getAppState().zoom.value;
+                            const viewportX = (excalidrawAPI.getAppState().scrollX * -1) + x / zoom;
+                            const viewportY = (excalidrawAPI.getAppState().scrollY * -1) + y / zoom;
+
+                            // 付箋（rectangle）を作成
+                            const rectangleElement = {
+                                id: Math.random().toString(36).substr(2, 9),
+                                type: 'rectangle',
+                                x: viewportX - 100,
+                                y: viewportY - 25,
+                                width: 200,
+                                height: 50,
+                                angle: 0,
+                                strokeColor: '#000000',
+                                backgroundColor: '#fef3bd',
+                                fillStyle: 'solid',
+                                strokeWidth: 1,
+                                strokeStyle: 'solid',
+                                roughness: 0,
+                                opacity: 100,
+                                groupIds: [],
+                                seed: Math.random(),
+                                version: 1,
+                                versionNonce: 0,
+                                isDeleted: false,
+                                boundElements: [{ type: "text", id: "text-" + Math.random().toString(36).substr(2, 9) }],
+                                updated: Date.now(),
+                                link: data.files[0].path,
+                                locked: false,
+                            };
+
+                            // テキスト要素を作成
+                            const textElement = {
+                                id: rectangleElement.boundElements[0].id,
+                                type: 'text',
+                                x: rectangleElement.x + 10,
+                                y: rectangleElement.y + 10,
+                                width: rectangleElement.width - 20,
+                                height: rectangleElement.height - 20,
+                                angle: 0,
+                                strokeColor: '#000000',
+                                backgroundColor: 'transparent',
+                                fillStyle: 'solid',
+                                strokeWidth: 1,
+                                strokeStyle: 'solid',
+                                roughness: 0,
+                                opacity: 100,
+                                groupIds: [],
+                                seed: Math.random(),
+                                version: 1,
+                                versionNonce: 0,
+                                isDeleted: false,
+                                text: file.name,
+                                fontSize: 16,
+                                fontFamily: 1,
+                                textAlign: "left",
+                                verticalAlign: "top",
+                                baseline: 12,
+                                containerId: rectangleElement.id,
+                                originalText: file.name,
+                                lineHeight: 1.1,
+                            };
+
+                            console.log('Creating elements at:', { viewportX, viewportY }); // デバッグログ
+
+                            // シーンを更新
+                            excalidrawAPI.updateScene({
+                                elements: [...excalidrawAPI.getSceneElements(), rectangleElement, textElement]
+                            });
+
+                            // 変更を保存
+                            const updatedElements = excalidrawAPI.getSceneElements();
+                            const updatedAppState = excalidrawAPI.getAppState();
+                            const updatedFiles = excalidrawAPI.getFiles();
+                            saveDrawing(updatedElements, updatedAppState, updatedFiles);
+                        }
+                    } catch (error) {
+                        console.error('ファイルアップロードエラー:', error);
+                    }
+                }
+            }
+
+            // コンポーネントのマウント時にイベントリスナーを追加
+            React.useEffect(() => {
+                const container = document.getElementById('excalidraw-container');
+                if (container) {
+                    container.addEventListener('dragover', handleDragOver);
+                    container.addEventListener('dragleave', handleDragLeave);
+                    container.addEventListener('drop', handleDrop);
+
+                    return () => {
+                        container.removeEventListener('dragover', handleDragOver);
+                        container.removeEventListener('dragleave', handleDragLeave);
+                        container.removeEventListener('drop', handleDrop);
+                    };
+                }
+            }, []);
+
             if (!sceneData) {
                 return React.createElement('div', null, 'Loading...');
             }
@@ -1078,14 +1228,11 @@
                     setExcalidrawAPI(api);
                     excalidrawRef.current = api;
                     
-                    // APIが初期化された直後にライブラリを読み込む
                     loadExcalidrawLibrary().then(libraryItems => {
-                        console.log("Library items loaded:", libraryItems);
                         if (libraryItems && api) {
                             api.updateLibrary({
                                 libraryItems: libraryItems.libraryItems || []
                             });
-                            console.log('ライブラリを読み込みました');
                         }
                     });
                 },
@@ -1096,26 +1243,32 @@
                         const elements = excalidrawRef.current.getSceneElements();
                         const appState = excalidrawRef.current.getAppState();
                         const files = excalidrawRef.current.getFiles();
-                        console.log("Saving on pointer up:", elements);
                         saveDrawing(elements, appState, files);
                     }
                 },
-                onLibraryChange: onLibraryChange,  // ライブラリ変更ハンドラを追加
+                onLibraryChange: onLibraryChange,
                 langCode: "ja-JP",
                 renderConfig: {
                     canvasBackgroundColor: "#ffffff",
-                    shouldCacheText: true,  // テキストのキャッシュを有効化
-                    imageCache: true,       // 画像のキャッシュを有効化
-                    throttleRedraw: true    // 再描画の制御
+                    shouldCacheText: true,
+                    imageCache: true,
+                    throttleRedraw: true
                 },
                 UIOptions: {
                     canvasActions: {
-                        export: false,      // 不要な機能を無効化
+                        export: false,
                         loadScene: false,
-                        saveAsImage: false
-                    }
+                        saveAsImage: false,
+                        toggleTheme: false,
+                        changeViewBackgroundColor: false
+                    },
+                    fileHandle: false
                 },
-                onLinkOpen: onLinkOpen,  // この行を追加
+                onLinkOpen: onLinkOpen,
+                handleKeyboardGlobally: false,
+                onDropFile: () => false,
+                detectScroll: false,
+                handleDropOnCanvas: false
             });
         };
 
