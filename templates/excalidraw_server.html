@@ -903,9 +903,21 @@
             const onLinkOpen = React.useCallback((element, event) => {
                 event.preventDefault();
                 if (element.link) {
+                    // リンクが "" で囲まれている場合、"" の中だけを取得
+                    let link = element.link.startsWith('"') && element.link.endsWith('"')
+                        ? element.link.slice(1, -1)
+                        : element.link;
+
+                    // cmdまたはexplorerから始まる場合は、そのままのパスを使用
+                    if (link.startsWith('cmd ') || link.toLowerCase().startsWith('explorer ')) {
+                        const viewPath = `/view/${link}`;
+                        window.open(viewPath, '_blank', 'noopener,noreferrer');
+                        return;
+                    }
+
                     // HTTPで始まるリンクは直接開く
-                    if (element.link.toLowerCase().startsWith('http')) {
-                        window.open(element.link, '_blank', 'noopener,noreferrer');
+                    if (link.toLowerCase().startsWith('http')) {
+                        window.open(link, '_blank', 'noopener,noreferrer');
                         return;
                     }
 
@@ -915,7 +927,8 @@
                         // 他のネットワークドライブのマッピングをここに追加
                     };
 
-                    let path = element.link;
+                    let path = link;
+                    console.log(path);
                     
                     // ネットワークドライブのマッピングを適用
                     for (const [drive, networkPath] of Object.entries(networkDriveMap)) {
