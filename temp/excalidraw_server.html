@@ -1194,6 +1194,60 @@
                 };
             }, [excalidrawAPI]);
 
+            // コマンド実行中フラグを追加
+            const [isCommandRunning, setIsCommandRunning] = React.useState(false);
+
+            React.useEffect(() => {
+                if (!excalidrawAPI) return;
+
+                const handleClick = async (event) => {
+                    // コマンド実行中は新しいコマンドを実行しない
+                    if (isCommandRunning) {
+                        console.log('コマンドの実行中です。完了までお待ちください。');
+                        return;
+                    }
+
+                    const element = excalidrawAPI.getElementsIncludingDeleted().find(
+                        el => el.id === event.target.dataset.id
+                    );
+
+                    if (element?.link?.startsWith('cmd ')) {
+                        try {
+                            setIsCommandRunning(true); // コマンド実行開始
+                            
+                            const response = await fetch('/execute-command', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ command: element.link })
+                            });
+
+                            const result = await response.json();
+                            if (!result.success) {
+                                throw new Error(result.error);
+                            }
+
+                        } catch (error) {
+                            console.error('コマンド実行エラー:', error);
+                        } finally {
+                            setIsCommandRunning(false); // コマンド実行完了
+                        }
+                    }
+                };
+
+                // コマンド実行中の要素のスタイルを変更
+                if (isCommandRunning) {
+                    const selectedElement = excalidrawAPI.getElementsIncludingDeleted().find(
+                        el => el.id === event.target.dataset.id
+                    );
+                    if (selectedElement) {
+                        selectedElement.opacity = 50; // 半透明にする
+                        excalidrawAPI.updateScene({
+                            elements: excalidrawAPI.getSceneElements()
+                        });
+                    }
+                }
+            }, [excalidrawAPI, isCommandRunning]); // isCommandRunningを依存配列に追加
+
             if (!sceneData) {
                 return React.createElement('div', null, 'Loading...');
             }
