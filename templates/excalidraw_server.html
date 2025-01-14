@@ -1065,10 +1065,14 @@
                 };
             }, [excalidrawAPI, exportSelectedAsSvg]);
 
-            // 付箋作成関数を追加
+            // 付箋作成関数を修正
             const createStickyNote = (x, y, filename, filepath) => {
                 const rectangleId = Math.random().toString(36).substr(2, 9);
                 const textId = "text-" + Math.random().toString(36).substr(2, 9);
+
+                // BASE_DIRを含む完全なパスを�築
+                const fullPath = "{{ BASE_DIR }}/" + filepath;
+                console.log('Creating sticky note with path:', fullPath); // デバッグログ追加
 
                 return [
                     {
@@ -1093,7 +1097,7 @@
                         isDeleted: false,
                         boundElements: [{ type: "text", id: textId }],
                         updated: Date.now(),
-                        link: filepath,
+                        link: fullPath, // 完全なパスを設定
                         locked: false,
                     },
                     {
@@ -1157,9 +1161,18 @@
                     const x = e.clientX - rect.left;
                     const y = e.clientY - rect.top;
 
+                    console.log('Current file_path:', '{{ file_path }}'); // デバッグログ追加
+
                     for (const file of files) {
                         const formData = new FormData();
                         formData.append('files[]', file);
+                        formData.append('current_path', '{{ file_path }}');
+
+                        console.log('Uploading file:', file.name); // デバッグログ追加
+                        console.log('FormData:', {
+                            files: formData.getAll('files[]'),
+                            current_path: formData.get('current_path')
+                        });
 
                         try {
                             const response = await fetch('/upload-files', {
@@ -1168,13 +1181,24 @@
                             });
 
                             const data = await response.json();
+                            console.log('Upload response:', data); // デバッグログ追加
+
                             if (data.success && excalidrawRef.current) {
                                 const api = excalidrawRef.current;
                                 const zoom = api.getAppState().zoom.value;
                                 const viewportX = (api.getAppState().scrollX * -1) + x / zoom;
                                 const viewportY = (api.getAppState().scrollY * -1) + y / zoom;
 
+                                console.log('Creating sticky note for:', {
+                                    filename: file.name,
+                                    path: data.files[0].path,
+                                    position: { x: viewportX, y: viewportY }
+                                });
+
                                 const elements = createStickyNote(viewportX, viewportY, file.name, data.files[0].path);
+                                
+                                console.log('Created elements:', elements); // デバッグログ追加
+
                                 api.updateScene({
                                     elements: [...api.getSceneElements(), ...elements]
                                 });

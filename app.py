@@ -1511,60 +1511,102 @@ def upload_page():
 
 @app.route('/upload-files', methods=['POST'])
 def upload_files():
-    """ファイルをアップロード"""
     try:
-        if 'files[]' not in request.files:
-            return jsonify({'error': 'ファイルがありません'}), 400
-
         files = request.files.getlist('files[]')
-        results = []
-
+        current_path = request.form.get('current_path', '')
+        
+        app.logger.info(f"Received upload request - current_path: {current_path}")
+        app.logger.info(f"Number of files: {len(files)}")
+        
+        # 現在のディレクトリを取得
+        current_dir = os.path.dirname(current_path)
+        base_upload_dir = os.path.join(BASE_DIR, current_dir, 'uploads')
+        
+        # アップロードフォルダの種類を定義（メールカテゴリを追加）
+        UPLOAD_CATEGORIES = {
+            'images': ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.svg', '.webp'],
+            'documents': ['.pdf', '.doc', '.docx', '.txt', '.rtf', '.odt', '.md'],
+            'presentations': ['.ppt', '.pptx', '.key', '.odp'],
+            'spreadsheets': ['.xls', '.xlsx', '.csv', '.ods'],
+            'archives': ['.zip', '.rar', '.7z', '.tar', '.gz'],
+            'emails': ['.msg', '.eml', '.emlx'],  # メール用の拡張子を追加
+            'others': []  # その他のファイル用
+        }
+        
+        uploaded_files = []
+        
         for file in files:
-            if file.filename == '':
-                continue
-
-            extension = file.filename.rsplit('.', 1)[1].lower() if '.' in file.filename else ''
-            
-            # 拡張子に基づいてアップロードフォルダを決定
-            upload_folder = None
-            for category, extensions in ALLOWED_EXTENSIONS.items():
-                if extension in extensions:
-                    upload_folder = UPLOAD_FOLDERS[category]
-                    break
-            
-            if upload_folder is None:
-                upload_folder = UPLOAD_FOLDERS['others']
-
-            # アップロードフォルダが存在しない場合は作成
-            os.makedirs(upload_folder, exist_ok=True)
-
-            # ファイル名を安全に変換
-            filename = secure_filename(file.filename)
-            
-            # 既に同じ名前のファイルが存在する場合は、番号を付加
-            base, ext = os.path.splitext(filename)
-            counter = 1
-            while os.path.exists(os.path.join(upload_folder, filename)):
-                filename = f"{base}_{counter}{ext}"
-                counter += 1
-
-            file_path = os.path.join(upload_folder, filename)
-            file.save(file_path)
-
-            results.append({
-                'filename': filename,
-                'path': normalize_path(os.path.relpath(file_path, BASE_DIR)),
-                'size': os.path.getsize(file_path)
-            })
-
+            if file:
+                filename = secure_filename(file.filename)
+                extension = os.path.splitext(filename)[1].lower()
+                
+                # ファイルの種類に基づいてサブフォルダを決定
+                category = 'others'
+                for cat, exts in UPLOAD_CATEGORIES.items():
+                    if extension in exts:
+                        category = cat
+                        break
+                
+                # カテゴリフォルダのパスを作成
+                category_dir = os.path.join(base_upload_dir, category)
+                os.makedirs(category_dir, exist_ok=True)
+                
+                # ファイルの保存パスを構築
+                file_path = os.path.join(category_dir, filename)
+                
+                app.logger.info(f"Saving file to: {file_path}")
+                
+                # ファイル名が重複する場合、連番を付加
+                base, ext = os.path.splitext(filename)
+                counter = 1
+                while os.path.exists(file_path):
+                    new_filename = f"{base}_{counter}{ext}"
+                    file_path = os.path.join(category_dir, new_filename)
+                    counter += 1
+                
+                # ファイルを保存
+                file.save(file_path)
+                
+                # 相対パスを作成（BASE_DIRからの相対パス）
+                relative_path = os.path.relpath(file_path, BASE_DIR)
+                
+                app.logger.info(f"File saved successfully. Relative path: {relative_path}")
+                
+                uploaded_files.append({
+                    'name': os.path.basename(file_path),
+                    'path': relative_path
+                })
+        
         return jsonify({
             'success': True,
-            'files': results
+            'files': uploaded_files
         })
-
+        
     except Exception as e:
         app.logger.error(f"アップロードエラー: {str(e)}")
-        return jsonify({'error': str(e)}), 500
+        app.logger.error(f"詳細なエラー情報: ", exc_info=True)
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+@app.route('/delete-items', methods=['POST'])
+def delete_items():
+    try:
+        items = request.json.get('items', [])
+        for item in items:
+            path = item['path']
+            item_type = item['type']
+            full_path = os.path.join(BASE_DIR, path)
+            
+            if item_type == 'folder':
+                shutil.rmtree(full_path)
+            else:
+                os.remove(full_path)
+                
+        return jsonify({'success': True})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
 
 if __name__ == '__main__':
     app.secret_key = 'your_secret_key_here'  # セッション用の秘密鍵

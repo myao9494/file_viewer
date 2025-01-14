@@ -110,14 +110,29 @@
     #image-tools-btn:hover {
         background-color: #00b357;
     }
+    .delete-btn {
+        background-color: #dc3545;
+        color: white;
+        border: none;
+        padding: 5px 10px;
+        border-radius: 3px;
+        cursor: pointer;
+    }
+    .delete-btn:hover {
+        background-color: #c82333;
+    }
+    .item-checkbox {
+        margin-right: 5px;
+        cursor: pointer;
+    }
 </style>
 
 <div class="folder-path">
     <div class="button-container">
-        <!-- <button onclick="openInCode()" title="Codeで開く"><i class="fas fa-edit"></i></button>
-        <button onclick="openFolder()" title="フォルダを開く"><i class="fas fa-folder-open"></i></button>
-        <button onclick="openJupyter()" title="Jupyterで開く"><i class="fas fa-book"></i></button> -->
         <button onclick="createFolder()" title="フォルダ作成"><i class="fas fa-folder-plus"></i></button>
+        <button onclick="deleteSelected()" title="選択項目を削除" class="delete-btn">
+            <i class="fas fa-trash"></i>
+        </button>
     </div>
     <h2 id="currentPath">
         現在のフォルダ: <span class="path-text" onclick="copyToClipboard('currentPath')" title="{{ full_path }}">{{ full_path }}</span>
@@ -161,6 +176,7 @@
 <ul class="folder-list">
 {% for folder in folders %}
     <li class="folder">
+        <input type="checkbox" class="item-checkbox" data-path="{{ folder.path }}" data-type="folder">
         <span class="icon">📁</span>
         <a href="{{ url_for('view_file', file_path=folder.path) }}">{{ folder.relative_path }}</a>
     </li>
@@ -171,6 +187,7 @@
 <ul class="file-list">
 {% for file in files %}
     <li class="file">
+        <input type="checkbox" class="item-checkbox" data-path="{{ file.path }}" data-type="file">
         <span class="icon">📄</span>
         <a href="{{ url_for('view_file', file_path=file.path) }}">{{ file.relative_path }}</a>
     </li>
@@ -736,6 +753,43 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // 初期表示時にボタンの表示/非表示を設定
     toggleImageToolsButton();
+
+    // 削除機能を追加
+    window.deleteSelected = function() {
+        const selectedItems = document.querySelectorAll('.item-checkbox:checked');
+        if (selectedItems.length === 0) {
+            alert('削除する項目を選択�ください。');
+            return;
+        }
+
+        const itemsToDelete = Array.from(selectedItems).map(checkbox => ({
+            path: checkbox.dataset.path,
+            type: checkbox.dataset.type
+        }));
+
+        if (confirm(`選択された${selectedItems.length}個の項目を削除してもよろしいですか？`)) {
+            fetch('/delete-items', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ items: itemsToDelete }),
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    alert('選択された項目が削除されました。');
+                    location.reload();
+                } else {
+                    alert('エラーが発生しました: ' + data.error);
+                }
+            })
+            .catch((error) => {
+                console.error('Error:', error);
+                alert('エラーが発生しました。');
+            });
+        }
+    }
 });
 </script>
 {% endblock %}
