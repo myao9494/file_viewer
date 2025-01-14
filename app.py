@@ -1608,6 +1608,26 @@ def delete_items():
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)})
 
+@app.route('/create-folder-shortcut', methods=['POST'])
+def create_folder_shortcut():
+    try:
+        folder_path = request.form.get('folder_path')
+        current_path = request.form.get('current_path')
+        
+        # フォルダパスの処理
+        # Windowsの場合はバックスラッシュに変換する必要があるかもしれません
+        folder_path = os.path.normpath(folder_path)
+        
+        return jsonify({
+            'success': True,
+            'folderPath': folder_path
+        })
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 400
+
 if __name__ == '__main__':
     app.secret_key = 'your_secret_key_here'  # セッション用の秘密鍵
     # デバッグモードでアプリケーションを実行

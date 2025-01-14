@@ -1154,123 +1154,176 @@
                     e.stopPropagation();
                     e.stopImmediatePropagation();
 
+                    // DataTransferItemListからフォルダ情報を取得できるように変更
+                    const items = e.dataTransfer.items;
                     const files = e.dataTransfer.files;
-                    if (files.length === 0) return;
-
+                    
                     const rect = e.target.getBoundingClientRect();
                     const x = e.clientX - rect.left;
                     const y = e.clientY - rect.top;
 
-                    for (const file of files) {
-                        // 画像ファイルかどうかをチェック
-                        if (file.type.startsWith('image/')) {
-                            try {
-                                const imageData = await readFileAsDataURL(file);
-                                if (excalidrawRef.current) {
-                                    const api = excalidrawRef.current;
-                                    const zoom = api.getAppState().zoom.value;
-                                    const viewportX = (api.getAppState().scrollX * -1) + x / zoom;
-                                    const viewportY = (api.getAppState().scrollY * -1) + y / zoom;
+                    // フォルダかどうかを判定する関数
+                    const isFolder = (item) => {
+                        if (item.kind === 'file') {
+                            const entry = item.webkitGetAsEntry();
+                            return entry && entry.isDirectory;
+                        }
+                        return false;
+                    };
 
-                                    // 画像の実際のサイズを取得
-                                    const img = new Image();
-                                    await new Promise((resolve, reject) => {
-                                        img.onload = resolve;
-                                        img.onerror = reject;
-                                        img.src = imageData;
+                    for (let i = 0; i < items.length; i++) {
+                        const item = items[i];
+                        
+                        // フォルダの場合
+                        if (isFolder(item)) {
+                            const entry = item.webkitGetAsEntry();
+                            if (entry && entry.isDirectory) {
+                                const formData = new FormData();
+                                formData.append('folder_path', entry.fullPath);
+                                formData.append('current_path', '{{ file_path }}');
+
+                                try {
+                                    const response = await fetch('/create-folder-shortcut', {
+                                        method: 'POST',
+                                        body: formData
                                     });
 
-                                    // 最大サイズを設定（必要に応じて調整）
-                                    const maxSize = 400;
-                                    let width = img.width;
-                                    let height = img.height;
+                                    const data = await response.json();
+                                    if (data.success && excalidrawRef.current) {
+                                        const api = excalidrawRef.current;
+                                        const zoom = api.getAppState().zoom.value;
+                                        const viewportX = (api.getAppState().scrollX * -1) + x / zoom;
+                                        const viewportY = (api.getAppState().scrollY * -1) + y / zoom;
 
-                                    // アスペクト比を維持�がらリサイズ
-                                    if (width > height) {
-                                        if (width > maxSize) {
-                                            height = (height * maxSize) / width;
-                                            width = maxSize;
-                                        }
-                                    } else {
-                                        if (height > maxSize) {
-                                            width = (width * maxSize) / height;
-                                            height = maxSize;
-                                        }
+                                        const elements = createStickyNote(
+                                            viewportX, 
+                                            viewportY, 
+                                            entry.name, 
+                                            data.folderPath
+                                        );
+                                        api.updateScene({
+                                            elements: [...api.getSceneElements(), ...elements]
+                                        });
                                     }
-
-                                    // 画像要素を作成（サイズを更新）
-                                    const imageElement = {
-                                        id: Math.random().toString(36).substr(2, 9),
-                                        type: "image",
-                                        x: viewportX - width/2,
-                                        y: viewportY - height/2,
-                                        width: width,
-                                        height: height,
-                                        angle: 0,
-                                        strokeColor: "transparent",
-                                        backgroundColor: "transparent",
-                                        fillStyle: "hachure",
-                                        strokeWidth: 1,
-                                        strokeStyle: "solid",
-                                        roughness: 1,
-                                        opacity: 100,
-                                        groupIds: [],
-                                        strokeSharpness: "sharp",
-                                        seed: Math.random(),
-                                        version: 1,
-                                        versionNonce: 0,
-                                        isDeleted: false,
-                                        boundElements: null,
-                                        updated: Date.now(),
-                                        link: null,
-                                        status: "pending",
-                                        fileId: file.name,
-                                        scale: [1, 1],
-                                        locked: false,
-                                        selectable: true,
-                                        draggable: true,
-                                        resizable: true,
-                                        rotatable: true
-                                    };
-
-                                    // シーンを更新て画像を追加
-                                    const fileId = Math.random().toString(36).substr(2, 9);
-                                    api.addFiles([{ id: fileId, dataURL: imageData }]);
-                                    imageElement.fileId = fileId;
-
-                                    api.updateScene({
-                                        elements: [...api.getSceneElements(), imageElement]
-                                    });
+                                } catch (error) {
+                                    console.error('フォルダショートカットの作成エラー:', error);
                                 }
-                            } catch (error) {
-                                console.error('画像の追加に失敗しました:', error);
+                                continue;
                             }
-                        } else {
-                            // 画像以外のファイルは従来通りの処理
-                            const formData = new FormData();
-                            formData.append('files[]', file);
-                            formData.append('current_path', '{{ file_path }}');
+                        }
 
-                            try {
-                                const response = await fetch('/upload-files', {
-                                    method: 'POST',
-                                    body: formData
-                                });
+                        // 既存のファイル処理（画像とその他のファイル）をそのまま維持
+                        if (files[i]) {
+                            // 画像ファイルかどうかをチェック
+                            if (files[i].type.startsWith('image/')) {
+                                try {
+                                    const imageData = await readFileAsDataURL(files[i]);
+                                    if (excalidrawRef.current) {
+                                        const api = excalidrawRef.current;
+                                        const zoom = api.getAppState().zoom.value;
+                                        const viewportX = (api.getAppState().scrollX * -1) + x / zoom;
+                                        const viewportY = (api.getAppState().scrollY * -1) + y / zoom;
 
-                                const data = await response.json();
-                                if (data.success && excalidrawRef.current) {
-                                    const api = excalidrawRef.current;
-                                    const zoom = api.getAppState().zoom.value;
-                                    const viewportX = (api.getAppState().scrollX * -1) + x / zoom;
-                                    const viewportY = (api.getAppState().scrollY * -1) + y / zoom;
+                                        // 画像の実際のサイズを取得
+                                        const img = new Image();
+                                        await new Promise((resolve, reject) => {
+                                            img.onload = resolve;
+                                            img.onerror = reject;
+                                            img.src = imageData;
+                                        });
 
-                                    const elements = createStickyNote(viewportX, viewportY, file.name, data.files[0].path);
-                                    api.updateScene({
-                                        elements: [...api.getSceneElements(), ...elements]
-                                    });
+                                        // 最大サイズを設定（必要に応じて調整）
+                                        const maxSize = 400;
+                                        let width = img.width;
+                                        let height = img.height;
+
+                                        // アスペクト比を維持がらリサイズ
+                                        if (width > height) {
+                                            if (width > maxSize) {
+                                                height = (height * maxSize) / width;
+                                                width = maxSize;
+                                            }
+                                        } else {
+                                            if (height > maxSize) {
+                                                width = (width * maxSize) / height;
+                                                height = maxSize;
+                                            }
+                                        }
+
+                                        // 画像要素を作成（サイズを更新）
+                                        const imageElement = {
+                                            id: Math.random().toString(36).substr(2, 9),
+                                            type: "image",
+                                            x: viewportX - width/2,
+                                            y: viewportY - height/2,
+                                            width: width,
+                                            height: height,
+                                            angle: 0,
+                                            strokeColor: "transparent",
+                                            backgroundColor: "transparent",
+                                            fillStyle: "hachure",
+                                            strokeWidth: 1,
+                                            strokeStyle: "solid",
+                                            roughness: 1,
+                                            opacity: 100,
+                                            groupIds: [],
+                                            strokeSharpness: "sharp",
+                                            seed: Math.random(),
+                                            version: 1,
+                                            versionNonce: 0,
+                                            isDeleted: false,
+                                            boundElements: null,
+                                            updated: Date.now(),
+                                            link: null,
+                                            status: "pending",
+                                            fileId: files[i].name,
+                                            scale: [1, 1],
+                                            locked: false,
+                                            selectable: true,
+                                            draggable: true,
+                                            resizable: true,
+                                            rotatable: true
+                                        };
+
+                                        // シーンを更新て画像を追加
+                                        const fileId = Math.random().toString(36).substr(2, 9);
+                                        api.addFiles([{ id: fileId, dataURL: imageData }]);
+                                        imageElement.fileId = fileId;
+
+                                        api.updateScene({
+                                            elements: [...api.getSceneElements(), imageElement]
+                                        });
+                                    }
+                                } catch (error) {
+                                    console.error('画像の追加に失敗しました:', error);
                                 }
-                            } catch (error) {
-                                console.error('アップロードエラー:', error);
+                            } else {
+                                // 画像以外のファイルは従来通りの処理
+                                const formData = new FormData();
+                                formData.append('files[]', files[i]);
+                                formData.append('current_path', '{{ file_path }}');
+
+                                try {
+                                    const response = await fetch('/upload-files', {
+                                        method: 'POST',
+                                        body: formData
+                                    });
+
+                                    const data = await response.json();
+                                    if (data.success && excalidrawRef.current) {
+                                        const api = excalidrawRef.current;
+                                        const zoom = api.getAppState().zoom.value;
+                                        const viewportX = (api.getAppState().scrollX * -1) + x / zoom;
+                                        const viewportY = (api.getAppState().scrollY * -1) + y / zoom;
+
+                                        const elements = createStickyNote(viewportX, viewportY, files[i].name, data.files[0].path);
+                                        api.updateScene({
+                                            elements: [...api.getSceneElements(), ...elements]
+                                        });
+                                    }
+                                } catch (error) {
+                                    console.error('アップロードエラー:', error);
+                                }
                             }
                         }
                     }
