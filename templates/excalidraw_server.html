@@ -1161,52 +1161,129 @@
                     const x = e.clientX - rect.left;
                     const y = e.clientY - rect.top;
 
-                    console.log('Current file_path:', '{{ file_path }}'); // デバッグログ追加
-
                     for (const file of files) {
-                        const formData = new FormData();
-                        formData.append('files[]', file);
-                        formData.append('current_path', '{{ file_path }}');
+                        // 画像ファイルかどうかをチェック
+                        if (file.type.startsWith('image/')) {
+                            try {
+                                const imageData = await readFileAsDataURL(file);
+                                if (excalidrawRef.current) {
+                                    const api = excalidrawRef.current;
+                                    const zoom = api.getAppState().zoom.value;
+                                    const viewportX = (api.getAppState().scrollX * -1) + x / zoom;
+                                    const viewportY = (api.getAppState().scrollY * -1) + y / zoom;
 
-                        console.log('Uploading file:', file.name); // デバッグログ追加
-                        console.log('FormData:', {
-                            files: formData.getAll('files[]'),
-                            current_path: formData.get('current_path')
-                        });
+                                    // 画像の実際のサイズを取得
+                                    const img = new Image();
+                                    await new Promise((resolve, reject) => {
+                                        img.onload = resolve;
+                                        img.onerror = reject;
+                                        img.src = imageData;
+                                    });
 
-                        try {
-                            const response = await fetch('/upload-files', {
-                                method: 'POST',
-                                body: formData
-                            });
+                                    // 最大サイズを設定（必要に応じて調整）
+                                    const maxSize = 400;
+                                    let width = img.width;
+                                    let height = img.height;
 
-                            const data = await response.json();
-                            console.log('Upload response:', data); // デバッグログ追加
+                                    // アスペクト比を維持�がらリサイズ
+                                    if (width > height) {
+                                        if (width > maxSize) {
+                                            height = (height * maxSize) / width;
+                                            width = maxSize;
+                                        }
+                                    } else {
+                                        if (height > maxSize) {
+                                            width = (width * maxSize) / height;
+                                            height = maxSize;
+                                        }
+                                    }
 
-                            if (data.success && excalidrawRef.current) {
-                                const api = excalidrawRef.current;
-                                const zoom = api.getAppState().zoom.value;
-                                const viewportX = (api.getAppState().scrollX * -1) + x / zoom;
-                                const viewportY = (api.getAppState().scrollY * -1) + y / zoom;
+                                    // 画像要素を作成（サイズを更新）
+                                    const imageElement = {
+                                        id: Math.random().toString(36).substr(2, 9),
+                                        type: "image",
+                                        x: viewportX - width/2,
+                                        y: viewportY - height/2,
+                                        width: width,
+                                        height: height,
+                                        angle: 0,
+                                        strokeColor: "transparent",
+                                        backgroundColor: "transparent",
+                                        fillStyle: "hachure",
+                                        strokeWidth: 1,
+                                        strokeStyle: "solid",
+                                        roughness: 1,
+                                        opacity: 100,
+                                        groupIds: [],
+                                        strokeSharpness: "sharp",
+                                        seed: Math.random(),
+                                        version: 1,
+                                        versionNonce: 0,
+                                        isDeleted: false,
+                                        boundElements: null,
+                                        updated: Date.now(),
+                                        link: null,
+                                        status: "pending",
+                                        fileId: file.name,
+                                        scale: [1, 1],
+                                        locked: false,
+                                        selectable: true,
+                                        draggable: true,
+                                        resizable: true,
+                                        rotatable: true
+                                    };
 
-                                console.log('Creating sticky note for:', {
-                                    filename: file.name,
-                                    path: data.files[0].path,
-                                    position: { x: viewportX, y: viewportY }
-                                });
+                                    // シーンを更新て画像を追加
+                                    const fileId = Math.random().toString(36).substr(2, 9);
+                                    api.addFiles([{ id: fileId, dataURL: imageData }]);
+                                    imageElement.fileId = fileId;
 
-                                const elements = createStickyNote(viewportX, viewportY, file.name, data.files[0].path);
-                                
-                                console.log('Created elements:', elements); // デバッグログ追加
-
-                                api.updateScene({
-                                    elements: [...api.getSceneElements(), ...elements]
-                                });
+                                    api.updateScene({
+                                        elements: [...api.getSceneElements(), imageElement]
+                                    });
+                                }
+                            } catch (error) {
+                                console.error('画像の追加に失敗しました:', error);
                             }
-                        } catch (error) {
-                            console.error('Upload error:', error);
+                        } else {
+                            // 画像以外のファイルは従来通りの処理
+                            const formData = new FormData();
+                            formData.append('files[]', file);
+                            formData.append('current_path', '{{ file_path }}');
+
+                            try {
+                                const response = await fetch('/upload-files', {
+                                    method: 'POST',
+                                    body: formData
+                                });
+
+                                const data = await response.json();
+                                if (data.success && excalidrawRef.current) {
+                                    const api = excalidrawRef.current;
+                                    const zoom = api.getAppState().zoom.value;
+                                    const viewportX = (api.getAppState().scrollX * -1) + x / zoom;
+                                    const viewportY = (api.getAppState().scrollY * -1) + y / zoom;
+
+                                    const elements = createStickyNote(viewportX, viewportY, file.name, data.files[0].path);
+                                    api.updateScene({
+                                        elements: [...api.getSceneElements(), ...elements]
+                                    });
+                                }
+                            } catch (error) {
+                                console.error('アップロードエラー:', error);
+                            }
                         }
                     }
+                };
+
+                // ファイルをData URLとして読み込む関数を追加
+                const readFileAsDataURL = (file) => {
+                    return new Promise((resolve, reject) => {
+                        const reader = new FileReader();
+                        reader.onload = () => resolve(reader.result);
+                        reader.onerror = reject;
+                        reader.readAsDataURL(file);
+                    });
                 };
 
                 // ドキュメントレベルでイベントをキャプチャ
