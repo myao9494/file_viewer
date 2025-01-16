@@ -119,8 +119,8 @@ def view_file(file_path):
     app.logger.info(f"view_file関数が呼び出されました。file_path: {repr(file_path)}")
 
     # ダブルクォートで囲まれている場合、中身だけを取り出す
-    if file_path.startswith('"') and file_path.endswith('"'):
-        file_path = file_path[1:-1]
+    # if file_path.startswith('"') and file_path.endswith('"'):
+    #     file_path = file_path[1:-1]
 
     # cmd コマンドの処理を追加
     if file_path.startswith('cmd '):
