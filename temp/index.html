@@ -196,7 +196,7 @@
 	<!-- サイズ調整入力欄を追加 -->
 	<div class="size-input-container">
 		<label for="size-input">size(%): </label>
-		<input type="number" id="size-input" value="100" min="10" max="200" step="2" onchange="updateGanttSize()">
+		<input type="number" id="size-input" value="96" min="10" max="200" step="2" onchange="updateGanttSize()">
 	</div>
 	<!-- <strong style="color: rgb(30, 0, 255); font-size: 20px;"> Belief and Evidence → Confidence  </strong> -->
 	<label class='searchEl'>task検索: <input id='search' type='field' placeholder='Search tasks...' style='width:100px' /></label>
@@ -533,11 +533,11 @@
 		// {name: "folder", height: 35, map_to: "folder", type: "textarea"},
 		// {name: "url_adress", height: 35, map_to: "url_adress", type: "textarea"},
 		// {name: "mail", height: 35, map_to: "mail", type: "textarea"},
-		{name: "kind", height:22, map_to:"kind_task", type:"select", options:gantt.serverList("kind_task", [
+	    {name: "kind", height:22, map_to:"kind_task", type:"select", options:gantt.serverList("kind_task", [
 			{ key: "1", label: "task" },
 			{ key: "2", label: "pro" },
 			{ key: "3", label: "MS" }
-		])},
+     	])},
 		{name: "time", type: "duration", map_to: "auto"},
 		{name: "barColor", height: 22, map_to: "color", type: "select", options: colors},
 		{name: "textColor", height: 22, map_to: "textColor", type: "select", options: colors},
@@ -737,12 +737,20 @@
 	
 	// タスクのバーの右側のテキスト設定
 	gantt.templates.rightside_text = function(start, end, task){
-		if (task.hyperlink === ""){
-			return getTaskHierarchy(task.id);}
-		else {
-			return '<a href="' + task.hyperlink + '" target="_blank">' + getTaskHierarchy(task.id) + '</a>';}
-		};
-    // return task.text + " " + task.duration + "<b>日</b>";};
+		var currentTaskInfo = `[${task.id}] ${task.text}`;
+		var parentInfo = getParentInfo(task.id);
+		var displayText = parentInfo ? `${currentTaskInfo} > ${parentInfo}` : currentTaskInfo;
+		
+		if (task.hyperlink === "") {
+			return displayText;
+		} else {
+			if (isPrintMode) {
+				return '<span style="color: black; text-decoration: none;">' + displayText + '</span>';
+			} else {
+				return '<a href="' + task.hyperlink + '" target="_blank">' + displayText + '</a>';
+			}
+		}
+	};
 
 	// タスクのバーのテキスト設定
 	gantt.templates.task_text = function(start, end, task){
@@ -953,6 +961,11 @@
 	// init
 	gantt.init("gantt_here");
 	gantt.load("/data");
+	
+	// データロード完了後にサイズを更新
+	gantt.attachEvent("onLoadEnd", function(){
+		updateGanttSize();
+	});
 
 	// スクロール
 	var scroll_state, click, original_mouse_position;
@@ -1190,28 +1203,36 @@
 	// var nodesSnapshot = document.evaluate('//*[@id="gantt_here"]/div/div[1]/div[1]/div/div/div[1]/div[2]', document, null, XPathResult.ORDERED_NODE_SNAPSHOT_TYPE, null );
 	// nodesSnapshot.snapshotItem(0).click();
 
-	// サイズ変更機能を修正
+	// サイズ変更機能を最適化
 	function updateGanttSize() {
-		const sizeInput = document.getElementById('size-input');
-		const scale = sizeInput.value / 100;
-		
-		// ganttチャートのコンテナを取得
-		const ganttContainer = document.getElementById('gantt_here');
-		
-		// スケールと幅を適用
-		ganttContainer.style.transform = `scale(${scale})`;
-		ganttContainer.style.width = `${(100 / scale)}%`;
-		ganttContainer.style.transformOrigin = 'top left';
-		
-		// コンテナの高さを調整（スケールを考慮）
-		const baseHeight = window.innerHeight - 52;
-		ganttContainer.style.height = `${baseHeight / scale}px`;
-		
-		// ganttチャートを再描画
-		gantt.render();
-		gantt.setSizes();
+		// requestAnimationFrameを使用してレンダリングを最適化
+		requestAnimationFrame(() => {
+			const sizeInput = document.getElementById('size-input');
+			const scale = sizeInput.value / 100;
+			const ganttContainer = document.getElementById('gantt_here');
+			
+			// バッチ処理でDOMの更新をまとめる
+			ganttContainer.style.cssText = `
+				transform: scale(${scale});
+				width: ${(100 / scale)}%;
+				transform-origin: top left;
+				height: ${(window.innerHeight - 52) / scale}px;
+			`;
+			
+			// レイアウトの強制再計算を避けるため、一度にまとめて実行
+			requestAnimationFrame(() => {
+				gantt.render();
+				gantt.setSizes();
+			});
+		});
 	}
-	
+
+	// DOMContentLoadedイベントで初期化を行う
+	document.addEventListener('DOMContentLoaded', function() {
+		// 初期表示時にzoomを90%に設定
+		updateGanttSize();
+	});
+
 	// ホイールイベントでのズーム機能を追加
 	document.getElementById('gantt_here').addEventListener('wheel', function(e) {
 		if (e.ctrlKey) {
@@ -1219,7 +1240,9 @@
 			const sizeInput = document.getElementById('size-input');
 			const currentSize = parseInt(sizeInput.value);
 			
-			const newSize = e.deltaY > 0 
+			// Windowsの場合、wheelDeltaYを使用
+			const delta = e.wheelDelta ? -e.wheelDelta : e.deltaY;
+			const newSize = delta > 0 
 				? Math.max(10, currentSize - 2)
 				: Math.min(200, currentSize + 2);
 			
@@ -1243,147 +1266,92 @@
 	// 印刷モードの状態管理
 	let isPrintMode = false;
 
-	// 印刷モードトグルボタンのイベントリスナー
+	// グローバルスコープで設定を保存する変数を修正
+	let savedConfig = {
+		show_grid: true,
+		scroll_size: 20,
+		grid_width: 280,
+		columns: null  // カラム設定を保存するために追加
+	};
+
+	// 印刷モードトグルボタンのイベントリスナーを修正
 	document.getElementById('printModeToggle').addEventListener('click', function() {
 		isPrintMode = !isPrintMode;
 		this.classList.toggle('active');
-		
-		// bodyにprint-modeクラスを追加/削除
 		document.body.classList.toggle('print-mode', isPrintMode);
 		
-		const ganttContainer = document.getElementById('gantt_here');
-		const gridCell = document.querySelector('.gantt_layout_cell.grid_cell');
-		const timelineCell = document.querySelector('.gantt_layout_cell.timeline_cell');
-		const scale = document.getElementById('size-input').value / 100;
-		
-		if (gridCell && timelineCell) {
-			if (isPrintMode) {
-				// 印刷モードの設定
-				gridCell.style.cssText = `
-					width: 10 !important;
-					max-width: 10 !important;
-					min-width: 10 !important;
-					padding: 0 !important;
-					margin: 0 !important;
-					overflow: hidden !important;
-					display: none !important;
-				`;
-				
-				timelineCell.style.cssText = `
-					width: 100% !important;
-					max-width: none !important;
-					min-width: 100% !important;
-				`;
-
-				ganttContainer.style.cssText = `
-					width: ${(100 / scale)}% !important;
-					height: ${(window.innerHeight - 52) / scale}px !important;
-					transform: scale(${scale}) !important;
-					transform-origin: top left !important;
-					overflow: hidden !important;
-				`;
-
-				gantt.config.scroll_size = 0;
-				gantt.config.show_grid = false;
-			} else {
-				// 通常モードの復元
-				// すべてのスタイルをクリア
-				gridCell.removeAttribute('style');
-				timelineCell.removeAttribute('style');
-				
-				// レイアウトを再初期化
-				gantt.config.scroll_size = 20;
-				gantt.config.show_grid = true;
-				
-				// グリッドの表示を強制
-				gantt.config.layout = {
-					css: "gantt_container",
-					rows: [
-						{
-							cols: [
-								{view: "grid", width: 300},  // グリッドの幅を明示的に指定
-								{view: "timeline", scrollX: "scrollHor", scrollY: "scrollVer"},
-								{view: "scrollbar", id: "scrollVer"}
-							]
-						},
-						{view: "scrollbar", id: "scrollHor", height: 20}
-					]
-				};
-				
-				// コンテナのスタイルを復元
-				ganttContainer.style.cssText = `
-					width: ${(100 / scale)}%;
-					height: calc(100vh - 52px);
-					transform: scale(${scale});
-					transform-origin: top left;
-				`;
-			}
+		if (isPrintMode) {
+			// 現在の設定を保存
+			savedConfig = {
+				show_grid: gantt.config.show_grid,
+				scroll_size: gantt.config.scroll_size,
+				grid_width: gantt.config.grid_width,
+				columns: [...gantt.config.columns]  // カラム設定を複製して保存
+			};
+			
+			// 印刷モード時の設定を適用
+			gantt.config.show_grid = false;
+			gantt.config.scroll_size = 0;
+			gantt.config.grid_width = 0;
+			gantt.config.columns = [];  // カラムを非表示
+		} else {
+			// 保存していた設定を完全に復元
+			gantt.config.show_grid = savedConfig.show_grid;
+			gantt.config.scroll_size = savedConfig.scroll_size;
+			gantt.config.grid_width = savedConfig.grid_width;
+			gantt.config.columns = savedConfig.columns;  // カラム設定を復元
 		}
 		
-		// タスク表示の設定
+		// テンプレートの更新
+		updateTemplatesForPrintMode(isPrintMode);
+		
+		// レイアウトの更新を最適化
+		requestAnimationFrame(() => {
+			gantt.render();
+			gantt.setSizes();
+		});
+	});
+
+	// テンプレート更新用の関数を修正
+	function updateTemplatesForPrintMode(isPrintMode) {
 		if (isPrintMode) {
-			gantt.templates.task_text = function(start, end, task){
+			gantt.templates.task_text = function(start, end, task) {
 				return "";
 			};
 			
-			gantt.templates.rightside_text = function(start, end, task){
-				if (task.hyperlink === ""){
-					return task.text;
-				} else {
-					return '<span style="color: black; text-decoration: none;">' + task.text + '</span>';
-				}
+			gantt.templates.rightside_text = function(start, end, task) {
+				var currentTaskInfo = `[${task.id}] ${task.text}`;
+				var parentInfo = getParentInfo(task.id);
+				var displayText = parentInfo ? `${currentTaskInfo} > ${parentInfo}` : currentTaskInfo;
+				return '<span style="color: black; text-decoration: none;">' + displayText + '</span>';
 			};
-
-			// 印刷モード時はすべてのgantt_side_contentを表示
-			document.querySelectorAll('.gantt_side_content').forEach(function(element) {
-				element.style.display = 'block';
-				element.style.color = 'rgb(0, 0, 0)';
-				element.style.fontSize = '11px';
-			});
 		} else {
-			// 通常モードのテンプレートを復元
-			gantt.templates.task_text = function(start, end, task){
-				if (task.hyperlink === "" ){
+			gantt.templates.task_text = function(start, end, task) {
+				if (task.hyperlink === "") {
 					return "[" + task.id + "]" + task.text;
 				} else {
-					if (task.kind_task==="1"||task.kind_task==="3"){
+					if (task.kind_task === "1" || task.kind_task === "3") {
 						return "";
 					} else {
-						return '<a href="' + task.hyperlink + '" target="_blank">' + "[" + task.id + "]"  + task.text + '</a>';
+						return '<a href="' + task.hyperlink + '" target="_blank">' + 
+								"[" + task.id + "]" + task.text + '</a>';
 					}
 				}
 			};
 			
-			gantt.templates.rightside_text = function(start, end, task){
-				if (task.hyperlink === ""){
-					return getTaskHierarchy(task.id);
+			gantt.templates.rightside_text = function(start, end, task) {
+				var currentTaskInfo = `[${task.id}] ${task.text}`;
+				var parentInfo = getParentInfo(task.id);
+				var displayText = parentInfo ? `${currentTaskInfo} > ${parentInfo}` : currentTaskInfo;
+				
+				if (task.hyperlink === "") {
+					return displayText;
 				} else {
-					return '<a href="' + task.hyperlink + '" target="_blank">' + getTaskHierarchy(task.id) + '</a>';
+					return '<a href="' + task.hyperlink + '" target="_blank">' + displayText + '</a>';
 				}
 			};
-
-			// 通常モードではtaskの場合のみgantt_side_contentを表示
-			document.querySelectorAll('.gantt_side_content').forEach(function(element) {
-				if (element.closest('.task') || element.closest('.ms')) {
-					element.style.display = 'block';
-				} else {
-					element.style.display = 'none';
-				}
-			});
 		}
-		
-		// レイアウトの再計算と再描画
-		gantt.setSizes();
-		setTimeout(function() {
-			if (!isPrintMode) {
-				// 通常モードの場合、完全な再初期化を実行
-				gantt.init('gantt_here');
-				gantt.parse(gantt.serialize());
-			} else {
-				gantt.render();
-			}
-		}, 100);
-	});
+	}
 
 	// また、ganttの初期化時にもイベントを追加
 	gantt.attachEvent("onTaskLoading", function(task){
@@ -1438,6 +1406,16 @@
 		task.hierarchy_path = getTaskHierarchy(id);
 		return true;
 	});
+
+	// 親タスクの情報を取得する関数を追加
+	function getParentInfo(taskId) {
+		var task = gantt.getTask(taskId);
+		if (task.parent && task.parent !== gantt.config.root_id) {
+			var parentTask = gantt.getTask(task.parent);
+			return `[${parentTask.id}] ${parentTask.text}`;
+		}
+		return "";
+	}
 </script>
 
 </body>

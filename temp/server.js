@@ -32,7 +32,38 @@ var db = mysql.createPool({
 	database: 'gantt_howto_node'
 });
 
-var moment = require('moment-timezone');
+// momentの依存関係を条件付きで読み込む
+let moment;
+try {
+    moment = require('moment-timezone');
+} catch (e) {
+    // moment-timezoneが利用できない場合は、基本的なDate操作を行う関数を定義
+    moment = function(date) {
+        return {
+            tz: function() {
+                return this;
+            },
+            format: function(format) {
+                if (!date) return '';
+                const d = new Date(date);
+                if (format === "YYYY-MM-DD") {
+                    return d.toISOString().split('T')[0];
+                }
+                return d.toISOString();
+            },
+            clone: function() {
+                return moment(date);
+            },
+            add: function(number, unit) {
+                const d = new Date(date);
+                if (unit === 'days') {
+                    d.setDate(d.getDate() + number);
+                }
+                return moment(d);
+            }
+        };
+    };
+}
 
 app.use(express.static(path.join(__dirname, "public")));
 app.use(bodyParser.urlencoded({extended: true}));
