@@ -7,3 +7,5 @@ dldraw_build/
 .DS_Store
 *.excalidraw.svg
 *.excalidraw
+.DS_Store
+top_excalidraw.svg

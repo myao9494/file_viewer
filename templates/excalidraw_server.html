@@ -972,7 +972,7 @@
                 }
             }, [BASE_DIR]);
 
-            // SVG保存機能を追加
+            // SVG保存機能を修正
             const exportSelectedAsSvg = React.useCallback(async () => {
                 if (!excalidrawAPI) {
                     console.warn('Excalidraw API not ready');
@@ -1034,27 +1034,28 @@
                         }
                     });
 
-                    // サーバーにSVGを保存
+                    // サーバーにSVGを保存（ファイル名をエンコード）
                     const response = await fetch("{{ url_for('save_selected_svg', file_path=file_path) }}", {
                         method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
+                        headers: { 
+                            'Content-Type': 'application/json',
+                            'Accept-Charset': 'utf-8'
+                        },
                         body: JSON.stringify({
                             svg: svgElement.outerHTML,
-                            filename: filename
+                            filename: encodeURIComponent(filename)
                         })
                     });
 
                     const result = await response.json();
                     if (result.success) {
-                        alert('SVGを保存しました');
-                        // サーバーから提供されるURLを使用して新しいタブで開く
+                        alert('SVGを保存しました: ' + decodeURIComponent(result.savedPath));
                         if (result.fileUrl) {
                             window.open(result.fileUrl, '_blank');
                         }
                     } else {
                         throw new Error(result.error || '保存に失敗しました');
                     }
-
                 } catch (error) {
                     console.error('SVG保存エラー:', error);
                     alert('SVGの保存に失敗しました: ' + error.message);

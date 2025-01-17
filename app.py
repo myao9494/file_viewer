@@ -1448,9 +1448,6 @@ def restore_excalidraw_backup():
 
 @app.route('/save-selected-svg/<path:file_path>', methods=['POST'])
 def save_selected_svg(file_path):
-    """
-    選択したオブジェクトをSVGとして保存（excalidrawファイルと同じ階層に保存）
-    """
     try:
         data = request.json
         svg_content = data.get('svg')
@@ -1459,35 +1456,43 @@ def save_selected_svg(file_path):
         if not svg_content or not filename:
             return jsonify({"success": False, "error": "必要なデータが不足しています"}), 400
             
+        # ファイル名をUTF-8でデコード
+        filename = urllib.parse.unquote(filename)
+        
         # 保存先のパスを構築
         current_dir = os.path.dirname(file_path)
         save_dir = os.path.join(BASE_DIR, current_dir)
         os.makedirs(save_dir, exist_ok=True)
         
-        # ファイル名を正規化
-        safe_filename = secure_filename(f"{filename}.svg")
+        # ファイル名を正規化（ただし日本語は保持）
+        safe_filename = "".join([
+            c for c in filename 
+            if c.isalnum() or c.isspace() or c in "._-()[]{}あ-んア-ンー一-龯"
+        ])
+        safe_filename = safe_filename.strip() + '.svg'
         svg_path = os.path.join(save_dir, safe_filename)
         
-        # SVGファイルを保存
+        # SVGファイルを保存（UTF-8で保存）
         with open(svg_path, 'w', encoding='utf-8') as f:
             f.write(svg_content)
             
         app.logger.info(f"Successfully saved SVG to {svg_path}")
         
-        # ルパスをクリップボードにコピー
+        # パスをクリップボードにコピー
         try:
             pyperclip.copy(svg_path)
             app.logger.info(f"Copied path to clipboard: {svg_path}")
         except Exception as e:
             app.logger.error(f"Failed to copy path to clipboard: {str(e)}")
         
-        # 一時的なURLを生成（static_urlを使用）
+        # 相対パスを生成
         relative_path = os.path.relpath(svg_path, BASE_DIR)
         temp_url = url_for('serve_file', file_path=relative_path)
         
         return jsonify({
             "success": True,
-            "fileUrl": temp_url
+            "fileUrl": temp_url,
+            "savedPath": relative_path
         })
         
     except Exception as e:
@@ -1522,22 +1527,35 @@ def upload_files():
         current_dir = os.path.dirname(current_path)
         base_upload_dir = os.path.join(BASE_DIR, current_dir, 'uploads')
         
-        # アップロードフォルダの種類を定義（メールカテゴリを追加）
+        # アップロードフォルダの種類を定義
         UPLOAD_CATEGORIES = {
             'images': ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.svg', '.webp'],
             'documents': ['.pdf', '.doc', '.docx', '.txt', '.rtf', '.odt', '.md'],
             'presentations': ['.ppt', '.pptx', '.key', '.odp'],
             'spreadsheets': ['.xls', '.xlsx', '.csv', '.ods'],
             'archives': ['.zip', '.rar', '.7z', '.tar', '.gz'],
-            'emails': ['.msg', '.eml', '.emlx'],  # メール用の拡張子を追加
-            'others': []  # その他のファイル用
+            'emails': ['.msg', '.eml', '.emlx'],
+            'others': []
         }
         
         uploaded_files = []
         
         for file in files:
             if file:
-                filename = secure_filename(file.filename)
+                # ファイル名をデコード
+                filename = file.filename
+                if isinstance(filename, bytes):
+                    filename = filename.decode('utf-8')
+                
+                # URLエンコードされている場合はデコード
+                try:
+                    filename = urllib.parse.unquote(filename)
+                except:
+                    pass
+
+                app.logger.info(f"Original filename: {filename}")
+                
+                # 拡張子を取得
                 extension = os.path.splitext(filename)[1].lower()
                 
                 # ファイルの種類に基づいてサブフォルダを決定
@@ -1551,13 +1569,18 @@ def upload_files():
                 category_dir = os.path.join(base_upload_dir, category)
                 os.makedirs(category_dir, exist_ok=True)
                 
-                # ファイルの保存パスを構築
-                file_path = os.path.join(category_dir, filename)
+                # 禁止文字を置換（ファイルシステムで使用できない文字を除去）
+                safe_filename = re.sub(r'[<>:"/\\|?*]', '', filename)
+                safe_filename = safe_filename.strip()
                 
+                # ファイルの保存パスを構築
+                file_path = os.path.join(category_dir, safe_filename)
+                
+                app.logger.info(f"Safe filename: {safe_filename}")
                 app.logger.info(f"Saving file to: {file_path}")
                 
                 # ファイル名が重複する場合、連番を付加
-                base, ext = os.path.splitext(filename)
+                base, ext = os.path.splitext(safe_filename)
                 counter = 1
                 while os.path.exists(file_path):
                     new_filename = f"{base}_{counter}{ext}"
