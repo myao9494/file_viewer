@@ -130,13 +130,39 @@
                 []
             );
 
-            // onChange関数を更新
+            // 座標計算を修正する関数を追加
+            const normalizeElementCoordinates = React.useCallback((elements) => {
+                return elements.map(element => {
+                    if (!element) return element;
+                    
+                    // 要素の座標を正規化
+                    const normalized = {
+                        ...element,
+                        x: Math.round(element.x * 100) / 100,
+                        y: Math.round(element.y * 100) / 100
+                    };
+
+                    // 幅と高さも正規化（存在する場合）
+                    if ('width' in element) {
+                        normalized.width = Math.round(element.width * 100) / 100;
+                    }
+                    if ('height' in element) {
+                        normalized.height = Math.round(element.height * 100) / 100;
+                    }
+
+                    return normalized;
+                });
+            }, []);
+
+            // handleChangeを修正
             const handleChange = React.useCallback((elements, state, files) => {
                 if (!previousElementsRef.current || hasElementsChanged(elements, previousElementsRef.current)) {
-                    debouncedSave(elements, state, files);
-                    previousElementsRef.current = JSON.parse(JSON.stringify(elements));
+                    // 座標を正規化してから保存
+                    const normalizedElements = normalizeElementCoordinates(elements);
+                    debouncedSave(normalizedElements, state, files);
+                    previousElementsRef.current = JSON.parse(JSON.stringify(normalizedElements));
                 }
-            }, [debouncedSave]);
+            }, [debouncedSave, normalizeElementCoordinates]);
 
             // 付箋を追加する関数
             const addStickyNote = React.useCallback(() => {
@@ -722,9 +748,12 @@
                 try {
                     console.log("Saving data...", elements.length, "elements");
                     
+                    // 保存前に座標を正規化
+                    const normalizedElements = normalizeElementCoordinates(elements);
+                    
                     // SVGをエクスポート
                     const svgString = await ExcalidrawLib.exportToSvg({
-                        elements: elements,
+                        elements: normalizedElements,
                         appState: {
                             ...appState,
                             exportWithDarkMode: false,
@@ -738,10 +767,10 @@
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
-                            elements: elements,
+                            elements: normalizedElements,
                             appState: appState,
                             files: files,
-                            svg: svgString.outerHTML  // SVGデータを追加
+                            svg: svgString.outerHTML
                         })
                     });
                     if (!response.ok) throw new Error('保存に失敗しました');
