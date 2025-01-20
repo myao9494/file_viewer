@@ -159,8 +159,24 @@
                 if (!previousElementsRef.current || hasElementsChanged(elements, previousElementsRef.current)) {
                     // 座標を正規化してから保存
                     const normalizedElements = normalizeElementCoordinates(elements);
-                    debouncedSave(normalizedElements, state, files);
-                    previousElementsRef.current = JSON.parse(JSON.stringify(normalizedElements));
+                    
+                    // 要素のヒットボックスを調整
+                    const adjustedElements = normalizedElements.map(element => {
+                        if (element.type === 'arrow') {
+                            return {
+                                ...element,
+                                // 矢印の選択領域を広げる
+                                selectionBoundsPadding: 10,
+                                boundElementPadding: 10,
+                                // 矢印の端点の選択領域を広げる
+                                endpointRadius: 8
+                            };
+                        }
+                        return element;
+                    });
+                    
+                    debouncedSave(adjustedElements, state, files);
+                    previousElementsRef.current = JSON.parse(JSON.stringify(adjustedElements));
                 }
             }, [debouncedSave, normalizeElementCoordinates]);
 
@@ -1113,9 +1129,8 @@
                 const rectangleId = Math.random().toString(36).substr(2, 9);
                 const textId = "text-" + Math.random().toString(36).substr(2, 9);
 
-                // BASE_DIRを含む完全なパスを�築
+                // BASE_DIRを含む完全なパスを構築
                 const fullPath = "{{ BASE_DIR }}/" + filepath;
-                console.log('Creating sticky note with path:', fullPath); // デバッグログ追加
 
                 return [
                     {
@@ -1140,8 +1155,10 @@
                         isDeleted: false,
                         boundElements: [{ type: "text", id: textId }],
                         updated: Date.now(),
-                        link: fullPath, // 完全なパスを設定
+                        link: fullPath,
                         locked: false,
+                        selectionBoundsPadding: 10,  // 選択領域のパディングを追加
+                        boundElementPadding: 10      // 関連要素とのパディングを追加
                     },
                     {
                         id: textId,
@@ -1172,6 +1189,8 @@
                         containerId: rectangleId,
                         originalText: filename,
                         lineHeight: 1.1,
+                        selectionBoundsPadding: 10,  // 選択領域のパディングを追加
+                        boundElementPadding: 10      // 関連要素とのパディングを追加
                     }
                 ];
             };
@@ -1446,7 +1465,9 @@
                     canvasBackgroundColor: "#ffffff",
                     shouldCacheText: true,
                     imageCache: true,
-                    throttleRedraw: true
+                    throttleRedraw: true,
+                    elementsPadding: 10, // 要素の周りのパディングを追加
+                    selectionBoundsPadding: 10 // 選択領域のパディングを追加
                 },
                 UIOptions: {
                     canvasActions: {
