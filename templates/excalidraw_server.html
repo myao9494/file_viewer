@@ -160,23 +160,46 @@
                     // 座標を正規化してから保存
                     const normalizedElements = normalizeElementCoordinates(elements);
                     
-                    // 要素のヒットボックスを調整
+                    // 要素のヒットボックスと位置を調整
                     const adjustedElements = normalizedElements.map(element => {
+                        const adjusted = { ...element };
+                        
                         if (element.type === 'arrow') {
-                            return {
-                                ...element,
-                                // 矢印の選択領域を広げる
-                                selectionBoundsPadding: 10,
-                                boundElementPadding: 10,
-                                // 矢印の端点の選択領域を広げる
-                                endpointRadius: 8
-                            };
+                            adjusted.selectionBoundsPadding = 10;
+                            adjusted.boundElementPadding = 10;
+                            adjusted.endpointRadius = 8;
                         }
-                        return element;
+
+                        // 座標の精度を保持しつつ、微小な揺れを防ぐ
+                        if (element.points) {
+                            adjusted.points = element.points.map(point => ({
+                                x: Math.round(point.x * 1000) / 1000,
+                                y: Math.round(point.y * 1000) / 1000
+                            }));
+                        }
+
+                        // バインドされた要素の位置関係を維持
+                        if (element.boundElements) {
+                            adjusted.boundElements = element.boundElements.map(bound => ({
+                                ...bound,
+                                gap: bound.gap || 8
+                            }));
+                        }
+
+                        return adjusted;
                     });
                     
-                    debouncedSave(adjustedElements, state, files);
-                    previousElementsRef.current = JSON.parse(JSON.stringify(adjustedElements));
+                    // 状態を更新する前に座標の整合性をチェック
+                    const validatedElements = adjustedElements.filter(element => {
+                        return element && 
+                               typeof element.x === 'number' && 
+                               typeof element.y === 'number' && 
+                               !isNaN(element.x) && 
+                               !isNaN(element.y);
+                    });
+
+                    debouncedSave(validatedElements, state, files);
+                    previousElementsRef.current = JSON.parse(JSON.stringify(validatedElements));
                 }
             }, [debouncedSave, normalizeElementCoordinates]);
 
@@ -544,10 +567,19 @@
                         event.preventDefault();
                         
                         const zoom = excalidrawAPI.getAppState().zoom.value;
+                        // より正確な座標計算
                         const viewportPosition = {
-                            x: (excalidrawAPI.getAppState().scrollX * -1) + mouseX / zoom,
-                            y: (excalidrawAPI.getAppState().scrollY * -1) + mouseY / zoom
+                            x: Math.round((excalidrawAPI.getAppState().scrollX * -1 + mouseX / zoom) * 1000) / 1000,
+                            y: Math.round((excalidrawAPI.getAppState().scrollY * -1 + mouseY / zoom) * 1000) / 1000
                         };
+                        
+                        // 座標のスナップ処理を追加
+                        const snapToGrid = (value, gridSize = 1) => {
+                            return Math.round(value / gridSize) * gridSize;
+                        };
+                        
+                        viewportPosition.x = snapToGrid(viewportPosition.x);
+                        viewportPosition.y = snapToGrid(viewportPosition.y);
 
                         navigator.clipboard.readText().then(async clipboardText => {
                             let PYTHON_EXECUTABLE = "python"
