@@ -1652,6 +1652,30 @@ def create_folder_shortcut():
             'error': str(e)
         }), 400
 
+@app.route('/rename', methods=['POST'])
+def rename_item():
+    try:
+        data = request.get_json()
+        old_path = os.path.join(BASE_DIR, data['old_path'].lstrip('/'))
+        new_name = data['new_name']
+        parent_dir = os.path.dirname(old_path)
+        new_path = os.path.join(parent_dir, new_name)
+
+        # ファイルが存在するか確認
+        if not os.path.exists(old_path):
+            return jsonify({'error': 'ファイルが見つかりません'}), 404
+
+        # 新しい名前のファイルが既に存在するか確認
+        if os.path.exists(new_path):
+            return jsonify({'error': '同じ名前のファイルが既に存在します'}), 409
+
+        # リネーム実行
+        os.rename(old_path, new_path)
+        return jsonify({'success': True, 'new_path': os.path.relpath(new_path, BASE_DIR)})
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 if __name__ == '__main__':
     app.secret_key = 'your_secret_key_here'  # セッション用の秘密鍵
     # デバッグモードでアプリケーションを実行

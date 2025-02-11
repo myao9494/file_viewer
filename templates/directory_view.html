@@ -125,6 +125,46 @@
         margin-right: 5px;
         cursor: pointer;
     }
+    .rename-icon {
+        cursor: pointer;
+        margin-left: 5px;
+        color: #6c757d;
+    }
+    .rename-icon:hover {
+        color: #007bff;
+    }
+    .rename-popup {
+        display: none;
+        position: absolute;
+        background-color: white;
+        padding: 20px;
+        border-radius: 5px;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        z-index: 1000;
+        min-width: 200px;
+    }
+    .rename-popup input {
+        width: 100%;
+        padding: 8px;
+        margin-bottom: 10px;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+    }
+    .rename-popup button {
+        margin-right: 10px;
+        padding: 5px 15px;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+    }
+    .rename-popup button.ok {
+        background-color: #28a745;
+        color: white;
+    }
+    .rename-popup button.cancel {
+        background-color: #6c757d;
+        color: white;
+    }
 </style>
 
 <div class="folder-path">
@@ -179,6 +219,7 @@
         <input type="checkbox" class="item-checkbox" data-path="{{ folder.path }}" data-type="folder">
         <span class="icon">📁</span>
         <a href="{{ url_for('view_file', file_path=folder.path) }}">{{ folder.relative_path }}</a>
+        <i class="fas fa-edit rename-icon" onclick="showRenamePopup('{{ folder.path }}', '{{ folder.relative_path }}', event)"></i>
     </li>
 {% endfor %}
 </ul>
@@ -190,13 +231,120 @@
         <input type="checkbox" class="item-checkbox" data-path="{{ file.path }}" data-type="file">
         <span class="icon">📄</span>
         <a href="{{ url_for('view_file', file_path=file.path) }}">{{ file.relative_path }}</a>
+        <i class="fas fa-edit rename-icon" onclick="showRenamePopup('{{ file.path }}', '{{ file.relative_path }}', event)"></i>
     </li>
 {% endfor %}
 </ul>
 
+<!-- リネームポップアップ -->
+<div id="renamePopup" class="rename-popup">
+    <h4>ファイル名の変更</h4>
+    <input type="text" id="newNameInput">
+    <input type="hidden" id="currentPath">
+    <div>
+        <button class="ok" onclick="performRename()">OK</button>
+        <button class="cancel" onclick="hideRenamePopup()">キャンセル</button>
+    </div>
+</div>
+
 <script>
+// リネーム関連の関数
+function showRenamePopup(path, currentName, event) {
+    const popup = document.getElementById('renamePopup');
+    const input = document.getElementById('newNameInput');
+    const currentPathInput = document.getElementById('currentPath');
+    
+    // 現在のファイル名をセット
+    input.value = currentName.split('/').pop();
+    currentPathInput.value = path;
+    
+    // クリックされた要素の位置を取得
+    const iconRect = event.target.getBoundingClientRect();
+    const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
+    
+    // ポップアップの位置を設定
+    popup.style.left = (iconRect.right + 10) + 'px';
+    popup.style.top = (iconRect.top + scrollTop - 10) + 'px';
+    
+    // ポップアップを表示
+    popup.style.display = 'block';
+    
+    // 入力フィールドにフォーカス
+    input.focus();
+    input.select();
+    
+    // 画面外にはみ出す場合の調整
+    const popupRect = popup.getBoundingClientRect();
+    if (popupRect.right > window.innerWidth) {
+        popup.style.left = (iconRect.left - popup.offsetWidth - 10) + 'px';
+    }
+}
+
+function hideRenamePopup() {
+    document.getElementById('renamePopup').style.display = 'none';
+}
+
+function performRename() {
+    const newName = document.getElementById('newNameInput').value;
+    const oldPath = document.getElementById('currentPath').value;
+    
+    if (!newName) {
+        alert('新しい名前を入力してください');
+        return;
+    }
+    
+    fetch('/rename', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            old_path: oldPath,
+            new_name: newName
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.error) {
+            alert(data.error);
+        } else {
+            // リネーム成功後、ページをリロード
+            location.reload();
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('リネーム中にエラーが発生しました');
+    })
+    .finally(() => {
+        hideRenamePopup();
+    });
+}
+
 document.addEventListener('DOMContentLoaded', function() {
     console.log('DOMContentLoaded event fired');
+
+    // Enterキーでフォーム送信、ESCキーでキャンセル
+    document.getElementById('newNameInput').addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            performRename();
+        } else if (e.key === 'Escape') {
+            e.preventDefault();
+            hideRenamePopup();
+        }
+    });
+
+    // ポップアップ外クリックで閉じる
+    document.addEventListener('click', function(e) {
+        const popup = document.getElementById('renamePopup');
+        const isClickInside = popup.contains(e.target);
+        const isRenameIcon = e.target.classList.contains('rename-icon');
+        
+        if (!isClickInside && !isRenameIcon && popup.style.display === 'block') {
+            hideRenamePopup();
+        }
+    });
 
     // 初期フィルターの設定（HTMLのdata-filter属性から取得）
     const defaultFilter = document.querySelector('.filter-btn').dataset.filter;
