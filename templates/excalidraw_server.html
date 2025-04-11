@@ -986,7 +986,7 @@
                         : element.link;
 
                     // cmdまたはexplorerから始まる場合は、そのままのパスを使用
-                    if (link.startsWith('cmd ') || link.toLowerCase().startsWith('explorer ')) {
+                    if (link.startsWith('cmd ') || link.startsWith('pyenv ') || link.toLowerCase().startsWith('explorer ')) {
                         const viewPath = `/view/${link}`;
                         window.open(viewPath, '_blank', 'noopener,noreferrer');
                         return;

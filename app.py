@@ -122,6 +122,32 @@ def view_file(file_path):
     # if file_path.startswith('"') and file_path.endswith('"'):
     #     file_path = file_path[1:-1]
 
+    if file_path.startswith('pyenv '):
+        try:
+            script_path = file_path[6:]  # "cmd "の部分を除去
+            app.logger.info(f"実行するコマンド: {script_path}")
+            # 作業ディレクトリを指定
+            work_dir = r'F:\000_work\py_env\py3123-master'
+            # setenv.batを実行するためのコマンド
+            setenv_command = 'setenv.bat'
+            # Popenを使用してコマンドを非同期で実行
+            process = subprocess.Popen(
+                f'cmd /c "{setenv_command} && python {script_path}"',
+                cwd=work_dir,
+                shell=True
+            )
+            return render_template('view_file.html',
+                content=f"{script_path}を実行しました",
+                file_path=f"Command: {script_path}",
+                full_path="",
+                current_item="Command Execution")
+        except Exception as e:
+            return render_template('view_file.html',
+                content=f"Error executing command: {str(e)}",
+                file_path=f"Command: {script_path}",
+                full_path="",
+            current_item="Command Execution Error")
+
     # cmd コマンドの処理を追加
     if file_path.startswith('cmd '):
         try:
@@ -379,7 +405,7 @@ def open_in_code():
         else:
             # vscode_path = '/Applications/Visual Studio Code.app/Contents/Resources/app/bin/code'
             # vscode_path = '/Applications/Cursor.app/Contents/MacOS/Cursor'
-            vscode_path = '/Applications/Windsurf.app/Contents/MacOS/Electron'
+            vscode_path = '/Applications/CodeLLM.app/Contents/MacOS/Electron'
 
         if os.path.exists(vscode_path):
             # URLデコードを行う
