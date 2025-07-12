@@ -116,7 +116,39 @@ def load_files():
 @app.route('/view/', defaults={'file_path': ''})
 @app.route('/view/<path:file_path>')
 def view_file(file_path):
-    app.logger.info(f"view_file関数が呼び出されました。file_path: {repr(file_path)}")
+    """相対パスでファイルを表示"""
+    return handle_file_view(file_path, is_absolute=False)
+
+@app.route('/fullpath')
+def view_file_fullpath():
+    """
+    フルパスでファイルを表示
+    ルートディレクトリ内のファイルの場合は相対パスに変換して通常処理に回す
+    """
+    file_path = request.args.get('path', '')
+    if not file_path:
+        return render_template('view_file.html',
+                             content="フルパスが指定されていません。",
+                             file_path="Error",
+                             full_path="",
+                             current_item="Error")
+    
+    # パスを正規化
+    normalized_full_path = normalize_path(file_path)
+    normalized_base_dir = normalize_path(BASE_DIR)
+    
+    # フルパスがBASE_DIR内のファイルかチェック
+    if normalized_full_path.startswith(normalized_base_dir):
+        # BASE_DIR内のファイルの場合、相対パスに変換
+        relative_path = os.path.relpath(normalized_full_path, normalized_base_dir)
+        # 相対パス用の処理に回す
+        return handle_file_view(relative_path, is_absolute=False)
+    else:
+        # BASE_DIR外のファイルの場合、フルパス処理
+        return handle_file_view(file_path, is_absolute=True)
+
+def handle_file_view(file_path, is_absolute=False):
+    app.logger.info(f"handle_file_view関数が呼び出されました。file_path: {repr(file_path)}, is_absolute: {is_absolute}")
 
     # ダブルクォートで囲まれている場合、中身だけを取り出す
     # if file_path.startswith('"') and file_path.endswith('"'):
@@ -205,24 +237,42 @@ def view_file(file_path):
     # 既存のファイル処理コード
     depth = int(request.args.get('depth', 0))
 
-    # 末尾のスラッシュを削除
-    if file_path.endswith('/'):
-        return redirect(url_for('view_file', file_path=file_path.rstrip('/')))
-
-    # file_pathが空の場合、ルートディレクトリを表示
-    if not file_path:
-        full_path = BASE_DIR
-        current_item = 'Root'
-    else:
-        file_path = file_path.lstrip('/')
-        full_path = normalize_path(os.path.join(BASE_DIR, file_path))
-        if full_path.find(net_work_drive) != -1:
-            full_path = full_path.split(net_work_drive)[1]
-            full_path = f"\\\\{net_work_drive}" + full_path
-            full_path = full_path.replace('/', '\\')
+    # パス処理の分岐
+    if is_absolute:
+        # フルパスの場合
+        full_path = normalize_path(file_path)
+        
+        # セキュリティチェック: 危険なパスを拒否
+        if '..' in file_path or file_path.startswith('~'):
+            return render_template('view_file.html',
+                                 content="セキュリティ上の理由により、このパスはアクセスできません。",
+                                 file_path=file_path,
+                                 full_path="",
+                                 current_item="Security Error")
+        
         file_name = os.path.basename(file_path)
         folder_name = os.path.basename(os.path.dirname(file_path))
         current_item = f"{file_name} - {folder_name}" if folder_name else file_name
+    else:
+        # 相対パスの場合（既存の処理）
+        # 末尾のスラッシュを削除
+        if file_path.endswith('/'):
+            return redirect(url_for('view_file', file_path=file_path.rstrip('/')))
+
+        # file_pathが空の場合、ルートディレクトリを表示
+        if not file_path:
+            full_path = BASE_DIR
+            current_item = 'Root'
+        else:
+            file_path = file_path.lstrip('/')
+            full_path = normalize_path(os.path.join(BASE_DIR, file_path))
+            if full_path.find(net_work_drive) != -1:
+                full_path = full_path.split(net_work_drive)[1]
+                full_path = f"\\\\{net_work_drive}" + full_path
+                full_path = full_path.replace('/', '\\')
+            file_name = os.path.basename(file_path)
+            folder_name = os.path.basename(os.path.dirname(file_path))
+            current_item = f"{file_name} - {folder_name}" if folder_name else file_name
 
     app.logger.info(f"full_path: {full_path}")
 
@@ -255,19 +305,36 @@ def view_file(file_path):
     # ディレクトリの場合
     if os.path.isdir(full_path):
         app.logger.info(f"ディレクトリを表示します: {full_path}")
-        folders, files = get_items_with_depth(full_path, depth, file_path)
-        parent_path = os.path.dirname(file_path) if file_path != '' else None
-        return render_template('directory_view.html', folders=folders, files=files, current_path=file_path, parent_path=parent_path, full_path=full_path, depth=depth, current_item=current_item)
+        if is_absolute:
+            # フルパスの場合のディレクトリ表示
+            folders, files = get_items_with_depth_absolute(full_path, depth)
+            parent_path = os.path.dirname(file_path) if file_path != '' else None
+            return render_template('directory_view_absolute.html', 
+                                 folders=folders, files=files, 
+                                 current_path=file_path, parent_path=parent_path, 
+                                 full_path=full_path, depth=depth, 
+                                 current_item=current_item, is_absolute=True)
+        else:
+            # 相対パスの場合（既存の処理）
+            folders, files = get_items_with_depth(full_path, depth, file_path)
+            parent_path = os.path.dirname(file_path) if file_path != '' else None
+            return render_template('directory_view.html', 
+                                 folders=folders, files=files, 
+                                 current_path=file_path, parent_path=parent_path, 
+                                 full_path=full_path, depth=depth, 
+                                 current_item=current_item)
 
     # ファイルの場合
     file_extension = os.path.splitext(full_path)[1].lower()
     base_name = os.path.basename(full_path).lower()
     
     # Excalidrawファイルの場合
-    # if (file_extension == '.excalidraw' or 
-    #     base_name.endswith('.excalidraw.svg') or 
-    #     base_name.endswith('.excalidraw.png')):
-    #     return excalidraw(file_path)
+    if (file_extension == '.excalidraw' or 
+        base_name.endswith('.excalidraw.svg') or 
+        base_name.endswith('.excalidraw.png')):
+        # Excalidrawエディタにリダイレクト
+        excalidraw_url = f"http://localhost:3001/?filepath={full_path}"
+        return redirect(excalidraw_url)
     
     # MIMEタイプを得
     mime_type, _ = mimetypes.guess_type(full_path)
@@ -703,6 +770,56 @@ def get_items_with_depth(root_path, depth, current_path):
 
     folders.sort(key=lambda x: x['relative_path'].lower())
     files.sort(key=lambda x: x['relative_path'].lower())
+    return folders, files
+
+def get_items_with_depth_absolute(root_path, depth):
+    """フルパス用のディレクトリ項目取得関数"""
+    folders = []
+    files = []
+    
+    try:
+        for dirpath, dirnames, filenames in os.walk(root_path):
+            relative_path = os.path.relpath(dirpath, root_path)
+            if relative_path == '.':
+                current_depth = 0
+            else:
+                current_depth = len(relative_path.split(os.sep))
+
+            if current_depth > depth:
+                dirnames[:] = []  # これ以上深いディレクトリは探索しない
+                continue
+
+            if current_depth == depth:
+                for dirname in dirnames:
+                    full_dir_path = os.path.join(dirpath, dirname)
+                    folders.append({
+                        'is_dir': True,
+                        'path': normalize_path(full_dir_path),  # フルパスを使用
+                        'relative_path': normalize_path(dirname),
+                        'name': dirname
+                    })
+                
+            if current_depth <= depth:
+                for filename in filenames:
+                    full_file_path = os.path.join(dirpath, filename)
+                    files.append({
+                        'is_dir': False,
+                        'path': normalize_path(full_file_path),  # フルパスを使用
+                        'relative_path': normalize_path(filename),
+                        'name': filename
+                    })
+
+            if current_depth == 0 and depth == 0:
+                break  # 現在のフォルダのみ処理
+
+        folders.sort(key=lambda x: x['name'].lower())
+        files.sort(key=lambda x: x['name'].lower())
+        
+    except PermissionError:
+        app.logger.warning(f"Permission denied accessing directory: {root_path}")
+    except Exception as e:
+        app.logger.error(f"Error listing directory {root_path}: {str(e)}")
+    
     return folders, files
 
 @app.route('/get_filtered_items/<path:file_path>')
