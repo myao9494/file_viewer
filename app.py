@@ -2,6 +2,7 @@ import os,re
 # import fnmatch
 import platform
 from flask import Flask, render_template, request, send_file, abort, url_for, Response, send_from_directory, jsonify, redirect, flash, session
+from flask_cors import CORS
 # import re
 import csv
 from utils.file_handler import get_file_content, get_file_list
@@ -36,6 +37,11 @@ if platform.system() == "Windows":
 
 
 app = Flask(__name__, static_folder='static')
+
+# CORS設定を追加
+# CORS(app, origins=['http://localhost:3001'])
+CORS(app, origins=['*'])
+# 
 
 # 以下を追加
 app.config['STATIC_URL_PATH'] = '/static'

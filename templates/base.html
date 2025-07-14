@@ -311,32 +311,18 @@
     }
 
     function openExcalidraw() {
-        const currentPath = window.location.pathname;
-        let currentDir = '';
-
-        // /view/または/excalidraw-server/からのパスを取得
-        if (currentPath.startsWith('/view/') || currentPath.startsWith('/excalidraw-server/')) {
-            const prefix = currentPath.startsWith('/view/') ? '/view/' : '/excalidraw-server/';
-            const filePath = currentPath.substring(prefix.length);
-            
-            // ファイルかフォルダかを判断
-            const isFile = filePath.split('/').pop().includes('.');
-            if (isFile) {
-                // ファイルの場合は、親ディレクトリを取得
-                currentDir = filePath.split('/').slice(0, -1).join('/');
-            } else {
-                // フォルダの場合は、そのままのパスを使用
-                currentDir = filePath;
-            }
-        }
-
         // ファイル名を入力するダイアログを表示
         const fileName = prompt('新しい図の名前を入力してください（.excalidraw は自動的に追加されます）:');
         
         if (fileName) {
-            // サーバーにファイル作成をリクエストせずに直接URLを構築
-            const filePath = currentDir ? `${currentDir}/${fileName}` : fileName;
-            window.location.href = `/excalidraw-server/${filePath}.excalidraw`;
+            // 現在のフォルダのフルパスを取得
+            const currentFullPath = '{{ full_path | trim }}';
+            
+            // URLを作成: http://localhost:3001/?filepath={現在のフォルダのフルパス}/{入力されたファイル名}.excalidraw
+            const excalidrawUrl = `http://localhost:3001/?filepath=${currentFullPath}/${fileName}.excalidraw`;
+            
+            // 新しいウィンドウで開く
+            window.open(excalidrawUrl, '_blank');
         }
     }
 
