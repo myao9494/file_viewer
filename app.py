@@ -2,7 +2,7 @@ import os,re
 # import fnmatch
 import platform
 from flask import Flask, render_template, request, send_file, abort, url_for, Response, send_from_directory, jsonify, redirect, flash, session
-from flask_cors import CORS
+# from flask_cors import CORS  # オフライン環境では使用不可のためコメントアウト
 # import re
 import csv
 from utils.file_handler import get_file_content, get_file_list
@@ -38,10 +38,36 @@ if platform.system() == "Windows":
 
 app = Flask(__name__, static_folder='static')
 
-# CORS設定を追加
-# CORS(app, origins=['http://localhost:3001'])
-CORS(app, origins=['*'])
-# 
+# CORS設定を手動で実装
+# セキュリティを考慮しない個人利用のため、すべてのオリジンからのアクセスを許可
+@app.after_request
+def after_request(response):
+    # すべてのオリジンからのアクセスを許可
+    response.headers.add('Access-Control-Allow-Origin', '*')
+    
+    # 許可するHTTPメソッドを指定
+    response.headers.add('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS')
+    
+    # 許可するヘッダーを指定
+    response.headers.add('Access-Control-Allow-Headers', 'Content-Type, Authorization')
+    
+    # プリフライトリクエストの結果をキャッシュする時間（秒）
+    response.headers.add('Access-Control-Max-Age', '3600')
+    
+    return response
+
+# OPTIONSリクエストとセッション管理を統合した関数
+@app.before_request
+def before_request():
+    if request.method == 'OPTIONS':
+        # OPTIONSリクエストの場合、after_requestでCORSヘッダーが設定されるため
+        # ここではヘッダーを設定せずに空のレスポンスを返す
+        response = jsonify({'message': 'OK'})
+        return response
+    
+    global BASE_DIR
+    # セッションからBASE_DIRを取得（存在しない場合はデフォルト値を使用）
+    BASE_DIR = session.get('BASE_DIR', BASE_DIR)
 
 # 以下を追加
 app.config['STATIC_URL_PATH'] = '/static'
@@ -864,11 +890,7 @@ def set_base_dir():
     else:
         return jsonify({'success': False, 'message': '無効なディレクトリパスです。'})
 
-@app.before_request
-def before_request():
-    global BASE_DIR
-    # セッションからBASE_DIRを取得（存在しない場合はデフォルト値を使用）
-    BASE_DIR = session.get('BASE_DIR', BASE_DIR)
+# 既存のbefore_requestは上記のsetup_sessionに統合済み
 
 @app.route('/open-jupyter', methods=['POST'])
 def open_jupyter():
