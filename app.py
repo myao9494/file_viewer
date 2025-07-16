@@ -282,6 +282,18 @@ def handle_file_view(file_path, is_absolute=False):
                                  full_path="",
                                  current_item="Security Error")
         
+        # Windowsネットワークドライブの処理を追加
+        if IS_WINDOWS and ('\\\\' in file_path or '//' in file_path):
+            # UNCパス（\\server\share）の場合
+            full_path = file_path.replace('/', '\\')
+            app.logger.info(f"Windowsネットワークパス処理: {full_path}")
+        elif full_path.find(net_work_drive) != -1:
+            # ネットワークドライブ名が含まれる場合
+            full_path = full_path.split(net_work_drive)[1]
+            full_path = f"\\\\{net_work_drive}" + full_path
+            full_path = full_path.replace('/', '\\')
+            app.logger.info(f"ネットワークドライブ変換: {full_path}")
+        
         file_name = os.path.basename(file_path)
         folder_name = os.path.basename(os.path.dirname(file_path))
         current_item = f"{file_name} - {folder_name}" if folder_name else file_name
