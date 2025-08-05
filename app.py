@@ -157,7 +157,51 @@ def view_file_fullpath():
     フルパスでファイルを表示
     ルートディレクトリ内のファイルの場合は相対パスに変換して通常処理に回す
     """
+    # 生のクエリ文字列から直接取得
+    raw_query = request.query_string.decode('utf-8')
+    app.logger.info(f"[DEBUG] Raw query string: {raw_query}")
+    
     file_path = request.args.get('path', '')
+    
+    # URLデコード処理を明示的に実行（ダブルクォートを含む文字列に対応）
+    if file_path:
+        try:
+            # URLエンコードされた文字列をデコード
+            file_path = urllib.parse.unquote_plus(file_path)
+            # HTMLエンティティもデコード（&quot; -> "）
+            file_path = html.unescape(file_path)
+            app.logger.info(f"[DEBUG] Original path param: {request.args.get('path', '')}")
+            app.logger.info(f"[DEBUG] Decoded path: {file_path}")
+        except Exception as e:
+            app.logger.warning(f"Failed to decode path parameter: {e}")
+            # デコードに失敗した場合は元の値を使用
+    
+    # 生のクエリ文字列からpathパラメータを手動で抽出してみる
+    if not file_path or file_path.strip() == 'cmd':
+        try:
+            if 'path=' in raw_query:
+                # path=以降を取得
+                path_part = raw_query.split('path=', 1)[1]
+                app.logger.info(f"[DEBUG] Path part before split: {path_part}")
+                
+                # &quot; が含まれている場合は、通常の&による分割をスキップ
+                if '&quot;' in path_part:
+                    # &quot; を含む場合は全体を取得（他のパラメータがないと仮定）
+                    app.logger.info("[DEBUG] Found &quot; - taking entire path part")
+                else:
+                    # 他のパラメータがある場合は&で分割
+                    if '&' in path_part and not path_part.startswith('&'):
+                        path_part = path_part.split('&')[0]
+                        app.logger.info(f"[DEBUG] Split by &: {path_part}")
+                
+                app.logger.info(f"[DEBUG] Path part before decode: {path_part}")
+                # URLデコードとHTMLエンティティデコードを実行
+                file_path = urllib.parse.unquote_plus(path_part)
+                app.logger.info(f"[DEBUG] After URL decode: {file_path}")
+                file_path = html.unescape(file_path)
+                app.logger.info(f"[DEBUG] Manual extraction result: {file_path}")
+        except Exception as e:
+            app.logger.warning(f"Manual extraction failed: {e}")
     if not file_path:
         return render_template('view_file.html',
                              content="フルパスが指定されていません。",
@@ -353,7 +397,7 @@ def handle_file_view(file_path, is_absolute=False):
             # フルパスの場合のディレクトリ表示
             folders, files = get_items_with_depth_absolute(full_path, depth)
             parent_path = os.path.dirname(file_path) if file_path != '' else None
-            return render_template('directory_view_absolute.html', 
+            return render_template('directory_view.html', 
                                  folders=folders, files=files, 
                                  current_path=file_path, parent_path=parent_path, 
                                  full_path=full_path, depth=depth, 
