@@ -36,9 +36,53 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 IS_WINDOWS = platform.system() == 'Windows'
 
 # ベースディレクトリの設定
-mac_BASE_DIR = r"/Users/sudoupousei/000_work"
-win_BASE_DIR = r"C:\Users\kabu_server\000_work"
-BASE_DIR = Path(mac_BASE_DIR if not IS_WINDOWS else win_BASE_DIR)
+mac_BASE_DIR = Path("/Users/sudoupousei/000_work")
+
+
+def _get_windows_base_dir() -> Path:
+    """Resolve the working root on Windows from the current user profile."""
+    user_profile = os.environ.get("USERPROFILE")
+    if user_profile:
+        return Path(user_profile) / "000_work"
+    # Fallback to the home directory when USERPROFILE is unavailable
+    return Path.home() / "000_work"
+
+
+BASE_DIR = mac_BASE_DIR if not IS_WINDOWS else _get_windows_base_dir()
+WINDOWS_LEGACY_ROOT = Path(r"F:\000_work")
+
+
+def convert_legacy_windows_path(raw_path: Optional[str]) -> Optional[str]:
+    """Translate legacy F:\\ paths to the current user profile based root."""
+    if not raw_path or not IS_WINDOWS:
+        return raw_path
+
+    normalized = raw_path.replace("/", "\\")
+    legacy_prefix = str(WINDOWS_LEGACY_ROOT)
+
+    if normalized.lower().startswith(legacy_prefix.lower()):
+        suffix = normalized[len(legacy_prefix):].lstrip("\\/")
+        return str(BASE_DIR / Path(suffix))
+
+    return raw_path
+
+
+def normalize_request_path(raw_path: Optional[str]) -> Path:
+    """Return a path relative to BASE_DIR with legacy Windows paths handled."""
+    if not raw_path:
+        return Path()
+
+    translated = convert_legacy_windows_path(raw_path)
+    sanitized = translated.replace("\\", "/") if translated else ""
+    candidate = Path(sanitized)
+
+    if candidate.is_absolute():
+        try:
+            candidate = candidate.relative_to(BASE_DIR)
+        except ValueError:
+            raise HTTPException(status_code=400, detail="許可されていないパスです")
+
+    return candidate
 
 def normalize_path(path):
     """パスを正規化する関数"""
@@ -53,7 +97,8 @@ async def index(request: Request):
 async def get_files(path: str = ""):
     """ファイル一覧を取得"""
     try:
-        target_path = BASE_DIR / path if path else BASE_DIR
+        relative_path = normalize_request_path(path)
+        target_path = BASE_DIR / relative_path
         if not target_path.exists():
             raise HTTPException(status_code=404, detail="パスが見つかりません")
         
@@ -85,7 +130,8 @@ async def get_files(path: str = ""):
 async def get_file(file_path: str):
     """ファイルの内容を取得"""
     try:
-        full_path = BASE_DIR / file_path
+        relative_path = normalize_request_path(file_path)
+        full_path = BASE_DIR / relative_path
         if not full_path.exists():
             raise HTTPException(status_code=404, detail="ファイルが見つかりません")
         
@@ -111,7 +157,8 @@ async def upload_file(
     """ファイルをアップロード"""
     try:
         uploaded_files = []
-        upload_dir = BASE_DIR / current_path / "uploads"
+        current_relative_path = normalize_request_path(current_path)
+        upload_dir = BASE_DIR / current_relative_path / "uploads"
         upload_dir.mkdir(parents=True, exist_ok=True)
         
         for file in files:
@@ -138,7 +185,8 @@ async def upload_file(
 async def create_folder(data: dict):
     """フォルダを作成"""
     try:
-        folder_path = BASE_DIR / data["path"] / data["name"]
+        parent_relative = normalize_request_path(data.get("path", ""))
+        folder_path = BASE_DIR / parent_relative / data["name"]
         folder_path.mkdir(parents=True, exist_ok=True)
         return {"success": True, "path": str(folder_path.relative_to(BASE_DIR))}
     except Exception as e:
@@ -148,7 +196,8 @@ async def create_folder(data: dict):
 async def delete_item(data: dict):
     """ファイルまたはフォルダを削除"""
     try:
-        item_path = BASE_DIR / data["path"]
+        item_relative = normalize_request_path(data.get("path", ""))
+        item_path = BASE_DIR / item_relative
         if item_path.is_file():
             item_path.unlink()
         elif item_path.is_dir():
@@ -161,7 +210,9 @@ async def delete_item(data: dict):
 async def view_file(request: Request, file_path: str):
     """ファイルを表示"""
     try:
-        full_path = BASE_DIR / file_path
+        relative_path = normalize_request_path(file_path)
+        full_path = BASE_DIR / relative_path
+        display_path = str(relative_path)
         if not full_path.exists():
             raise HTTPException(status_code=404, detail="ファイルが見つかりません")
         
@@ -169,7 +220,7 @@ async def view_file(request: Request, file_path: str):
         if full_path.is_dir():
             return templates.TemplateResponse("directory_view.html", {
                 "request": request,
-                "path": file_path,
+                "path": display_path,
                 "full_path": full_path
             })
         else:
@@ -180,13 +231,13 @@ async def view_file(request: Request, file_path: str):
                 return templates.TemplateResponse("view_file.html", {
                     "request": request,
                     "content": content,
-                    "file_path": file_path,
+                    "file_path": display_path,
                     "full_path": full_path
                 })
             elif mime_type and mime_type.startswith('image/'):
                 return templates.TemplateResponse("image_view.html", {
                     "request": request,
-                    "file_path": file_path,
+                    "file_path": display_path,
                     "full_path": full_path
                 })
             else:

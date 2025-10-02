@@ -75,14 +75,43 @@ app.config['STATIC_URL_PATH'] = '/static'
 # OSの種類を判別
 IS_WINDOWS = platform.system() == 'Windows'
 
-# パスの区切り文字を統一する関数を追加import urllib.parse
+WINDOWS_LEGACY_ROOT = pathlib.PureWindowsPath(r"F:\000_work")
 
+
+def _get_windows_base_dir() -> pathlib.Path:
+    """Get the current working root for Windows environments."""
+    user_profile = os.environ.get("USERPROFILE")
+    if user_profile:
+        return pathlib.Path(user_profile) / "000_work"
+    return pathlib.Path.home() / "000_work"
+
+
+WINDOWS_BASE_DIR_PATH = _get_windows_base_dir()
+
+
+def _translate_legacy_windows_path(path_str: str) -> str:
+    """Translate legacy F:\\ paths to the new user profile based location."""
+    normalized = path_str.replace("/", "\\")
+    legacy_prefix = str(WINDOWS_LEGACY_ROOT)
+
+    if normalized.lower().startswith(legacy_prefix.lower()):
+        suffix = normalized[len(legacy_prefix):].lstrip("\\/")
+        translated = WINDOWS_BASE_DIR_PATH / pathlib.Path(suffix)
+        return str(translated)
+
+    return path_str
+
+
+# パスの区切り文字を統一する関数を追加
 def normalize_path(path):
-    # n_path = path.replace('\\', '/')
-    # n_path = os.path.normpath(path)
-    # n_path = path.replace("%5C","/")
-    n_path = pathlib.Path(path).as_posix()
-    return n_path
+    if path is None:
+        return None
+
+    path_str = str(path)
+    if IS_WINDOWS:
+        path_str = _translate_legacy_windows_path(path_str)
+
+    return pathlib.Path(path_str).as_posix()
 
 # グローバル変数としてBASE_DIRを定義
 global BASE_DIR
