@@ -1,4 +1,7 @@
 import os,re
+import logging
+import threading
+import signal
 # import fnmatch
 import platform
 from flask import Flask, render_template, request, send_file, abort, url_for, Response, send_from_directory, jsonify, redirect, flash, session
@@ -23,6 +26,7 @@ import zipfile
 import io
 import shutil
 from itertools import zip_longest  # この行を追加
+from typing import List, Dict, Any, Tuple, Optional
 # import pyperclip
 from PIL import Image
 from datetime import datetime
@@ -37,6 +41,12 @@ if platform.system() == "Windows":
 
 
 app = Flask(__name__, static_folder='static')
+
+# Server control defaults
+DEFAULT_HOST = os.environ.get('FILE_VIEWER_HOST', '0.0.0.0')
+DEFAULT_PORT = int(os.environ.get('FILE_VIEWER_PORT', '5001'))
+app.config['SERVER_HOST'] = DEFAULT_HOST
+app.config['SERVER_PORT'] = DEFAULT_PORT
 
 # CORS設定を手動で実装
 # セキュリティを考慮しない個人利用のため、すべてのオリジンからのアクセスを許可
@@ -74,6 +84,7 @@ app.config['STATIC_URL_PATH'] = '/static'
 
 # OSの種類を判別
 IS_WINDOWS = platform.system() == 'Windows'
+CREATE_NO_WINDOW = subprocess.CREATE_NO_WINDOW if IS_WINDOWS and hasattr(subprocess, 'CREATE_NO_WINDOW') else 0
 
 WINDOWS_LEGACY_ROOT = pathlib.PureWindowsPath(r"F:\000_work")
 
@@ -113,6 +124,136 @@ def normalize_path(path):
 
     return pathlib.Path(path_str).as_posix()
 
+
+def get_pids_for_port(port: int) -> List[int]:
+    """Return a sorted list of PIDs listening on or connected to the given TCP port."""
+    try:
+        if IS_WINDOWS:
+            result = subprocess.run(
+                ['netstat', '-ano'],
+                capture_output=True,
+                text=True,
+                creationflags=CREATE_NO_WINDOW if IS_WINDOWS else 0
+            )
+            if result.returncode not in (0, 1):
+                server_control_logger.warning('netstat returned non-zero exit code %s: %s', result.returncode, result.stderr.strip())
+            pids = set()
+            for line in result.stdout.splitlines():
+                if f":{port}" not in line:
+                    continue
+                tokens = line.split()
+                if len(tokens) < 5:
+                    continue
+                pid_token = tokens[-1]
+                if pid_token.isdigit():
+                    pids.add(int(pid_token))
+            return sorted(pids)
+        result = subprocess.run(
+            ['lsof', '-ti', f'tcp:{port}'],
+            capture_output=True,
+            text=True
+        )
+        pids = set()
+        for line in result.stdout.splitlines():
+            line = line.strip()
+            if line.isdigit():
+                pids.add(int(line))
+        return sorted(pids)
+    except FileNotFoundError:
+        server_control_logger.error('Required command not found while checking port %s', port)
+        return []
+    except Exception as exc:
+        server_control_logger.error('Failed to gather PIDs for port %s: %s', port, exc)
+        return []
+
+
+def is_port_in_use(port: int) -> bool:
+    return bool(get_pids_for_port(port))
+
+
+def terminate_pid(pid: int, force: bool = True) -> Tuple[bool, str]:
+    """Terminate a process by PID. Returns (success, message)."""
+    try:
+        if IS_WINDOWS:
+            cmd = ['taskkill', '/PID', str(pid)]
+            if force:
+                cmd.append('/F')
+            result = subprocess.run(
+                cmd,
+                capture_output=True,
+                text=True,
+                creationflags=CREATE_NO_WINDOW if IS_WINDOWS else 0
+            )
+            if result.returncode == 0:
+                return True, result.stdout.strip() or 'Terminated'
+            message = (result.stderr or result.stdout).strip()
+            if 'not found' in message.lower():
+                return True, message
+            return False, message
+        signal_to_use = signal.SIGKILL if force and hasattr(signal, 'SIGKILL') else signal.SIGTERM
+        os.kill(pid, signal_to_use)
+        return True, f'Sent signal {signal_to_use}'
+    except ProcessLookupError:
+        return True, 'Process already exited'
+    except PermissionError as exc:
+        return False, f'Permission denied: {exc}'
+    except Exception as exc:
+        return False, str(exc)
+
+
+def stop_processes_by_port(port: int) -> Dict[str, Any]:
+    """Stop all processes using the specified port and report the outcome."""
+    result: Dict[str, Any] = {
+        'requested_port': port,
+        'matched_pids': [],
+        'killed_pids': [],
+        'errors': [],
+        'self_shutdown': False,
+    }
+
+    pids = get_pids_for_port(port)
+    result['matched_pids'] = pids
+    if not pids:
+        return result
+
+    for pid in pids:
+        if pid == os.getpid():
+            result['self_shutdown'] = True
+            result['killed_pids'].append(pid)
+            continue
+
+        success, message = terminate_pid(pid)
+        if success:
+            result['killed_pids'].append(pid)
+            server_control_logger.info('Terminated PID %s on port %s: %s', pid, port, message)
+        else:
+            error_info = {'pid': pid, 'message': message}
+            result['errors'].append(error_info)
+            server_control_logger.error('Failed to terminate PID %s on port %s: %s', pid, port, message)
+
+    if not result['self_shutdown']:
+        time.sleep(0.2)
+        result['port_active_after_stop'] = is_port_in_use(port)
+    else:
+        # Current process will handle shutdown separately; port remains active until exit
+        result['port_active_after_stop'] = True
+
+    return result
+
+
+def schedule_application_shutdown(environ: dict, delay: float = 1.0) -> None:
+    def _shutdown():
+        time.sleep(delay)
+        shutdown_func = environ.get('werkzeug.server.shutdown')
+        server_control_logger.info('Invoking werkzeug shutdown callback: %s', bool(shutdown_func))
+        if shutdown_func:
+            shutdown_func()
+        else:
+            os._exit(0)
+
+    threading.Thread(target=_shutdown, daemon=True).start()
+
+
 # グローバル変数としてBASE_DIRを定義
 global BASE_DIR
 
@@ -129,6 +270,18 @@ win_TEMPLATE_FOLDER = r"F:\000_work\template_folder"
 TEMPLATE_FOLDER = normalize_path(mac_TEMPLATE_FOLDER if not IS_WINDOWS else win_TEMPLATE_FOLDER)
 
 app.jinja_env.globals['BASE_DIR'] = BASE_DIR
+app.jinja_env.globals['SERVER_PORT'] = DEFAULT_PORT
+
+SERVER_CONTROL_LOG_PATH = os.path.join(BASE_DIR, 'logs', 'server_control.log')
+os.makedirs(os.path.dirname(SERVER_CONTROL_LOG_PATH), exist_ok=True)
+server_control_logger = logging.getLogger('server_control')
+if not server_control_logger.handlers:
+    file_handler = logging.FileHandler(SERVER_CONTROL_LOG_PATH)
+    file_handler.setFormatter(logging.Formatter('%(asctime)s [%(levelname)s] %(message)s'))
+    server_control_logger.addHandler(file_handler)
+    server_control_logger.setLevel(logging.INFO)
+    server_control_logger.propagate = False
+
 # JupyterのベースURLを設定
 JUPYTER_BASE_URL =  'http://localhost:8888/lab/tree' 
 
@@ -738,6 +891,72 @@ def open_folder():
     except Exception as e:
         app.logger.error(f"エラーが発生しました: {str(e)}")
         return jsonify({'success': False, 'error': str(e)})
+
+
+def _parse_port_value(port_value) -> Tuple[bool, Optional[int], str]:
+    try:
+        port_int = int(port_value)
+        if not (0 < port_int < 65536):
+            raise ValueError
+        return True, port_int, ''
+    except (TypeError, ValueError):
+        return False, None, '無効なポート番号です。'
+
+
+@app.route('/stop', methods=['POST'])
+def stop_server_process():
+    payload = request.get_json(silent=True) or {}
+    port_value = payload.get('port', app.config.get('SERVER_PORT'))
+    valid, port, error_message = _parse_port_value(port_value)
+    if not valid:
+        return jsonify({'status': 'error', 'message': error_message, 'port': port_value}), 400
+
+    server_control_logger.info('Stop request received for port %s from %s', port, request.remote_addr)
+    result = stop_processes_by_port(port)
+    server_control_logger.info('Stop result: %s', result)
+
+    if not result['matched_pids']:
+        return jsonify({'status': 'not_found', 'message': '対象ポートで動作中のプロセスはありません。', 'port': port}), 404
+
+    response_payload = {
+        'status': 'stopped',
+        'port': port,
+        'killedPids': result['killed_pids'],
+        'errors': result['errors'],
+        'selfShutdown': result['self_shutdown'],
+        'portActive': result.get('port_active_after_stop', False)
+    }
+
+    if result['self_shutdown']:
+        response_payload['message'] = 'サーバーはまもなく停止します。'
+        schedule_application_shutdown(dict(request.environ), delay=1.0)
+    elif result.get('port_active_after_stop'):
+        response_payload['status'] = 'partial'
+        response_payload['message'] = 'ポートが引き続き使用中です。追加の手動対応が必要な可能性があります。'
+    else:
+        response_payload['message'] = 'ポートは解放されました。'
+
+    status_code = 200 if not result['errors'] and (result['self_shutdown'] or not result.get('port_active_after_stop', False)) else 207
+    return jsonify(response_payload), status_code
+
+
+@app.route('/status')
+def server_status():
+    port_value = request.args.get('port', app.config.get('SERVER_PORT'))
+    valid, port, error_message = _parse_port_value(port_value)
+    if not valid:
+        return jsonify({'status': 'error', 'message': error_message, 'port': port_value}), 400
+
+    pids = get_pids_for_port(port)
+    status_value = 'running' if pids else 'stopped'
+    response_payload = {
+        'status': status_value,
+        'port': port,
+        'pid': pids[0] if pids else None,
+        'pids': pids
+    }
+    server_control_logger.info('Status request for port %s returned %s (PIDs: %s)', port, status_value, pids)
+    return jsonify(response_payload)
 
 @app.route('/mindmap/<path:file_path>')
 def view_mindmap(file_path):
@@ -1933,6 +2152,23 @@ def rename_item():
         return jsonify({'error': str(e)}), 500
 
 if __name__ == '__main__':
+    import argparse
+
+    debug_env = os.environ.get('FILE_VIEWER_DEBUG', '1')
+    default_debug = debug_env.lower() not in ('0', 'false', 'no')
+
+    parser = argparse.ArgumentParser(description='File Viewer Web Application')
+    parser.add_argument('--host', default=DEFAULT_HOST, help='Bind host (default: %(default)s)')
+    parser.add_argument('--port', type=int, default=DEFAULT_PORT, help='Bind port (default: %(default)s)')
+    parser.add_argument('--debug', dest='debug', action='store_true', help='Enable debug mode')
+    parser.add_argument('--no-debug', dest='debug', action='store_false', help='Disable debug mode')
+    parser.set_defaults(debug=default_debug)
+
+    args = parser.parse_args()
+
     app.secret_key = 'your_secret_key_here'  # セッション用の秘密鍵
-    # デバッグモードでアプリケーションを実行
-    app.run(debug=True, host='0.0.0.0', port=5001)
+    app.config['SERVER_HOST'] = args.host
+    app.config['SERVER_PORT'] = args.port
+    app.jinja_env.globals['SERVER_PORT'] = args.port
+
+    app.run(debug=args.debug, host=args.host, port=args.port)
