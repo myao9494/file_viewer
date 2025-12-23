@@ -1595,6 +1595,59 @@ def get_markdown_content():
 def excalidraw_local():
     return render_template('excalidraw_local.html')
 
+@app.route('/open-obsidian', methods=['POST'])
+def open_obsidian():
+    """
+    パスから Vault 名とファイルパスを特定し、Obsidian URI で開く
+    """
+    data = request.json
+    file_path = data.get('path')
+    if not file_path:
+        return jsonify({'success': False, 'error': 'パスが指定されていません。'}), 400
+    
+    try:
+        # パスを正規化
+        normalized_path = normalize_path(file_path).replace('\\', '/')
+        
+        # パスの中から "obsidian" を含むディレクトリを探す
+        parts = normalized_path.split('/')
+        obsidian_idx = -1
+        for i, part in enumerate(parts):
+            if 'obsidian' in part.lower():
+                obsidian_idx = i
+                break
+        
+        if obsidian_idx == -1:
+            return jsonify({'success': False, 'error': 'パスに "obsidian" を含むディレクトリが見つかりません。'}), 400
+        
+        vault_name = parts[obsidian_idx]
+        # Vault以降のパスを特定 (例: 01_data/test.md)
+        # フォルダの場合は末尾に / を付けると Obsidian でフォルダが開く
+        relative_file_path = '/'.join(parts[obsidian_idx+1:])
+        if os.path.isdir(file_path) and relative_file_path and not relative_file_path.endswith('/'):
+            relative_file_path += '/'
+            
+        # Obsidian URI を構築
+        # 注意: relative_file_path は URL エンコードが必要
+        encoded_file = urllib.parse.quote(relative_file_path)
+        obsidian_uri = f"obsidian://open?vault={vault_name}&file={encoded_file}"
+        
+        app.logger.info(f"Opening Obsidian: {obsidian_uri}")
+        
+        if platform.system() == 'Darwin':  # macOS
+            subprocess.Popen(['open', obsidian_uri])
+        elif platform.system() == 'Windows':
+            # Windows の場合は start コマンドを使用
+            os.startfile(obsidian_uri)
+        else:
+            return jsonify({'success': False, 'error': 'サポートされていないOSです。'}), 500
+            
+        return jsonify({'success': True, 'uri': obsidian_uri})
+        
+    except Exception as e:
+        app.logger.error(f"Error opening Obsidian: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
 @app.route('/create-markdown', methods=['POST'])
 def create_markdown():
     """

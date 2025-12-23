@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="ja">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -8,7 +9,8 @@
     <!-- CSSファイルの読み込み: url_for関数を使用してFlaskのstatic_folderから取得 -->
     <link rel="stylesheet" href="{{ url_for('static', filename='css/common.css') }}">
     <!-- MathJax: 数式表示のためのJavaScriptライブラリ -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML" async></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML"
+        async></script>
     <!-- headブロック: 追加のhead要素をPythonコードから挿入可能 -->
     {% block head %}{% endblock %}
     <!-- ファビコンの追加 -->
@@ -31,11 +33,14 @@
             padding: 5px;
             border-radius: 3px;
         }
+
         .top-buttons {
             display: flex;
             gap: 5px;
         }
-        .top-buttons a, .top-buttons button {
+
+        .top-buttons a,
+        .top-buttons button {
             background: none;
             border: none;
             font-size: 16px;
@@ -49,11 +54,15 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            text-decoration: none;  /* リンクの下線を削除 */
+            text-decoration: none;
+            /* リンクの下線を削除 */
         }
-        .top-buttons a:hover, .top-buttons button:hover {
+
+        .top-buttons a:hover,
+        .top-buttons button:hover {
             background-color: rgba(0, 0, 0, 0.1);
         }
+
         .folder-path {
             flex-grow: 1;
             display: flex;
@@ -63,9 +72,11 @@
             overflow: hidden;
             text-overflow: ellipsis;
         }
+
         .container {
             padding-top: 40px;
         }
+
         .toast-container {
             position: fixed;
             top: 50px;
@@ -75,6 +86,7 @@
             flex-direction: column;
             gap: 10px;
         }
+
         .toast {
             min-width: 220px;
             max-width: 320px;
@@ -89,21 +101,26 @@
             transform: translateY(-10px);
             transition: opacity 0.3s ease, transform 0.3s ease;
         }
+
         .toast.show {
             opacity: 1;
             transform: translateY(0);
         }
+
         .toast.error {
             background-color: rgba(180, 20, 20, 0.9);
         }
+
         .toast.success {
             background-color: rgba(20, 120, 20, 0.9);
         }
+
         .toast.info {
             background-color: rgba(60, 60, 60, 0.9);
         }
     </style>
 </head>
+
 <body>
     <!-- ディレクトリ表示ボタンとクリップボードから開くボタンを含むコンテナ -->
     <div class="top-bar">
@@ -145,6 +162,9 @@
             <button id="statusServerBtn" title="ステータスを確認" onclick="promptStatusCheck()">
                 <i class="fas fa-info-circle"></i>
             </button>
+            <button id="openInObsidianBtn" title="Obsidianで開く" onclick="openInObsidian()" style="display: none;">
+                <i class="fas fa-gem"></i>
+            </button>
         </div>
         {% block folder_path %}{% endblock %}
     </div>
@@ -164,403 +184,437 @@
     <!-- JavaScriptファイルの読み込み: url_for関数を使用してFlaskのstatic_folderから取得 -->
     <script src="{{ url_for('static', filename='js/main.js') }}"></script>
     <div id="toastContainer" class="toast-container"></div>
-    
+
     <!-- ディレクトリ表示機能のためのJavaScript -->
     <script>
-    const defaultServerPort = {{ SERVER_PORT | default(5001) | int }};
-    const PORT_STORAGE_KEY = 'file_viewer_last_port';
+        const defaultServerPort = {{ SERVER_PORT | default (5001) | int }};
+        const PORT_STORAGE_KEY = 'file_viewer_last_port';
 
-    function getStoredPort(defaultPort) {
-        try {
-            const stored = localStorage.getItem(PORT_STORAGE_KEY);
-            if (stored !== null) {
-                const parsed = parseInt(stored, 10);
-                if (!Number.isNaN(parsed) && parsed > 0 && parsed < 65536) {
-                    return parsed;
+        function getStoredPort(defaultPort) {
+            try {
+                const stored = localStorage.getItem(PORT_STORAGE_KEY);
+                if (stored !== null) {
+                    const parsed = parseInt(stored, 10);
+                    if (!Number.isNaN(parsed) && parsed > 0 && parsed < 65536) {
+                        return parsed;
+                    }
                 }
+            } catch (error) {
+                console.warn('Failed to read stored port:', error);
             }
-        } catch (error) {
-            console.warn('Failed to read stored port:', error);
+            return defaultPort;
         }
-        return defaultPort;
-    }
 
-    function setStoredPort(port) {
-        try {
-            localStorage.setItem(PORT_STORAGE_KEY, String(port));
-        } catch (error) {
-            console.warn('Failed to store port:', error);
+        function setStoredPort(port) {
+            try {
+                localStorage.setItem(PORT_STORAGE_KEY, String(port));
+            } catch (error) {
+                console.warn('Failed to store port:', error);
+            }
         }
-    }
 
-    let lastUsedPort = getStoredPort(defaultServerPort);
+        let lastUsedPort = getStoredPort(defaultServerPort);
 
-    document.addEventListener('DOMContentLoaded', function() {
-        var showDirectoryBtn = document.getElementById('showDirectoryBtn');
-        var currentPath = window.location.pathname;
+        document.addEventListener('DOMContentLoaded', function () {
+            var showDirectoryBtn = document.getElementById('showDirectoryBtn');
+            var currentPath = window.location.pathname;
 
-        function updateHref() {
-            if (currentPath.startsWith('/view/') || currentPath.startsWith('/excalidraw-server/')) {
-                var prefix = currentPath.startsWith('/view/') ? '/view/' : '/excalidraw-server/';
-                var filePath = currentPath.substring(prefix.length);
-                
-                if (filePath) {
-                    var parentPath = filePath.split('/').slice(0, -1).join('/');
-                    showDirectoryBtn.href = '/view/' + parentPath;
+            function updateHref() {
+                if (currentPath.startsWith('/view/') || currentPath.startsWith('/excalidraw-server/')) {
+                    var prefix = currentPath.startsWith('/view/') ? '/view/' : '/excalidraw-server/';
+                    var filePath = currentPath.substring(prefix.length);
+
+                    if (filePath) {
+                        var parentPath = filePath.split('/').slice(0, -1).join('/');
+                        showDirectoryBtn.href = '/view/' + parentPath;
+                    } else {
+                        showDirectoryBtn.href = '/view';
+                    }
                 } else {
                     showDirectoryBtn.href = '/view';
                 }
+            }
+
+            updateHref();
+            checkObsidianVisibility();
+        });
+
+        function checkObsidianVisibility() {
+            const fullPath = '{{ full_path | trim }}'.toLowerCase();
+            const btn = document.getElementById('openInObsidianBtn');
+            if (fullPath.includes('obsidian')) {
+                btn.style.display = 'flex';
             } else {
-                showDirectoryBtn.href = '/view';
+                btn.style.display = 'none';
             }
         }
 
-        updateHref();
-    });
-
-    function openFromClipboard() {
-        navigator.clipboard.readText().then(function(clipText) {
-            // サーバーサイドでパスを正規化
-            fetch('/normalize-path', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ path: clipText })
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    openInViewer(data.normalized_path);
-                } else {
-                    alert('パスの正規化に失敗しました: ' + data.error);
-                }
-            })
-            .catch(error => {
-                console.error('エラー:', error);
-                alert('エラーが発生しました。');
-            });
-        }).catch(function(err) {
-            console.error('クリップボードからテキストを読み取れませんでした: ', err);
-            alert('クリップボードからテキストを読み取れませんでした。');
-        });
-    }
-
-    function openInViewer(path) {
-        // BASE_DIRを取得（サーバーから提供される必要があります）
-        const baseDir = '{{ BASE_DIR }}';
-        
-        // パスをBASE_DIRからの相対パスに変換
-        let relativePath = path;
-        if (path.startsWith(baseDir)) {
-            relativePath = path.slice(baseDir.length);
-        }
-        
-        // パスの先頭のスラッシュを削除
-        relativePath = relativePath.replace(/^[/\\]+/, '');
-        
-        // パスの各部分をエンコード
-        const encodedPath = relativePath.split('/').map(encodeURIComponent).join('/');
-        
-        // 新しいURLを生成して開く
-        const newUrl = `/view/${encodedPath}`;
-        window.location.href = newUrl;
-    }
-
-    function downloadItem(event) {
-        event.preventDefault();
-        var currentPath = window.location.pathname;
-        var isFile = currentPath.split('/').pop().includes('.');
-        
-        if (isFile) {
-            // ファイルの場合は直接ダウンロード
-            window.location.href = currentPath.replace('/view/', '/download/');
-        } else {
-            // フォルダ場合はアラートを表示
-            if (confirm('これはフォルダです。ZIPファイルとしてダウンロードしますか？')) {
-                window.location.href = currentPath.replace('/view/', '/download-zip/');
-            }
-        }
-    }
-
-    function openInVSCode() {
-        // var currentPath = window.location.pathname;
-        // var filePath = '';
-        
-        // if (currentPath.startsWith('/view/')) {
-        //     filePath = currentPath.substring(6);
-        // } else if (currentPath.startsWith('/excalidraw-server/')) {
-        //     filePath = currentPath.substring(18);
-        // }
-        
-        fetch('/open-in-code2', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            // body: JSON.stringify({ path: filePath })
-            body: JSON.stringify({ path: '{{ full_path | trim }}' }),
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                console.log('VSCodeで開きました');
-            } else {
-                alert('エラーが発生しました: ' + data.error);
-            }
-        })
-        .catch(error => {
-            console.error('エラー:', error);
-            alert('エラーが発生しました。');
-        });
-    }
-
-    function openInCode() {
-        fetch('/open-in-code', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ path: '{{ full_path | trim }}' }),
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                console.log('ファイルがCodeで開かれました。');
-            } else {
-                alert('エラーが発生しました: ' + data.error);
-            }
-        })
-        .catch((error) => {
-            console.error('Error:', error);
-            alert('エラーが発生しました。');
-        });
-    }
-
-    function openFolder() {
-        fetch('/open-folder', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ path: '{{ full_path | trim }}' }),
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                console.log('フォルダが開かれました。');
-            } else {
-                alert('エラーが発生しました: ' + data.error);
-            }
-        })
-        .catch((error) => {
-            console.error('Error:', error);
-            alert('エラーが発生しました。');
-        });
-    }
-
-    function openJupyter() {
-        fetch('/open-jupyter', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ path: '{{ full_path | trim }}' }),
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                console.log('Jupyterが新しいタブでかれました。');
-            } else {
-                alert('エラーが発生しました: ' + data.error);
-            }
-        })
-        .catch((error) => {
-            console.error('Error:', error);
-            alert('エラーが発生しました。');
-        });
-    }
-
-    function openExcalidraw() {
-        // ファイル名を入力するダイアログを表示
-        const fileName = prompt('新しい図の名前を入力してください（.excalidraw は自動的に追加されます）:');
-        
-        if (fileName) {
-            // 現在のフォルダのフルパスを取得
-            const currentFullPath = '{{ full_path | trim }}';
-            
-            // URLを作成: http://localhost:3001/?filepath={現在のフォルダのフルパス}/{入力されたファイル名}.excalidraw
-            const excalidrawUrl = `http://localhost:3001/?filepath=${currentFullPath}/${fileName}.excalidraw`;
-            
-            // 新しいウィンドウで開く
-            window.open(excalidrawUrl, '_blank');
-        }
-    }
-
-    function createMarkdown() {
-        const currentPath = window.location.pathname;
-        let currentDir = '';
-
-        // /view/からのパスを取得
-        if (currentPath.startsWith('/view/')) {
-            const filePath = currentPath.substring(6);
-            
-            // ファイルかフォルダかを判断
-            const isFile = filePath.split('/').pop().includes('.');
-            if (isFile) {
-                // ファイルの場合は、親ディレクトリを取得
-                currentDir = filePath.split('/').slice(0, -1).join('/');
-            } else {
-                // フォルダの場合は、そのままのパスを使用
-                currentDir = filePath;
-            }
-        }
-
-        // ファイル名を入力するダイアログを表示
-        const fileName = prompt('新しいMarkdownファイルの名前を入力してください（.md は自動的に追加されます）:');
-        
-        if (fileName) {
-            // 拡張子を追加
-            const fullFileName = fileName.endsWith('.md') ? fileName : `${fileName}.md`;
-                
-            // サーバーにファイル作成をリクエスト
-            fetch('/create-markdown', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    directory: currentDir,
-                    filename: fullFileName
+        function openFromClipboard() {
+            navigator.clipboard.readText().then(function (clipText) {
+                // サーバーサイドでパスを正規化
+                fetch('/normalize-path', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ path: clipText })
                 })
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    // 作成されたファイルを表示
-                    window.location.href = `/view/${data.file_path}`;
-                } else {
-                    alert('エラーが発生しました: ' + data.error);
-                }
-            })
-            .catch(error => {
-                console.error('Error:', error);
-                alert('エラーが発生しました。');
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            openInViewer(data.normalized_path);
+                        } else {
+                            alert('パスの正規化に失敗しました: ' + data.error);
+                        }
+                    })
+                    .catch(error => {
+                        console.error('エラー:', error);
+                        alert('エラーが発生しました。');
+                    });
+            }).catch(function (err) {
+                console.error('クリップボードからテキストを読み取れませんでした: ', err);
+                alert('クリップボードからテキストを読み取れませんでした。');
             });
         }
-    }
 
-    function promptServerStop() {
-        const input = prompt('対象ポート番号を入力してください（停止）:', lastUsedPort);
-        if (input === null) {
-            return;
-        }
-        const port = parseInt(input, 10);
-        if (!Number.isInteger(port) || port <= 0 || port >= 65536) {
-            showToast('ポート番号が無効です。', 'error');
-            return;
-        }
-        lastUsedPort = port;
-        setStoredPort(port);
-        sendServerAction('stop', port);
-    }
+        function openInViewer(path) {
+            // BASE_DIRを取得（サーバーから提供される必要があります）
+            const baseDir = '{{ BASE_DIR }}';
 
-    function promptStatusCheck() {
-        const input = prompt('ステータスを確認するポート番号を入力してください:', lastUsedPort);
-        if (input === null) {
-            return;
-        }
-        const port = parseInt(input, 10);
-        if (!Number.isInteger(port) || port <= 0 || port >= 65536) {
-            showToast('ポート番号が無効です。', 'error');
-            return;
+            // パスをBASE_DIRからの相対パスに変換
+            let relativePath = path;
+            if (path.startsWith(baseDir)) {
+                relativePath = path.slice(baseDir.length);
+            }
+
+            // パスの先頭のスラッシュを削除
+            relativePath = relativePath.replace(/^[/\\]+/, '');
+
+            // パスの各部分をエンコード
+            const encodedPath = relativePath.split('/').map(encodeURIComponent).join('/');
+
+            // 新しいURLを生成して開く
+            const newUrl = `/view/${encodedPath}`;
+            window.location.href = newUrl;
         }
 
-        lastUsedPort = port;
-        setStoredPort(port);
+        function downloadItem(event) {
+            event.preventDefault();
+            var currentPath = window.location.pathname;
+            var isFile = currentPath.split('/').pop().includes('.');
 
-        fetch(`/status?port=${port}`)
-            .then(async response => {
-                const data = await response.json().catch(() => ({ status: 'error', message: 'レスポンスの解析に失敗しました。' }));
-                if (!response.ok || data.status === 'error') {
-                    showToast(data.message || 'ステータス取得に失敗しました。', 'error');
-                    return;
+            if (isFile) {
+                // ファイルの場合は直接ダウンロード
+                window.location.href = currentPath.replace('/view/', '/download/');
+            } else {
+                // フォルダ場合はアラートを表示
+                if (confirm('これはフォルダです。ZIPファイルとしてダウンロードしますか？')) {
+                    window.location.href = currentPath.replace('/view/', '/download-zip/');
                 }
-                const pidInfo = data.pid ? `PID: ${data.pid}` : 'PID情報なし';
-                const type = data.status === 'running' ? 'success' : (data.status === 'stopped' ? 'info' : 'error');
-                showToast(`ポート${data.port}: ${data.status} (${pidInfo})`, type);
+            }
+        }
+
+        function openInVSCode() {
+            // var currentPath = window.location.pathname;
+            // var filePath = '';
+
+            // if (currentPath.startsWith('/view/')) {
+            //     filePath = currentPath.substring(6);
+            // } else if (currentPath.startsWith('/excalidraw-server/')) {
+            //     filePath = currentPath.substring(18);
+            // }
+
+            fetch('/open-in-code2', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                // body: JSON.stringify({ path: filePath })
+                body: JSON.stringify({ path: '{{ full_path | trim }}' }),
             })
-            .catch(() => showToast('通信エラーが発生しました。', 'error'));
-    }
-
-    function sendServerAction(action, port) {
-        fetch(`/${action}`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ port })
-        })
-        .then(async response => {
-            const data = await response.json().catch(() => ({ status: 'error', message: 'レスポンスの解析に失敗しました。' }));
-            handleServerResponse(action, data, response.ok);
-        })
-        .catch(() => {
-            showToast('通信エラーが発生しました。', 'error');
-        });
-    }
-
-    function handleServerResponse(action, data, ok) {
-        if (!ok || data.status === 'error') {
-            showToast(data.message || '操作に失敗しました。', 'error');
-            return;
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        console.log('VSCodeで開きました');
+                    } else {
+                        alert('エラーが発生しました: ' + data.error);
+                    }
+                })
+                .catch(error => {
+                    console.error('エラー:', error);
+                    alert('エラーが発生しました。');
+                });
         }
 
-        if (Number.isInteger(data.port)) {
-            lastUsedPort = data.port;
-            setStoredPort(data.port);
+        function openInCode() {
+            fetch('/open-in-code', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ path: '{{ full_path | trim }}' }),
+            })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        console.log('ファイルがCodeで開かれました。');
+                    } else {
+                        alert('エラーが発生しました: ' + data.error);
+                    }
+                })
+                .catch((error) => {
+                    console.error('Error:', error);
+                    alert('エラーが発生しました。');
+                });
         }
 
-        const pidInfo = Array.isArray(data.killedPids) && data.killedPids.length ? ` (PID: ${data.killedPids.join(', ')})` : '';
-        const message = data.message || '停止しました。';
-        const toastType = data.status === 'stopped' ? 'success' : (data.status === 'partial' ? 'error' : 'info');
-
-        showToast(`ポート${data.port}: ${message}${pidInfo}`, toastType);
-
-        if (data.errors && data.errors.length) {
-            console.warn('Server action completed with errors:', data.errors);
+        function openFolder() {
+            fetch('/open-folder', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ path: '{{ full_path | trim }}' }),
+            })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        console.log('フォルダが開かれました。');
+                    } else {
+                        alert('エラーが発生しました: ' + data.error);
+                    }
+                })
+                .catch((error) => {
+                    console.error('Error:', error);
+                    alert('エラーが発生しました。');
+                });
         }
-    }
 
-    function showToast(message, type = 'info') {
-        const container = document.getElementById('toastContainer');
-        if (!container) {
-            alert(message);
-            return;
+        function openJupyter() {
+            fetch('/open-jupyter', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ path: '{{ full_path | trim }}' }),
+            })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        console.log('Jupyterが新しいタブでかれました。');
+                    } else {
+                        alert('エラーが発生しました: ' + data.error);
+                    }
+                })
+                .catch((error) => {
+                    console.error('Error:', error);
+                    alert('エラーが発生しました。');
+                });
         }
 
-        const toast = document.createElement('div');
-        toast.className = 'toast';
-        if (type === 'success') {
-            toast.classList.add('success');
-        } else if (type === 'error') {
-            toast.classList.add('error');
-        } else if (type === 'info') {
-            toast.classList.add('info');
+        function openInObsidian() {
+            fetch('/open-obsidian', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ path: '{{ full_path | trim }}' }),
+            })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        console.log('Obsidianで開きました: ' + data.uri);
+                    } else {
+                        alert('エラーが発生しました: ' + data.error);
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('エラーが発生しました。');
+                });
         }
-        toast.textContent = message;
-        container.appendChild(toast);
 
-        requestAnimationFrame(() => {
-            toast.classList.add('show');
-        });
+        function openExcalidraw() {
+            // ファイル名を入力するダイアログを表示
+            const fileName = prompt('新しい図の名前を入力してください（.excalidraw は自動的に追加されます）:');
 
-        setTimeout(() => {
-            toast.classList.remove('show');
-            setTimeout(() => toast.remove(), 300);
-        }, 4000);
-    }
+            if (fileName) {
+                // 現在のフォルダのフルパスを取得
+                const currentFullPath = '{{ full_path | trim }}';
+
+                // URLを作成: http://localhost:3001/?filepath={現在のフォルダのフルパス}/{入力されたファイル名}.excalidraw
+                const excalidrawUrl = `http://localhost:3001/?filepath=${currentFullPath}/${fileName}.excalidraw`;
+
+                // 新しいウィンドウで開く
+                window.open(excalidrawUrl, '_blank');
+            }
+        }
+
+        function createMarkdown() {
+            const currentPath = window.location.pathname;
+            let currentDir = '';
+
+            // /view/からのパスを取得
+            if (currentPath.startsWith('/view/')) {
+                const filePath = currentPath.substring(6);
+
+                // ファイルかフォルダかを判断
+                const isFile = filePath.split('/').pop().includes('.');
+                if (isFile) {
+                    // ファイルの場合は、親ディレクトリを取得
+                    currentDir = filePath.split('/').slice(0, -1).join('/');
+                } else {
+                    // フォルダの場合は、そのままのパスを使用
+                    currentDir = filePath;
+                }
+            }
+
+            // ファイル名を入力するダイアログを表示
+            const fileName = prompt('新しいMarkdownファイルの名前を入力してください（.md は自動的に追加されます）:');
+
+            if (fileName) {
+                // 拡張子を追加
+                const fullFileName = fileName.endsWith('.md') ? fileName : `${fileName}.md`;
+
+                // サーバーにファイル作成をリクエスト
+                fetch('/create-markdown', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        directory: currentDir,
+                        filename: fullFileName
+                    })
+                })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            // 作成されたファイルを表示
+                            window.location.href = `/view/${data.file_path}`;
+                        } else {
+                            alert('エラーが発生しました: ' + data.error);
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error:', error);
+                        alert('エラーが発生しました。');
+                    });
+            }
+        }
+
+        function promptServerStop() {
+            const input = prompt('対象ポート番号を入力してください（停止）:', lastUsedPort);
+            if (input === null) {
+                return;
+            }
+            const port = parseInt(input, 10);
+            if (!Number.isInteger(port) || port <= 0 || port >= 65536) {
+                showToast('ポート番号が無効です。', 'error');
+                return;
+            }
+            lastUsedPort = port;
+            setStoredPort(port);
+            sendServerAction('stop', port);
+        }
+
+        function promptStatusCheck() {
+            const input = prompt('ステータスを確認するポート番号を入力してください:', lastUsedPort);
+            if (input === null) {
+                return;
+            }
+            const port = parseInt(input, 10);
+            if (!Number.isInteger(port) || port <= 0 || port >= 65536) {
+                showToast('ポート番号が無効です。', 'error');
+                return;
+            }
+
+            lastUsedPort = port;
+            setStoredPort(port);
+
+            fetch(`/status?port=${port}`)
+                .then(async response => {
+                    const data = await response.json().catch(() => ({ status: 'error', message: 'レスポンスの解析に失敗しました。' }));
+                    if (!response.ok || data.status === 'error') {
+                        showToast(data.message || 'ステータス取得に失敗しました。', 'error');
+                        return;
+                    }
+                    const pidInfo = data.pid ? `PID: ${data.pid}` : 'PID情報なし';
+                    const type = data.status === 'running' ? 'success' : (data.status === 'stopped' ? 'info' : 'error');
+                    showToast(`ポート${data.port}: ${data.status} (${pidInfo})`, type);
+                })
+                .catch(() => showToast('通信エラーが発生しました。', 'error'));
+        }
+
+        function sendServerAction(action, port) {
+            fetch(`/${action}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ port })
+            })
+                .then(async response => {
+                    const data = await response.json().catch(() => ({ status: 'error', message: 'レスポンスの解析に失敗しました。' }));
+                    handleServerResponse(action, data, response.ok);
+                })
+                .catch(() => {
+                    showToast('通信エラーが発生しました。', 'error');
+                });
+        }
+
+        function handleServerResponse(action, data, ok) {
+            if (!ok || data.status === 'error') {
+                showToast(data.message || '操作に失敗しました。', 'error');
+                return;
+            }
+
+            if (Number.isInteger(data.port)) {
+                lastUsedPort = data.port;
+                setStoredPort(data.port);
+            }
+
+            const pidInfo = Array.isArray(data.killedPids) && data.killedPids.length ? ` (PID: ${data.killedPids.join(', ')})` : '';
+            const message = data.message || '停止しました。';
+            const toastType = data.status === 'stopped' ? 'success' : (data.status === 'partial' ? 'error' : 'info');
+
+            showToast(`ポート${data.port}: ${message}${pidInfo}`, toastType);
+
+            if (data.errors && data.errors.length) {
+                console.warn('Server action completed with errors:', data.errors);
+            }
+        }
+
+        function showToast(message, type = 'info') {
+            const container = document.getElementById('toastContainer');
+            if (!container) {
+                alert(message);
+                return;
+            }
+
+            const toast = document.createElement('div');
+            toast.className = 'toast';
+            if (type === 'success') {
+                toast.classList.add('success');
+            } else if (type === 'error') {
+                toast.classList.add('error');
+            } else if (type === 'info') {
+                toast.classList.add('info');
+            }
+            toast.textContent = message;
+            container.appendChild(toast);
+
+            requestAnimationFrame(() => {
+                toast.classList.add('show');
+            });
+
+            setTimeout(() => {
+                toast.classList.remove('show');
+                setTimeout(() => toast.remove(), 300);
+            }, 4000);
+        }
     </script>
     {% block scripts %}{% endblock %}
 </body>
+
 </html>
