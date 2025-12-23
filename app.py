@@ -606,7 +606,8 @@ def handle_file_view(file_path, is_absolute=False):
     # Excalidrawファイルの場合
     if (file_extension == '.excalidraw' or 
         base_name.endswith('.excalidraw.svg') or 
-        base_name.endswith('.excalidraw.png')):
+        base_name.endswith('.excalidraw.png') or
+        base_name.endswith('.excalidraw.md')):
         # Excalidrawエディタにリダイレクト
         excalidraw_url = f"http://localhost:3001/?filepath={full_path}"
         return redirect(excalidraw_url)
@@ -747,7 +748,8 @@ def open_in_code():
         else:
             # vscode_path = '/Applications/Visual Studio Code.app/Contents/Resources/app/bin/code'
             # vscode_path = '/Applications/Cursor.app/Contents/MacOS/Cursor'
-            vscode_path = '/Applications/CodeLLM.app/Contents/MacOS/Electron'
+            # vscode_path = '/Applications/CodeLLM.app/Contents/MacOS/Electron'
+            vscode_path = '/Applications/Antigravity.app/Contents/MacOS/Electron'
 
         if os.path.exists(vscode_path):
             # URLデコードを行う
