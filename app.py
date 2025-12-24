@@ -608,9 +608,12 @@ def handle_file_view(file_path, is_absolute=False):
         base_name.endswith('.excalidraw.svg') or 
         base_name.endswith('.excalidraw.png') or
         base_name.endswith('.excalidraw.md')):
-        # Excalidrawエディタにリダイレクト
+        # Excalidrawエディタを別タブで開く
         excalidraw_url = f"http://localhost:3001/?filepath={full_path}"
-        return redirect(excalidraw_url)
+        return render_template('open_new_tab.html', 
+                             target_url=excalidraw_url, 
+                             file_path=file_path,
+                             current_item=current_item)
     
     # MIMEタイプを得
     mime_type, _ = mimetypes.guess_type(full_path)
